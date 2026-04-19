@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams } from "react-router"
-import { Minus, Plus } from "lucide-react"
+import { ChevronLeft, Minus, Plus } from "lucide-react"
 import { publicApiFetch } from "@/lib/api"
 import type { PublicEventDetailResponse } from "@/types/api"
 import {
@@ -16,6 +16,8 @@ import {
   type CartDrinkLine,
   type CartTicketLine,
 } from "@/stores/cart-store"
+
+type PurchaseWorkflow = "tickets" | "products"
 
 function useWindowOpen(iso: Date | string | null | undefined) {
   const [now, setNow] = useState(() => Date.now())
@@ -36,6 +38,7 @@ export function EventDetailPage() {
 
   const [data, setData] = useState<PublicEventDetailResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [workflow, setWorkflow] = useState<PurchaseWorkflow | null>(null)
   const [ticketTypeId, setTicketTypeId] = useState<string>("")
   const [qty, setQty] = useState(0)
   const [drinks, setDrinks] = useState<Record<string, number>>({})
@@ -63,6 +66,19 @@ export function EventDetailPage() {
   useEffect(() => {
     load()
   }, [load])
+
+  const hasTicketCatalog = (data?.ticketTypes.length ?? 0) > 0
+  const hasProductCatalog = (data?.drinkProducts.length ?? 0) > 0
+  const needsWorkflowChoice = hasTicketCatalog && hasProductCatalog
+
+  useEffect(() => {
+    if (!data) return
+    const hasT = data.ticketTypes.length > 0
+    const hasP = data.drinkProducts.length > 0
+    if (hasT && !hasP) setWorkflow("tickets")
+    else if (!hasT && hasP) setWorkflow("products")
+    else setWorkflow(null)
+  }, [data])
 
   const selectedType = useMemo(
     () => data?.ticketTypes.find((t) => t.id === ticketTypeId),
@@ -122,6 +138,24 @@ export function EventDetailPage() {
     navigate(`/checkout/${eventId}`)
   }
 
+  const chooseTicketsWorkflow = () => {
+    setDrinks({})
+    setWorkflow("tickets")
+  }
+
+  const chooseProductsWorkflow = () => {
+    setQty(0)
+    setWorkflow("products")
+  }
+
+  const anyTicketPurchasable =
+    !!data?.ticketTypes.some((t) => t.availableForPurchase) && ticketsWindow.open
+  const productsPurchasable = consWindow.open && hasProductCatalog
+
+  const showChooser = data && needsWorkflowChoice && workflow == null
+  const showTicketStep = data && workflow === "tickets"
+  const showProductStep = data && workflow === "products"
+
   if (!eventId) return null
 
   return (
@@ -134,6 +168,17 @@ export function EventDetailPage() {
         ) : (
           <>
             <header className="space-y-3">
+              {showTicketStep || showProductStep ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="-ml-2 h-auto rounded-xl px-2 py-1.5 text-sm text-[#8E8E93] hover:bg-white/5 hover:text-white"
+                  onClick={() => setWorkflow(null)}
+                >
+                  <ChevronLeft className="mr-0.5 size-4" aria-hidden />
+                  Elegir otra opción
+                </Button>
+              ) : null}
               <p className="text-sm text-[#8E8E93]">{data.productora.name}</p>
               <h1 className="text-2xl font-bold tracking-tight text-white">
                 {data.event.name}
@@ -144,151 +189,225 @@ export function EventDetailPage() {
               ) : null}
             </header>
 
-            <section className="space-y-4">
-              <h2 className="text-2xl font-bold tracking-tight text-white">Entradas</h2>
-              {ticketsFrom != null && !ticketsWindow.open ? (
-                <p className="text-sm leading-relaxed text-[#8E8E93]">
-                  Venta desde el {formatEventDate(ticketsFrom)} · en{" "}
-                  <span className="tabular-nums text-white/90">
-                    {formatCountdown(ticketsWindow.msLeft)}
-                  </span>
-                </p>
-              ) : null}
-
-              <div className="rounded-2xl bg-[#1C1C1E] px-2 py-2">
-                {data.ticketTypes.length === 0 ? (
-                  <p className="px-4 py-10 text-center text-sm text-[#8E8E93]">
-                    Sin entradas a la venta.
+            {showChooser ? (
+              <section className="space-y-6">
+                <div className="space-y-2">
+                  <h2 className="text-2xl font-bold tracking-tight text-white">
+                    ¿Qué querés comprar?
+                  </h2>
+                  <p className="text-sm leading-relaxed text-[#8E8E93]">
+                    Elegí si buscás entradas para el evento o consumos para canjear en el
+                    momento.
                   </p>
-                ) : (
-                  <ul className="flex flex-col">
-                    {data.ticketTypes.map((t, i) => (
-                      <li
-                        key={t.id}
-                        className={
-                          i > 0 ? "ml-4 border-t border-zinc-800/50" : ""
-                        }
-                      >
-                        <button
-                          type="button"
-                          disabled={!t.availableForPurchase || !ticketsWindow.open}
-                          onClick={() => setTicketTypeId(t.id)}
-                          className={`flex w-full items-center justify-between gap-4 rounded-xl px-4 py-4 text-left transition-colors ${
-                            ticketTypeId === t.id ? "bg-white/5" : "hover:bg-white/3"
-                          } ${!t.availableForPurchase || !ticketsWindow.open ? "opacity-40" : ""}`}
-                        >
-                          <span className="font-medium text-white">{t.name}</span>
-                          <span className="shrink-0 tabular-nums text-sm text-[#8E8E93]">
-                            {formatMoneyArsExact(t.price)}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              {selectedType?.availableForPurchase && ticketsWindow.open ? (
-                <div className="flex items-center justify-between px-1">
-                  <span className="text-sm text-[#8E8E93]">Cantidad</span>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      className="rounded-xl text-[#8E8E93] hover:bg-white/5 hover:text-white"
-                      onClick={() => setQty((q) => Math.max(0, q - 1))}
-                    >
-                      <Minus className="size-4" />
-                    </Button>
-                    <span className="min-w-8 text-center tabular-nums text-sm text-white">
-                      {qty}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      className="rounded-xl text-[#8E8E93] hover:bg-white/5 hover:text-white"
-                      onClick={() => setQty((q) => q + 1)}
-                    >
-                      <Plus className="size-4" />
-                    </Button>
-                  </div>
                 </div>
-              ) : null}
-            </section>
-
-            <section className="space-y-4">
-              <h2 className="text-2xl font-bold tracking-tight text-white">Bar</h2>
-              {consFrom != null && !consWindow.open ? (
-                <p className="text-sm leading-relaxed text-[#8E8E93]">
-                  Consumos desde el {formatEventDate(consFrom)} · en{" "}
-                  <span className="tabular-nums text-white/90">
-                    {formatCountdown(consWindow.msLeft)}
-                  </span>
-                </p>
-              ) : null}
-
-              {data.drinkProducts.length === 0 ? (
-                <p className="text-sm text-[#8E8E93]">No hay consumos digitales para este evento.</p>
-              ) : (
                 <div className="rounded-2xl bg-[#1C1C1E] px-2 py-2">
                   <ul className="flex flex-col">
-                    {data.drinkProducts.map((p, i) => {
-                      const q = drinks[p.id] ?? 0
-                      const rowDisabled = !consWindow.open
-                      return (
-                        <li
-                          key={p.id}
-                          className={i > 0 ? "ml-4 border-t border-zinc-800/50" : ""}
-                        >
-                          <div
-                            className={`flex items-center justify-between gap-3 px-4 py-4 ${rowDisabled ? "opacity-40" : ""}`}
-                          >
-                            <div className="min-w-0">
-                              <p className="font-medium text-white">{p.name}</p>
-                              <p className="mt-0.5 text-sm text-[#8E8E93]">
-                                {formatMoneyArsExact(p.price)} c/u
-                              </p>
-                            </div>
-                            <div className="flex shrink-0 items-center gap-1">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon-sm"
-                                className="rounded-xl text-[#8E8E93] hover:bg-white/5"
-                                disabled={rowDisabled}
-                                onClick={() => setDrinkQty(p.id, q - 1)}
-                              >
-                                <Minus className="size-4" />
-                              </Button>
-                              <span className="min-w-6 text-center tabular-nums text-sm text-white">
-                                {q}
-                              </span>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon-sm"
-                                className="rounded-xl text-[#8E8E93] hover:bg-white/5"
-                                disabled={rowDisabled}
-                                onClick={() => setDrinkQty(p.id, q + 1)}
-                              >
-                                <Plus className="size-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        </li>
-                      )
-                    })}
+                    <li>
+                      <button
+                        type="button"
+                        disabled={!hasTicketCatalog || !anyTicketPurchasable}
+                        onClick={chooseTicketsWorkflow}
+                        className={`flex w-full flex-col items-start gap-1 rounded-xl px-4 py-5 text-left transition-colors ${
+                          !hasTicketCatalog || !anyTicketPurchasable
+                            ? "cursor-not-allowed opacity-40"
+                            : "hover:bg-white/5"
+                        }`}
+                      >
+                        <span className="font-medium text-white">Entradas</span>
+                        <span className="text-sm text-[#8E8E93]">
+                          {hasTicketCatalog && anyTicketPurchasable
+                            ? "Elegí tipo y cantidad"
+                            : ticketsFrom != null && !ticketsWindow.open
+                              ? `Disponibles desde el ${formatEventDate(ticketsFrom)}`
+                              : "No hay entradas a la venta"}
+                        </span>
+                      </button>
+                    </li>
+                    <li className="ml-4 border-t border-zinc-800/50">
+                      <button
+                        type="button"
+                        disabled={!hasProductCatalog || !productsPurchasable}
+                        onClick={chooseProductsWorkflow}
+                        className={`flex w-full flex-col items-start gap-1 rounded-xl px-4 py-5 text-left transition-colors ${
+                          !hasProductCatalog || !productsPurchasable
+                            ? "cursor-not-allowed opacity-40"
+                            : "hover:bg-white/5"
+                        }`}
+                      >
+                        <span className="font-medium text-white">Consumos</span>
+                        <span className="text-sm text-[#8E8E93]">
+                          {hasProductCatalog && productsPurchasable
+                            ? "Bebidas y productos del evento"
+                            : consFrom != null && !consWindow.open
+                              ? `Disponibles desde el ${formatEventDate(consFrom)}`
+                              : "No hay consumos para este evento"}
+                        </span>
+                      </button>
+                    </li>
                   </ul>
                 </div>
-              )}
-            </section>
+              </section>
+            ) : null}
+
+            {showTicketStep ? (
+              <section className="space-y-4">
+                <h2 className="text-2xl font-bold tracking-tight text-white">Entradas</h2>
+                {ticketsFrom != null && !ticketsWindow.open ? (
+                  <p className="text-sm leading-relaxed text-[#8E8E93]">
+                    Venta desde el {formatEventDate(ticketsFrom)} · en{" "}
+                    <span className="tabular-nums text-white/90">
+                      {formatCountdown(ticketsWindow.msLeft)}
+                    </span>
+                  </p>
+                ) : null}
+
+                <div className="rounded-2xl bg-[#1C1C1E] px-2 py-2">
+                  {data.ticketTypes.length === 0 ? (
+                    <p className="px-4 py-10 text-center text-sm text-[#8E8E93]">
+                      Sin entradas a la venta.
+                    </p>
+                  ) : (
+                    <ul className="flex flex-col">
+                      {data.ticketTypes.map((t, i) => (
+                        <li
+                          key={t.id}
+                          className={
+                            i > 0 ? "ml-4 border-t border-zinc-800/50" : ""
+                          }
+                        >
+                          <button
+                            type="button"
+                            disabled={!t.availableForPurchase || !ticketsWindow.open}
+                            onClick={() => setTicketTypeId(t.id)}
+                            className={`flex w-full items-center justify-between gap-4 rounded-xl px-4 py-4 text-left transition-colors ${
+                              ticketTypeId === t.id ? "bg-white/5" : "hover:bg-white/3"
+                            } ${!t.availableForPurchase || !ticketsWindow.open ? "opacity-40" : ""}`}
+                          >
+                            <span className="font-medium text-white">{t.name}</span>
+                            <span className="shrink-0 tabular-nums text-sm text-[#8E8E93]">
+                              {formatMoneyArsExact(t.price)}
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                {selectedType?.availableForPurchase && ticketsWindow.open ? (
+                  <div className="flex items-center justify-between px-1">
+                    <span className="text-sm text-[#8E8E93]">Cantidad</span>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="rounded-xl text-[#8E8E93] hover:bg-white/5 hover:text-white"
+                        onClick={() => setQty((q) => Math.max(0, q - 1))}
+                      >
+                        <Minus className="size-4" />
+                      </Button>
+                      <span className="min-w-8 text-center tabular-nums text-sm text-white">
+                        {qty}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="rounded-xl text-[#8E8E93] hover:bg-white/5 hover:text-white"
+                        onClick={() => setQty((q) => q + 1)}
+                      >
+                        <Plus className="size-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+              </section>
+            ) : null}
+
+            {showProductStep ? (
+              <section className="space-y-4">
+                <h2 className="text-2xl font-bold tracking-tight text-white">Consumos</h2>
+                {consFrom != null && !consWindow.open ? (
+                  <p className="text-sm leading-relaxed text-[#8E8E93]">
+                    Consumos desde el {formatEventDate(consFrom)} · en{" "}
+                    <span className="tabular-nums text-white/90">
+                      {formatCountdown(consWindow.msLeft)}
+                    </span>
+                  </p>
+                ) : null}
+
+                {data.drinkProducts.length === 0 ? (
+                  <p className="text-sm text-[#8E8E93]">
+                    No hay consumos digitales para este evento.
+                  </p>
+                ) : (
+                  <div className="rounded-2xl bg-[#1C1C1E] px-2 py-2">
+                    <ul className="flex flex-col">
+                      {data.drinkProducts.map((p, i) => {
+                        const q = drinks[p.id] ?? 0
+                        const rowDisabled = !consWindow.open
+                        return (
+                          <li
+                            key={p.id}
+                            className={i > 0 ? "ml-4 border-t border-zinc-800/50" : ""}
+                          >
+                            <div
+                              className={`flex items-center justify-between gap-3 px-4 py-4 ${rowDisabled ? "opacity-40" : ""}`}
+                            >
+                              <div className="min-w-0">
+                                <p className="font-medium text-white">{p.name}</p>
+                                <p className="mt-0.5 text-sm text-[#8E8E93]">
+                                  {formatMoneyArsExact(p.price)} c/u
+                                </p>
+                              </div>
+                              <div className="flex shrink-0 items-center gap-1">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  className="rounded-xl text-[#8E8E93] hover:bg-white/5"
+                                  disabled={rowDisabled}
+                                  onClick={() => setDrinkQty(p.id, q - 1)}
+                                >
+                                  <Minus className="size-4" />
+                                </Button>
+                                <span className="min-w-6 text-center tabular-nums text-sm text-white">
+                                  {q}
+                                </span>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  className="rounded-xl text-[#8E8E93] hover:bg-white/5"
+                                  disabled={rowDisabled}
+                                  onClick={() => setDrinkQty(p.id, q + 1)}
+                                >
+                                  <Plus className="size-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  </div>
+                )}
+              </section>
+            ) : null}
+
+            {data && !hasTicketCatalog && !hasProductCatalog ? (
+              <p className="text-sm text-[#8E8E93]">
+                Este evento no tiene venta online por el momento.
+              </p>
+            ) : null}
           </>
         )}
       </div>
 
-      {data ? (
+      {data &&
+      !showChooser &&
+      (showTicketStep || showProductStep || !needsWorkflowChoice) ? (
         <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-800/50 bg-black/70 px-6 pt-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] backdrop-blur-xl sm:px-8">
           <div className="mx-auto flex w-full max-w-lg flex-col gap-4">
             <div className="flex items-baseline justify-between gap-4">
