@@ -1,20 +1,14 @@
-import {
-  digitalConsumptions,
-  events,
-  products,
-  sales,
-  ticketTypes,
-  tickets,
-} from "@backend/db/schema"
+/** Client-side API types (no backend package — deploys standalone). */
 
-export type TicketRow = typeof tickets.$inferSelect
-export type DigitalConsumptionRow = typeof digitalConsumptions.$inferSelect
-export type EventRow = typeof events.$inferSelect
-export type TicketTypeRow = typeof ticketTypes.$inferSelect
-export type ProductRow = typeof products.$inferSelect
-export type SaleRow = typeof sales.$inferSelect
+export type TicketStatus = "PENDING" | "USED" | "CANCELLED"
+export type ConsumptionStatus = "PENDING" | "REDEEMED" | "CANCELLED"
+export type PaymentMethod = "CASH" | "CARD" | "MERCADOPAGO" | "TRANSFER"
 
-export type PublicEventSummary = Pick<EventRow, "id" | "name" | "date" | "location"> & {
+export type PublicEventSummary = {
+  id: string
+  name: string
+  date: string
+  location: string | null
   productora: { id: string; name: string }
 }
 
@@ -32,11 +26,19 @@ export type PublicTicketTypeItem = {
   availableForPurchase: boolean
 }
 
-export type PublicDrinkProductItem = Pick<ProductRow, "id" | "name" | "price">
+export type PublicDrinkProductItem = {
+  id: string
+  name: string
+  price: string
+}
 
 export type PublicEventDetailResponse = {
   productora: { id: string; name: string }
-  event: Pick<EventRow, "id" | "name" | "date" | "location"> & {
+  event: {
+    id: string
+    name: string
+    date: string
+    location: string | null
     ticketsAvailableFrom: Date | string | null
     consumptionsAvailableFrom: Date | string | null
   }
@@ -52,19 +54,29 @@ export type GuestCheckoutResponse = {
 
 export type ReceiptApiResponse = {
   receiptToken: string
-  sale: Pick<SaleRow, "id" | "totalAmount" | "paymentMethod" | "createdAt">
-  event: Pick<EventRow, "id" | "name" | "date" | "location">
+  sale: {
+    id: string
+    totalAmount: string
+    paymentMethod: PaymentMethod
+    createdAt: string | null
+  }
+  event: {
+    id: string
+    name: string
+    date: string
+    location: string | null
+  }
   productora: { name: string }
   tickets: Array<{
     id: string
     qrHash: string
-    status: TicketRow["status"]
-    ticketType: Pick<TicketTypeRow, "name" | "price">
+    status: TicketStatus
+    ticketType: { name: string; price: string }
   }>
   consumptions: Array<{
     id: string
     qrHash: string
-    status: DigitalConsumptionRow["status"]
-    product: Pick<ProductRow, "id" | "name" | "price">
+    status: ConsumptionStatus
+    product: { id: string; name: string; price: string }
   }>
 }
