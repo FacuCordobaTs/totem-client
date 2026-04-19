@@ -271,50 +271,56 @@ export function ReceiptPage() {
                 Apple Wallet (próximamente)
               </Button>
             </div>
-            <div className="ml-4 border-t border-zinc-800/50 pt-6">
-              <p className="text-xs font-semibold uppercase tracking-wider text-[#8E8E93]">
-                Detalle de compra
-              </p>
-              <p className="mt-3 text-sm text-[#8E8E93]">
-                Fecha:{" "}
-                <span className="text-white/90">
-                  {data.sale.createdAt
-                    ? formatEventDate(data.sale.createdAt)
-                    : "—"}
-                </span>
-              </p>
-              <p className="mt-2 text-sm text-[#8E8E93]">
-                Pago:{" "}
-                <span className="text-white/90">
-                  {formatPaymentMethod(data.sale.paymentMethod)}
-                </span>
-              </p>
+            <div className="flex flex-col">
+              <div className="ml-4 h-px shrink-0 bg-zinc-800/50" aria-hidden />
+              <div className="pt-6">
+                <p className="text-xs font-semibold uppercase tracking-wider text-[#8E8E93]">
+                  Detalle de compra
+                </p>
+                <p className="mt-3 text-sm text-[#8E8E93]">
+                  Fecha:{" "}
+                  <span className="text-white/90">
+                    {data.sale.createdAt
+                      ? formatEventDate(data.sale.createdAt)
+                      : "—"}
+                  </span>
+                </p>
+                <p className="mt-2 text-sm text-[#8E8E93]">
+                  Pago:{" "}
+                  <span className="text-white/90">
+                    {formatPaymentMethod(data.sale.paymentMethod)}
+                  </span>
+                </p>
+              </div>
             </div>
-            <div className="ml-4 border-t border-zinc-800/50 pt-6">
-              <p className="text-xs font-semibold uppercase tracking-wider text-[#8E8E93]">
-                Referencias (soporte)
-              </p>
-              <p className="mt-3 break-all font-mono text-[11px] leading-relaxed text-[#8E8E93]">
-                Pedido: {truncateHash(receiptToken, 12, 8)}
-              </p>
-              <ul className="mt-4 space-y-3">
-                {data.tickets.map((t, i) => (
-                  <li
-                    key={t.id}
-                    className="font-mono text-[11px] leading-relaxed text-[#8E8E93]"
-                  >
-                    Entrada {i + 1}: {truncateHash(t.qrHash, 10, 6)}
-                  </li>
-                ))}
-                {data.consumptions.map((c, i) => (
-                  <li
-                    key={c.id}
-                    className="font-mono text-[11px] leading-relaxed text-[#8E8E93]"
-                  >
-                    Consumo {i + 1}: {truncateHash(c.qrHash, 10, 6)}
-                  </li>
-                ))}
-              </ul>
+            <div className="flex flex-col">
+              <div className="ml-4 h-px shrink-0 bg-zinc-800/50" aria-hidden />
+              <div className="pt-6">
+                <p className="text-xs font-semibold uppercase tracking-wider text-[#8E8E93]">
+                  Referencias (soporte)
+                </p>
+                <p className="mt-3 break-all font-mono text-[11px] leading-relaxed text-[#8E8E93]">
+                  Pedido: {truncateHash(receiptToken, 12, 8)}
+                </p>
+                <ul className="mt-4 space-y-3">
+                  {data.tickets.map((t, i) => (
+                    <li
+                      key={t.id}
+                      className="font-mono text-[11px] leading-relaxed text-[#8E8E93]"
+                    >
+                      Entrada {i + 1}: {truncateHash(t.qrHash, 10, 6)}
+                    </li>
+                  ))}
+                  {data.consumptions.map((c, i) => (
+                    <li
+                      key={c.id}
+                      className="font-mono text-[11px] leading-relaxed text-[#8E8E93]"
+                    >
+                      Consumo {i + 1}: {truncateHash(c.qrHash, 10, 6)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           </div>
         </AppleSheet>

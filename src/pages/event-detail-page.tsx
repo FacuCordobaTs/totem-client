@@ -223,7 +223,11 @@ export function EventDetailPage() {
                         </span>
                       </button>
                     </li>
-                    <li className="ml-4 border-t border-zinc-800/50">
+                    <li className="flex flex-col">
+                      <div
+                        className="ml-4 h-px shrink-0 bg-zinc-800/50"
+                        aria-hidden
+                      />
                       <button
                         type="button"
                         disabled={!hasProductCatalog || !productsPurchasable}
@@ -269,12 +273,13 @@ export function EventDetailPage() {
                   ) : (
                     <ul className="flex flex-col">
                       {data.ticketTypes.map((t, i) => (
-                        <li
-                          key={t.id}
-                          className={
-                            i > 0 ? "ml-4 border-t border-zinc-800/50" : ""
-                          }
-                        >
+                        <li key={t.id} className="flex flex-col">
+                          {i > 0 ? (
+                            <div
+                              className="ml-4 h-px shrink-0 bg-zinc-800/50"
+                              aria-hidden
+                            />
+                          ) : null}
                           <button
                             type="button"
                             disabled={!t.availableForPurchase || !ticketsWindow.open}
@@ -348,10 +353,13 @@ export function EventDetailPage() {
                         const q = drinks[p.id] ?? 0
                         const rowDisabled = !consWindow.open
                         return (
-                          <li
-                            key={p.id}
-                            className={i > 0 ? "ml-4 border-t border-zinc-800/50" : ""}
-                          >
+                          <li key={p.id} className="flex flex-col">
+                            {i > 0 ? (
+                              <div
+                                className="ml-4 h-px shrink-0 bg-zinc-800/50"
+                                aria-hidden
+                              />
+                            ) : null}
                             <div
                               className={`flex items-center justify-between gap-3 px-4 py-4 ${rowDisabled ? "opacity-40" : ""}`}
                             >

@@ -205,34 +205,46 @@ export function CheckoutPage() {
                 <p className="text-sm text-[#8E8E93]">Evento</p>
                 <p className="mt-1 font-medium text-white">{snapshot.eventName}</p>
               </div>
-              <div className="ml-4 border-t border-zinc-800/50 py-4">
-                <p className="text-sm text-[#8E8E93]">Organiza</p>
-                <p className="mt-1 text-white/90">{snapshot.productoraName}</p>
+              <div className="flex flex-col">
+                <div className="ml-4 h-px shrink-0 bg-zinc-800/50" aria-hidden />
+                <div className="py-4">
+                  <p className="text-sm text-[#8E8E93]">Organiza</p>
+                  <p className="mt-1 text-white/90">{snapshot.productoraName}</p>
+                </div>
               </div>
-              <div className="ml-4 border-t border-zinc-800/50 py-4">
-                <p className="text-sm text-[#8E8E93]">Entradas</p>
-                <p className="mt-1 text-white/90">
-                  {snapshot.ticketLines.length === 0
-                    ? "—"
-                    : snapshot.ticketLines.map((l) => `${l.quantity} × entrada`).join(", ")}
-                </p>
+              <div className="flex flex-col">
+                <div className="ml-4 h-px shrink-0 bg-zinc-800/50" aria-hidden />
+                <div className="py-4">
+                  <p className="text-sm text-[#8E8E93]">Entradas</p>
+                  <p className="mt-1 text-white/90">
+                    {snapshot.ticketLines.length === 0
+                      ? "—"
+                      : snapshot.ticketLines.map((l) => `${l.quantity} × entrada`).join(", ")}
+                  </p>
+                </div>
               </div>
-              <div className="ml-4 border-t border-zinc-800/50 py-4">
-                <p className="text-sm text-[#8E8E93]">Consumos</p>
-                <p className="mt-1 text-white/90">
-                  {snapshot.drinkLines.length === 0
-                    ? "—"
-                    : snapshot.drinkLines
-                        .filter((d) => d.quantity > 0)
-                        .map((d) => `${d.quantity} ítem`)
-                        .join(", ")}
-                </p>
+              <div className="flex flex-col">
+                <div className="ml-4 h-px shrink-0 bg-zinc-800/50" aria-hidden />
+                <div className="py-4">
+                  <p className="text-sm text-[#8E8E93]">Consumos</p>
+                  <p className="mt-1 text-white/90">
+                    {snapshot.drinkLines.length === 0
+                      ? "—"
+                      : snapshot.drinkLines
+                          .filter((d) => d.quantity > 0)
+                          .map((d) => `${d.quantity} ítem`)
+                          .join(", ")}
+                  </p>
+                </div>
               </div>
-              <div className="ml-4 border-t border-zinc-800/50 py-4">
-                <p className="text-sm text-[#8E8E93]">Total</p>
-                <p className="mt-1 text-xl font-bold tabular-nums text-white">
-                  {formatMoneyArsExact(clientTotal)}
-                </p>
+              <div className="flex flex-col">
+                <div className="ml-4 h-px shrink-0 bg-zinc-800/50" aria-hidden />
+                <div className="py-4">
+                  <p className="text-sm text-[#8E8E93]">Total</p>
+                  <p className="mt-1 text-xl font-bold tabular-nums text-white">
+                    {formatMoneyArsExact(clientTotal)}
+                  </p>
+                </div>
               </div>
             </div>
             <Button
