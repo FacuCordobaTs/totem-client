@@ -198,7 +198,7 @@ export function CheckoutPage() {
         <h1 className="text-2xl font-bold tracking-tight text-white">Pago</h1>
 
         {step === "review" ? (
-          <section className="space-y-6 rounded-2xl bg-[#1C1C1E] p-6 sm:p-8">
+          <section className="space-y-6 rounded-2xl bg-transparent p-6 sm:p-8">
             <h2 className="text-2xl font-bold tracking-tight text-white">Resumen</h2>
             <div className="space-y-0 text-sm">
               <div className="py-4">
@@ -257,7 +257,7 @@ export function CheckoutPage() {
         ) : null}
 
         {step === "contact" ? (
-          <section className="space-y-8 rounded-2xl bg-[#1C1C1E] p-6 sm:p-8">
+          <section className="space-y-8 rounded-2xl bg-transparent p-6 sm:p-8">
             <h2 className="text-2xl font-bold tracking-tight text-white">Tus datos</h2>
             <div className="space-y-6">
               <div className="space-y-2">

@@ -200,14 +200,14 @@ export function EventDetailPage() {
                     momento.
                   </p>
                 </div>
-                <div className="rounded-2xl bg-[#1C1C1E] px-2 py-2">
+                <div className="rounded-2xl bg-transparent px-2 py-2">
                   <ul className="flex flex-col">
                     <li>
                       <button
                         type="button"
                         disabled={!hasTicketCatalog || !anyTicketPurchasable}
                         onClick={chooseTicketsWorkflow}
-                        className={`flex w-full flex-col items-start gap-1 rounded-xl px-4 py-5 text-left transition-colors ${
+                        className={`flex w-full mb-4 flex-col border border-white/10 items-start gap-1 rounded-xl px-4 py-5 text-left transition-colors ${
                           !hasTicketCatalog || !anyTicketPurchasable
                             ? "cursor-not-allowed opacity-40"
                             : "hover:bg-white/5"
@@ -232,7 +232,7 @@ export function EventDetailPage() {
                         type="button"
                         disabled={!hasProductCatalog || !productsPurchasable}
                         onClick={chooseProductsWorkflow}
-                        className={`flex w-full flex-col items-start gap-1 rounded-xl px-4 py-5 text-left transition-colors ${
+                        className={`flex w-full flex-col border border-white/10 items-start gap-1 rounded-xl px-4 py-5 text-left transition-colors ${
                           !hasProductCatalog || !productsPurchasable
                             ? "cursor-not-allowed opacity-40"
                             : "hover:bg-white/5"
@@ -265,7 +265,7 @@ export function EventDetailPage() {
                   </p>
                 ) : null}
 
-                <div className="rounded-2xl bg-[#1C1C1E] px-2 py-2">
+                <div className="rounded-2xl bg-transparent px-2 py-2">
                   {data.ticketTypes.length === 0 ? (
                     <p className="px-4 py-10 text-center text-sm text-[#8E8E93]">
                       Sin entradas a la venta.
@@ -284,7 +284,7 @@ export function EventDetailPage() {
                             type="button"
                             disabled={!t.availableForPurchase || !ticketsWindow.open}
                             onClick={() => setTicketTypeId(t.id)}
-                            className={`flex w-full items-center justify-between gap-4 rounded-xl px-4 py-4 text-left transition-colors ${
+                            className={`flex w-full items-center justify-between gap-4 rounded-xl px-4 py-4 my-2 border border-white/10 text-left transition-colors ${
                               ticketTypeId === t.id ? "bg-white/5" : "hover:bg-white/3"
                             } ${!t.availableForPurchase || !ticketsWindow.open ? "opacity-40" : ""}`}
                           >
