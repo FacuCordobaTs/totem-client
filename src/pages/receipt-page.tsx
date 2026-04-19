@@ -1,11 +1,20 @@
 import { useCallback, useEffect, useState } from "react"
-import { Link, useParams } from "react-router"
+import { Link, useLocation, useParams } from "react-router"
 import QRCode from "qrcode"
+import { MoreHorizontal, X } from "lucide-react"
 import { publicApiFetch } from "@/lib/api"
 import type { ReceiptApiResponse } from "@/types/api"
 import { Button } from "@/components/ui/button"
-import { formatEventDateTime, formatMoneyArsExact } from "@/lib/format"
-import { Download, Wallet } from "lucide-react"
+import {
+  consumptionStatusLabel,
+  formatEventDate,
+  formatEventDay,
+  formatMoneyArsExact,
+  formatPaymentMethod,
+  ticketStatusLabel,
+  truncateHash,
+} from "@/lib/format"
+import { AppleSheet } from "@/components/apple-sheet"
 
 function QrBlock({
   hash,
@@ -27,7 +36,7 @@ function QrBlock({
     QRCode.toDataURL(hash, {
       width: 200,
       margin: 1,
-      color: { dark: "#fafafa", light: "#18181b" },
+      color: { dark: "#fafafa", light: "#121212" },
     })
       .then((url) => {
         if (!cancelled) setSrc(url)
@@ -42,11 +51,11 @@ function QrBlock({
 
   if (!active) {
     return (
-      <div className="flex flex-col items-center gap-3 border border-white/10 bg-zinc-950/20 p-4 opacity-55 grayscale">
-        <p className="max-w-[220px] text-center text-xs text-zinc-500">{label}</p>
-        <div className="flex size-[200px] items-center justify-center border border-dashed border-white/10">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.25em] text-zinc-500">
-            Consumido
+      <div className="flex flex-col items-center gap-4 rounded-2xl bg-[#1C1C1E] px-4 py-8 opacity-50 grayscale">
+        <p className="max-w-[220px] text-center text-sm text-[#8E8E93]">{label}</p>
+        <div className="flex size-[200px] items-center justify-center rounded-xl border border-dashed border-zinc-700/50">
+          <span className="text-xs font-semibold uppercase tracking-widest text-[#8E8E93]">
+            Canjeada
           </span>
         </div>
       </div>
@@ -54,23 +63,42 @@ function QrBlock({
   }
 
   return (
-    <div className="flex flex-col items-center gap-3 border border-white/10 bg-zinc-950/80 p-4">
-      <p className="max-w-[220px] text-center text-xs text-zinc-400">{label}</p>
+    <div className="flex flex-col items-center gap-4 rounded-2xl bg-[#1C1C1E] px-4 py-6">
+      <p className="max-w-[240px] text-center text-sm text-[#8E8E93]">{label}</p>
       {src ? (
-        <img src={src} alt="" className="size-[200px]" width={200} height={200} />
+        <img src={src} alt="" className="size-[200px] rounded-xl" width={200} height={200} />
       ) : (
-        <div className="flex size-[200px] items-center justify-center text-xs text-zinc-600">
+        <div className="flex size-[200px] items-center justify-center text-sm text-[#8E8E93]">
           …
         </div>
       )}
+      <Link
+        to={`/qr/${encodeURIComponent(hash)}`}
+        className="text-sm text-[#8E8E93] underline decoration-zinc-600 underline-offset-4 hover:text-white"
+      >
+        Pantalla completa
+      </Link>
     </div>
   )
 }
 
 export function ReceiptPage() {
   const { receiptToken } = useParams<{ receiptToken: string }>()
+  const location = useLocation()
+  const fromCheckout =
+    (location.state as { fromCheckout?: boolean } | null)?.fromCheckout === true
+
   const [data, setData] = useState<ReceiptApiResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [showPurchaseBanner, setShowPurchaseBanner] = useState(fromCheckout)
+  const [moreOpen, setMoreOpen] = useState(false)
+
+  useEffect(() => {
+    if (!fromCheckout) return
+    setShowPurchaseBanner(true)
+    const t = window.setTimeout(() => setShowPurchaseBanner(false), 12000)
+    return () => window.clearTimeout(t)
+  }, [fromCheckout, receiptToken])
 
   const load = useCallback(() => {
     if (!receiptToken) return
@@ -86,82 +114,88 @@ export function ReceiptPage() {
   if (!receiptToken) return null
 
   return (
-    <div className="min-h-dvh bg-[#09090b] px-5 pb-24 pt-10 text-zinc-50">
-      <div className="mx-auto flex max-w-lg flex-col gap-10">
-        <header className="space-y-2 border-b border-white/10 pb-8">
-          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-zinc-500">
-            Comprobante
-          </p>
-          {error ? (
-            <p className="text-sm text-red-400">{error}</p>
-          ) : !data ? (
-            <p className="text-sm text-zinc-500">Cargando…</p>
-          ) : (
-            <>
-              <h1 className="text-2xl font-semibold tracking-tight text-white">
+    <div className="min-h-dvh pb-28">
+      <header className="sticky top-0 z-30 border-b border-zinc-800/50 bg-black/70 px-6 py-4 backdrop-blur-xl sm:px-8">
+        <div className="mx-auto flex max-w-lg items-start justify-between gap-4">
+          <div className="min-w-0 flex-1 pt-1">
+            <p className="text-sm text-[#8E8E93]">Comprobante</p>
+            {data ? (
+              <h1 className="mt-1 truncate text-lg font-bold tracking-tight text-white">
                 {data.event.name}
               </h1>
-              <p className="text-sm text-zinc-400">{data.productora.name}</p>
-              <p className="text-xs text-zinc-500">{formatEventDateTime(data.event.date)}</p>
-              <p className="mt-4 text-sm text-zinc-300">
-                Total{" "}
-                <span className="tabular-nums text-white">
-                  {formatMoneyArsExact(data.sale.totalAmount)}
-                </span>
-              </p>
-            </>
-          )}
-        </header>
+            ) : null}
+          </div>
+          {data ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="shrink-0 rounded-xl text-[#8E8E93] hover:bg-white/5 hover:text-white"
+              aria-label="Más opciones"
+              onClick={() => setMoreOpen(true)}
+            >
+              <MoreHorizontal className="size-5" />
+            </Button>
+          ) : null}
+        </div>
+      </header>
 
-        {data ? (
+      <div className="mx-auto flex max-w-lg flex-col gap-8 px-6 pt-8 sm:px-8">
+        {showPurchaseBanner ? (
+          <div
+            role="status"
+            className="flex items-start gap-3 rounded-2xl bg-white/5 px-4 py-4"
+          >
+            <p className="flex-1 text-sm leading-relaxed text-[#8E8E93]">
+              <span className="font-semibold text-white">Listo.</span> Mostrá los QR en ingreso o
+              barra cuando te lo pidan.
+            </p>
+            <button
+              type="button"
+              className="shrink-0 rounded-lg p-1 text-[#8E8E93] hover:bg-white/10 hover:text-white"
+              aria-label="Cerrar"
+              onClick={() => setShowPurchaseBanner(false)}
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        ) : null}
+
+        {error ? (
+          <p className="text-sm text-red-400">{error}</p>
+        ) : !data ? (
+          <p className="text-sm text-[#8E8E93]">Cargando…</p>
+        ) : (
           <>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="rounded-none border-white/20 bg-transparent text-zinc-200 hover:bg-white/5"
-                onClick={() => {
-                  /* mock: integración futura */
-                }}
-              >
-                <Download className="mr-2 size-4" aria-hidden />
-                Descargar QRs
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="rounded-none border-white/20 bg-transparent text-zinc-200 hover:bg-white/5"
-                onClick={() => {
-                  /* mock */
-                }}
-              >
-                <Wallet className="mr-2 size-4" aria-hidden />
-                Apple Wallet
-              </Button>
+            <div className="space-y-2">
+              <p className="text-sm text-[#8E8E93]">{data.productora.name}</p>
+              <p className="text-sm text-[#8E8E93]">{formatEventDay(data.event.date)}</p>
+              <p className="pt-4 text-2xl font-bold tabular-nums text-white">
+                {formatMoneyArsExact(data.sale.totalAmount)}
+              </p>
             </div>
 
             <section className="space-y-4">
-              <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-400">
-                Entradas
-              </h2>
-              <div className="flex flex-col gap-6">
+              <h2 className="text-2xl font-bold tracking-tight text-white">Entradas</h2>
+              <div className="flex flex-col gap-8">
                 {data.tickets.length === 0 ? (
-                  <p className="text-sm text-zinc-600">Sin entradas en esta compra.</p>
+                  <p className="text-sm text-[#8E8E93]">Ninguna en esta compra.</p>
                 ) : (
                   data.tickets.map((t) => {
                     const active = t.status === "PENDING"
                     return (
                       <div key={t.id} className="space-y-3">
-                        <p className="text-sm font-medium text-zinc-200">
-                          {t.ticketType.name}{" "}
-                          <span className="text-zinc-500">
-                            · {formatMoneyArsExact(t.ticketType.price)}
-                          </span>
-                        </p>
+                        <div>
+                          <p className="font-medium text-white">{t.ticketType.name}</p>
+                          <p className="mt-1 text-sm text-[#8E8E93]">
+                            {formatMoneyArsExact(t.ticketType.price)} ·{" "}
+                            {ticketStatusLabel(t.status)}
+                          </p>
+                        </div>
                         <QrBlock
                           hash={t.qrHash}
                           active={active}
-                          label={active ? "Mostrá este QR en el ingreso" : "Entrada utilizada"}
+                          label={active ? "Mostrá este código en el ingreso" : "Entrada utilizada"}
                         />
                       </div>
                     )
@@ -171,27 +205,26 @@ export function ReceiptPage() {
             </section>
 
             <section className="space-y-4">
-              <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-400">
-                Consumos
-              </h2>
-              <div className="flex flex-col gap-6">
+              <h2 className="text-2xl font-bold tracking-tight text-white">Consumos</h2>
+              <div className="flex flex-col gap-8">
                 {data.consumptions.length === 0 ? (
-                  <p className="text-sm text-zinc-600">Sin consumos en esta compra.</p>
+                  <p className="text-sm text-[#8E8E93]">Ninguno en esta compra.</p>
                 ) : (
                   data.consumptions.map((c) => {
                     const active = c.status === "PENDING"
                     return (
                       <div key={c.id} className="space-y-3">
-                        <p className="text-sm font-medium text-zinc-200">
-                          {c.product.name}{" "}
-                          <span className="text-zinc-500">
-                            · {formatMoneyArsExact(c.product.price)}
-                          </span>
-                        </p>
+                        <div>
+                          <p className="font-medium text-white">{c.product.name}</p>
+                          <p className="mt-1 text-sm text-[#8E8E93]">
+                            {formatMoneyArsExact(c.product.price)} ·{" "}
+                            {consumptionStatusLabel(c.status)}
+                          </p>
+                        </div>
                         <QrBlock
                           hash={c.qrHash}
                           active={active}
-                          label={active ? "Canje en barra" : "Canjeado"}
+                          label={active ? "Canje en barra" : "Ya canjeada"}
                         />
                       </div>
                     )
@@ -199,17 +232,93 @@ export function ReceiptPage() {
                 )}
               </div>
             </section>
-          </>
-        ) : null}
 
-        {data ? (
-          <p className="text-center text-[10px] text-zinc-600">
-            <Link to={`/e/${data.event.id}`} className="underline decoration-white/20">
-              Volver al evento
-            </Link>
-          </p>
-        ) : null}
+            <p className="pb-8 text-center">
+              <Link
+                to={`/e/${data.event.id}`}
+                className="text-sm text-[#8E8E93] underline decoration-zinc-700 underline-offset-4 hover:text-white"
+              >
+                Volver al evento
+              </Link>
+            </p>
+          </>
+        )}
       </div>
+
+      {data ? (
+        <AppleSheet
+          open={moreOpen}
+          onOpenChange={setMoreOpen}
+          title="Más"
+          description="Acciones y datos para soporte."
+        >
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-12 justify-start rounded-xl text-white hover:bg-white/10"
+                onClick={() => setMoreOpen(false)}
+              >
+                Descargar QRs (próximamente)
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-12 justify-start rounded-xl text-white hover:bg-white/10"
+                onClick={() => setMoreOpen(false)}
+              >
+                Apple Wallet (próximamente)
+              </Button>
+            </div>
+            <div className="ml-4 border-t border-zinc-800/50 pt-6">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#8E8E93]">
+                Detalle de compra
+              </p>
+              <p className="mt-3 text-sm text-[#8E8E93]">
+                Fecha:{" "}
+                <span className="text-white/90">
+                  {data.sale.createdAt
+                    ? formatEventDate(data.sale.createdAt)
+                    : "—"}
+                </span>
+              </p>
+              <p className="mt-2 text-sm text-[#8E8E93]">
+                Pago:{" "}
+                <span className="text-white/90">
+                  {formatPaymentMethod(data.sale.paymentMethod)}
+                </span>
+              </p>
+            </div>
+            <div className="ml-4 border-t border-zinc-800/50 pt-6">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#8E8E93]">
+                Referencias (soporte)
+              </p>
+              <p className="mt-3 break-all font-mono text-[11px] leading-relaxed text-[#8E8E93]">
+                Pedido: {truncateHash(receiptToken, 12, 8)}
+              </p>
+              <ul className="mt-4 space-y-3">
+                {data.tickets.map((t, i) => (
+                  <li
+                    key={t.id}
+                    className="font-mono text-[11px] leading-relaxed text-[#8E8E93]"
+                  >
+                    Entrada {i + 1}: {truncateHash(t.qrHash, 10, 6)}
+                  </li>
+                ))}
+                {data.consumptions.map((c, i) => (
+                  <li
+                    key={c.id}
+                    className="font-mono text-[11px] leading-relaxed text-[#8E8E93]"
+                  >
+                    Consumo {i + 1}: {truncateHash(c.qrHash, 10, 6)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </AppleSheet>
+      ) : null}
     </div>
   )
 }

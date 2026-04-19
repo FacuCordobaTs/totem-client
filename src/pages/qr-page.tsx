@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Link, useNavigate, useParams } from "react-router"
+import { useNavigate, useParams } from "react-router"
 import QRCode from "qrcode"
 import { Button } from "@/components/ui/button"
 
@@ -15,7 +15,7 @@ export function QrPage() {
     QRCode.toDataURL(value, {
       width: 280,
       margin: 2,
-      color: { dark: "#fafafa", light: "#09090b" },
+      color: { dark: "#fafafa", light: "#121212" },
     })
       .then((url) => {
         if (!cancelled) setDataUrl(url)
@@ -31,40 +31,36 @@ export function QrPage() {
   if (!hash) return null
 
   return (
-    <div className="flex min-h-dvh flex-col bg-[#09090b] text-zinc-100">
-      <div className="flex items-center justify-between gap-2 p-4">
+    <div className="flex min-h-dvh flex-col">
+      <header className="sticky top-0 z-10 border-b border-zinc-800/50 bg-black/70 px-6 py-4 backdrop-blur-xl">
         <Button
           variant="ghost"
-          className="rounded-none text-zinc-400 hover:bg-white/5"
+          className="-ml-2 rounded-xl px-3 text-sm text-[#8E8E93] hover:bg-white/5 hover:text-white"
           type="button"
           onClick={() => navigate(-1)}
         >
           Cerrar
         </Button>
-        <Button variant="ghost" className="rounded-none text-zinc-400 hover:bg-white/5" asChild>
-          <Link to="/">Inicio</Link>
-        </Button>
-      </div>
-      <div className="flex flex-1 flex-col items-center justify-center gap-6 px-4 pb-16">
-        <p className="max-w-xs text-center text-sm text-zinc-400">
-          Mostrá este código en la entrada o en la barra
+      </header>
+      <div className="flex flex-1 flex-col items-center justify-center gap-10 px-6 py-16">
+        <p className="max-w-xs text-center text-sm leading-relaxed text-[#8E8E93]">
+          Mostrá este código en la entrada o en la barra.
         </p>
-        {dataUrl ? (
-          <img
-            src={dataUrl}
-            alt="Código QR"
-            className="max-w-[85vw] border border-white/10 bg-zinc-950 p-2"
-            width={256}
-            height={256}
-          />
-        ) : (
-          <div className="flex h-64 w-64 max-w-[85vw] items-center justify-center border border-white/10 text-zinc-600">
-            Generando…
-          </div>
-        )}
-        <p className="max-w-xs break-all text-center text-[10px] text-zinc-600">
-          {decodeURIComponent(hash)}
-        </p>
+        <div className="rounded-2xl bg-[#1C1C1E] p-6">
+          {dataUrl ? (
+            <img
+              src={dataUrl}
+              alt="Código QR"
+              className="max-w-[min(85vw,280px)] rounded-xl"
+              width={280}
+              height={280}
+            />
+          ) : (
+            <div className="flex h-64 w-64 max-w-[85vw] items-center justify-center rounded-xl text-sm text-[#8E8E93]">
+              Generando…
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

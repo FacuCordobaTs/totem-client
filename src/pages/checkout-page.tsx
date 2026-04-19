@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, CheckCircle2, Loader2 } from "lucide-react"
 import { publicApiFetch } from "@/lib/api"
 import type { GuestCheckoutResponse } from "@/types/api"
 import { Button } from "@/components/ui/button"
@@ -13,14 +13,23 @@ import {
 } from "@/stores/cart-store"
 import { formatMoneyArsExact } from "@/lib/format"
 
-type Step = "review" | "contact" | "done"
+type Step = "review" | "contact" | "success"
 
 const paymentOptions = [
   { value: "CARD" as const, label: "Tarjeta" },
   { value: "MERCADOPAGO" as const, label: "Mercado Pago" },
   { value: "TRANSFER" as const, label: "Transferencia" },
-  { value: "CASH" as const, label: "Efectivo (acuerdo previo)" },
+  { value: "CASH" as const, label: "Efectivo" },
 ]
+
+type PurchaseSummary = {
+  receiptToken: string
+  eventName: string
+  productoraName: string
+  total: string
+}
+
+const RECEIPT_REDIRECT_MS = 2400
 
 export function CheckoutPage() {
   const { eventId } = useParams<{ eventId: string }>()
@@ -31,7 +40,7 @@ export function CheckoutPage() {
   const [step, setStep] = useState<Step>("review")
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  const [receiptToken, setReceiptToken] = useState<string | null>(null)
+  const [purchaseSummary, setPurchaseSummary] = useState<PurchaseSummary | null>(null)
 
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
@@ -39,32 +48,67 @@ export function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] =
     useState<(typeof paymentOptions)[number]["value"]>("CARD")
 
+  const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const clientTotal = useMemo(
     () => (cart ? computeCartTotalString(cart) : "0.00"),
     [cart]
   )
 
+  const goToReceipt = useCallback(
+    (summary: PurchaseSummary) => {
+      if (redirectTimerRef.current != null) {
+        clearTimeout(redirectTimerRef.current)
+        redirectTimerRef.current = null
+      }
+      navigate(`/receipt/${summary.receiptToken}`, {
+        replace: true,
+        state: { fromCheckout: true },
+      })
+    },
+    [navigate]
+  )
+
   useEffect(() => {
     if (!eventId) return
+    if (purchaseSummary) return
     if (!cart || cart.eventId !== eventId) {
       navigate(`/e/${eventId}`, { replace: true })
     }
-  }, [eventId, cart, navigate])
+  }, [eventId, cart, navigate, purchaseSummary])
 
-  if (!eventId || !cart || cart.eventId !== eventId) return null
+  useEffect(() => {
+    if (step !== "success" || !purchaseSummary) return
+    redirectTimerRef.current = setTimeout(() => {
+      goToReceipt(purchaseSummary)
+      redirectTimerRef.current = null
+    }, RECEIPT_REDIRECT_MS)
+    return () => {
+      if (redirectTimerRef.current != null) {
+        clearTimeout(redirectTimerRef.current)
+        redirectTimerRef.current = null
+      }
+    }
+  }, [step, purchaseSummary, goToReceipt])
 
-  const snapshot: CartSnapshot = cart
+  if (!eventId) return null
+  if (!purchaseSummary && (!cart || cart.eventId !== eventId)) return null
+
+  const snapshot: CartSnapshot | null =
+    cart && cart.eventId === eventId ? cart : null
 
   const submitPurchase = async () => {
+    if (!snapshot) return
     setBusy(true)
     setErr(null)
     try {
+      const totalStr = computeCartTotalString(snapshot)
       const data = await publicApiFetch<GuestCheckoutResponse>("/public/checkout", {
         method: "POST",
         body: JSON.stringify({
           eventId: snapshot.eventId,
           paymentMethod,
-          clientTotal,
+          clientTotal: totalStr,
           contact: {
             name: name.trim(),
             email: email.trim(),
@@ -80,9 +124,14 @@ export function CheckoutPage() {
           })),
         }),
       })
+      setPurchaseSummary({
+        receiptToken: data.receiptToken,
+        eventName: snapshot.eventName,
+        productoraName: snapshot.productoraName,
+        total: totalStr,
+      })
       clearCart()
-      setReceiptToken(data.receiptToken)
-      setStep("done")
+      setStep("success")
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Error al completar la compra")
     } finally {
@@ -90,56 +139,87 @@ export function CheckoutPage() {
     }
   }
 
+  if (step === "success" && purchaseSummary) {
+    return (
+      <div className="flex min-h-dvh flex-col px-6 pb-20 pt-14 sm:px-8 sm:pt-16">
+        <div className="mx-auto flex w-full max-w-lg flex-col items-center gap-10 text-center">
+          <div className="flex size-20 items-center justify-center rounded-full bg-white/10">
+            <CheckCircle2 className="size-10 text-white" aria-hidden />
+          </div>
+          <div className="space-y-3">
+            <h1 className="text-2xl font-bold tracking-tight text-white">
+              Compra exitosa
+            </h1>
+            <p className="mx-auto max-w-sm text-sm leading-relaxed text-[#8E8E93]">
+              Ya podés ver tus códigos en el comprobante.
+            </p>
+          </div>
+          <div className="w-full space-y-4 rounded-2xl bg-[#1C1C1E] p-6 text-left">
+            <p className="text-sm font-medium text-white">{purchaseSummary.eventName}</p>
+            <p className="text-sm text-[#8E8E93]">{purchaseSummary.productoraName}</p>
+            <div className="border-t border-zinc-800/50 pt-4 ml-4">
+              <p className="text-sm text-[#8E8E93]">Total</p>
+              <p className="mt-1 text-lg font-bold tabular-nums text-white">
+                {formatMoneyArsExact(purchaseSummary.total)}
+              </p>
+            </div>
+          </div>
+          <div className="flex w-full flex-col items-center gap-6">
+            <p className="flex items-center gap-2 text-sm text-[#8E8E93]">
+              <Loader2 className="size-4 animate-spin opacity-70" aria-hidden />
+              Abriendo comprobante…
+            </p>
+            <Button
+              type="button"
+              className="h-12 w-full rounded-xl bg-white text-base font-semibold text-black hover:bg-zinc-200"
+              onClick={() => goToReceipt(purchaseSummary)}
+            >
+              Ver comprobante
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!snapshot) return null
+
   return (
-    <div className="flex min-h-dvh flex-col bg-[#09090b] px-5 pb-16 pt-10 text-zinc-50">
-      <div className="mx-auto flex w-full max-w-lg flex-col gap-10">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="rounded-none text-zinc-500 hover:bg-white/5 hover:text-zinc-200"
-            asChild
-          >
+    <div className="flex min-h-dvh flex-col px-6 pb-24 pt-10 sm:px-8">
+      <div className="mx-auto flex w-full max-w-lg flex-col gap-8">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon-sm" className="rounded-xl text-[#8E8E93] hover:bg-white/5 hover:text-white" asChild>
             <Link to={`/e/${eventId}`} aria-label="Volver">
               <ArrowLeft className="size-5" />
             </Link>
           </Button>
-          <span className="text-[11px] font-medium uppercase tracking-[0.2em] text-zinc-500">
-            Checkout
-          </span>
         </div>
 
-        <h1 className="text-2xl font-semibold tracking-tight text-white">
-          {step === "done" ? "Compra confirmada" : "Finalizar compra"}
-        </h1>
+        <h1 className="text-2xl font-bold tracking-tight text-white">Pago</h1>
 
         {step === "review" ? (
-          <section className="space-y-6 border border-white/10 bg-zinc-950/50 p-6">
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-400">
-              Resumen
-            </h2>
-            <div className="space-y-4 text-sm">
-              <div>
-                <p className="text-xs text-zinc-500">Evento</p>
-                <p className="mt-1 font-medium text-zinc-100">{snapshot.eventName}</p>
+          <section className="space-y-6 rounded-2xl bg-[#1C1C1E] p-6 sm:p-8">
+            <h2 className="text-2xl font-bold tracking-tight text-white">Resumen</h2>
+            <div className="space-y-0 text-sm">
+              <div className="py-4">
+                <p className="text-sm text-[#8E8E93]">Evento</p>
+                <p className="mt-1 font-medium text-white">{snapshot.eventName}</p>
               </div>
-              <div className="border-t border-white/10 pt-4">
-                <p className="text-xs text-zinc-500">Productora</p>
-                <p className="mt-1 text-zinc-300">{snapshot.productoraName}</p>
+              <div className="ml-4 border-t border-zinc-800/50 py-4">
+                <p className="text-sm text-[#8E8E93]">Organiza</p>
+                <p className="mt-1 text-white/90">{snapshot.productoraName}</p>
               </div>
-              <div className="border-t border-white/10 pt-4">
-                <p className="text-xs text-zinc-500">Entradas</p>
-                <p className="mt-1 text-zinc-200">
+              <div className="ml-4 border-t border-zinc-800/50 py-4">
+                <p className="text-sm text-[#8E8E93]">Entradas</p>
+                <p className="mt-1 text-white/90">
                   {snapshot.ticketLines.length === 0
                     ? "—"
-                    : snapshot.ticketLines
-                        .map((l) => `${l.quantity} × entrada`)
-                        .join(", ")}
+                    : snapshot.ticketLines.map((l) => `${l.quantity} × entrada`).join(", ")}
                 </p>
               </div>
-              <div className="border-t border-white/10 pt-4">
-                <p className="text-xs text-zinc-500">Consumos</p>
-                <p className="mt-1 text-zinc-200">
+              <div className="ml-4 border-t border-zinc-800/50 py-4">
+                <p className="text-sm text-[#8E8E93]">Consumos</p>
+                <p className="mt-1 text-white/90">
                   {snapshot.drinkLines.length === 0
                     ? "—"
                     : snapshot.drinkLines
@@ -148,15 +228,15 @@ export function CheckoutPage() {
                         .join(", ")}
                 </p>
               </div>
-              <div className="border-t border-white/10 pt-4">
-                <p className="text-xs text-zinc-500">Total</p>
-                <p className="mt-1 text-lg font-semibold tabular-nums text-white">
+              <div className="ml-4 border-t border-zinc-800/50 py-4">
+                <p className="text-sm text-[#8E8E93]">Total</p>
+                <p className="mt-1 text-xl font-bold tabular-nums text-white">
                   {formatMoneyArsExact(clientTotal)}
                 </p>
               </div>
             </div>
             <Button
-              className="h-11 w-full rounded-none border border-white/20 bg-white text-[#09090b] hover:bg-zinc-200"
+              className="h-12 w-full rounded-xl bg-white text-base font-semibold text-black hover:bg-zinc-200"
               onClick={() => setStep("contact")}
             >
               Continuar
@@ -165,25 +245,23 @@ export function CheckoutPage() {
         ) : null}
 
         {step === "contact" ? (
-          <section className="space-y-8 border border-white/10 bg-zinc-950/50 p-6">
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-400">
-              Contacto y pago
-            </h2>
-            <div className="space-y-5">
+          <section className="space-y-8 rounded-2xl bg-[#1C1C1E] p-6 sm:p-8">
+            <h2 className="text-2xl font-bold tracking-tight text-white">Tus datos</h2>
+            <div className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="co-name" className="text-zinc-300">
+                <Label htmlFor="co-name" className="text-sm text-[#8E8E93]">
                   Nombre
                 </Label>
                 <Input
                   id="co-name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="rounded-none border-white/15 bg-[#09090b] text-zinc-100 placeholder:text-zinc-600"
+                  className="h-11 rounded-xl border-zinc-700/80 bg-black/30 text-white placeholder:text-zinc-600"
                   autoComplete="name"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="co-email" className="text-zinc-300">
+                <Label htmlFor="co-email" className="text-sm text-[#8E8E93]">
                   Email
                 </Label>
                 <Input
@@ -191,13 +269,13 @@ export function CheckoutPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="rounded-none border-white/15 bg-[#09090b] text-zinc-100 placeholder:text-zinc-600"
+                  className="h-11 rounded-xl border-zinc-700/80 bg-black/30 text-white placeholder:text-zinc-600"
                   autoComplete="email"
                 />
-                <p className="text-xs text-zinc-500">¿A dónde enviamos tus entradas?</p>
+                <p className="text-sm text-[#8E8E93]">Para enviarte las entradas.</p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="co-phone" className="text-zinc-300">
+                <Label htmlFor="co-phone" className="text-sm text-[#8E8E93]">
                   Teléfono
                 </Label>
                 <Input
@@ -205,27 +283,23 @@ export function CheckoutPage() {
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="rounded-none border-white/15 bg-[#09090b] text-zinc-100 placeholder:text-zinc-600"
+                  className="h-11 rounded-xl border-zinc-700/80 bg-black/30 text-white placeholder:text-zinc-600"
                   autoComplete="tel"
                 />
-                <p className="text-xs text-zinc-500">
-                  ¿A dónde enviamos los códigos de consumos en barra?
-                </p>
+                <p className="text-sm text-[#8E8E93]">Para avisos de consumos en barra.</p>
               </div>
             </div>
 
             <div className="space-y-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-400">
-                Medio de pago
-              </p>
-              <div className="grid gap-2">
+              <p className="text-sm font-medium text-[#8E8E93]">Medio de pago</p>
+              <div className="flex flex-col gap-2">
                 {paymentOptions.map((opt) => (
                   <label
                     key={opt.value}
-                    className={`flex cursor-pointer items-center gap-3 border px-4 py-3 text-sm ${
+                    className={`flex cursor-pointer items-center gap-3 rounded-xl px-4 py-3 text-sm ${
                       paymentMethod === opt.value
-                        ? "border-white/40 bg-white/[0.06]"
-                        : "border-white/10 hover:border-white/20"
+                        ? "bg-white/10 text-white"
+                        : "text-[#8E8E93] hover:bg-white/5"
                     }`}
                   >
                     <input
@@ -243,9 +317,9 @@ export function CheckoutPage() {
 
             {err ? <p className="text-sm text-red-400">{err}</p> : null}
 
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3 pt-2">
               <Button
-                className="h-11 w-full rounded-none border border-white/20 bg-white text-[#09090b] hover:bg-zinc-200"
+                className="h-12 w-full rounded-xl bg-white text-base font-semibold text-black hover:bg-zinc-200"
                 disabled={
                   busy || name.trim().length < 1 || !email.includes("@") || phone.trim().length < 1
                 }
@@ -256,27 +330,13 @@ export function CheckoutPage() {
               <Button
                 type="button"
                 variant="ghost"
-                className="rounded-none text-zinc-500 hover:bg-white/5"
+                className="h-11 rounded-xl text-[#8E8E93] hover:bg-white/5 hover:text-white"
                 disabled={busy}
                 onClick={() => setStep("review")}
               >
-                Volver al resumen
+                Volver
               </Button>
             </div>
-          </section>
-        ) : null}
-
-        {step === "done" && receiptToken ? (
-          <section className="space-y-6 border border-white/10 bg-zinc-950/50 p-6">
-            <p className="text-sm leading-relaxed text-zinc-300">
-              Guardá este enlace: es tu comprobante y acceso a los códigos QR de esta compra.
-            </p>
-            <Button
-              className="h-11 w-full rounded-none border border-white/20 bg-white text-[#09090b] hover:bg-zinc-200"
-              asChild
-            >
-              <Link to={`/receipt/${receiptToken}`}>Ver mi comprobante</Link>
-            </Button>
           </section>
         ) : null}
       </div>

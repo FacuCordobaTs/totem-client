@@ -8,6 +8,7 @@ import { CheckoutPage } from "@/pages/checkout-page"
 import { ReceiptPage } from "@/pages/receipt-page"
 import { QrPage } from "@/pages/qr-page"
 import { EventLinkHintPage } from "@/pages/event-link-hint-page"
+import { AppShell } from "@/components/app-shell"
 
 function NightRoot({ children }: { children: ReactNode }) {
   useEffect(() => {
@@ -18,7 +19,7 @@ function NightRoot({ children }: { children: ReactNode }) {
       document.documentElement.style.colorScheme = ""
     }
   }, [])
-  return <>{children}</>
+  return <AppShell>{children}</AppShell>
 }
 
 const router = createBrowserRouter([

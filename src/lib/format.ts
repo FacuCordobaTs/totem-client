@@ -76,3 +76,29 @@ export function truncateHash(hash: string, head = 8, tail = 4): string {
   if (hash.length <= head + tail + 1) return hash
   return `${hash.slice(0, head)}…${hash.slice(-tail)}`
 }
+
+const PAYMENT_LABELS: Record<string, string> = {
+  CASH: "Efectivo",
+  CARD: "Tarjeta",
+  MERCADOPAGO: "Mercado Pago",
+  TRANSFER: "Transferencia",
+}
+
+export function formatPaymentMethod(code: string): string {
+  return PAYMENT_LABELS[code] ?? code
+}
+
+/** Estado legible para asistentes (sin enums crudos). */
+export function ticketStatusLabel(s: string): string {
+  if (s === "PENDING") return "Pendiente"
+  if (s === "USED") return "Utilizada"
+  if (s === "CANCELLED") return "Anulada"
+  return s
+}
+
+export function consumptionStatusLabel(s: string): string {
+  if (s === "PENDING") return "Pendiente"
+  if (s === "REDEEMED") return "Canjeada"
+  if (s === "CANCELLED") return "Anulada"
+  return s
+}
