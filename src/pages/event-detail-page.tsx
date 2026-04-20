@@ -167,20 +167,37 @@ export function EventDetailPage() {
           <p className="text-sm text-[#8E8E93]">Cargando…</p>
         ) : (
           <>
+            {showTicketStep || showProductStep ? (
+              <Button
+                type="button"
+                variant="ghost"
+                className="-ml-2 h-auto self-start rounded-xl px-2 py-1.5 text-sm text-[#8E8E93] hover:bg-white/5 hover:text-white"
+                onClick={() => setWorkflow(null)}
+              >
+                <ChevronLeft className="mr-0.5 size-4" aria-hidden />
+                Elegir otra opción
+              </Button>
+            ) : null}
+
+            {data.event.imageUrl ? (
+              <figure className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-zinc-900 shadow-[0_24px_48px_-12px_rgba(0,0,0,0.65)] ring-1 ring-white/[0.04]">
+                <img
+                  src={data.event.imageUrl}
+                  alt={data.event.name}
+                  className="aspect-[5/3] w-full object-cover sm:aspect-[2/1]"
+                  loading="eager"
+                  decoding="async"
+                />
+                <div
+                  className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent"
+                  aria-hidden
+                />
+              </figure>
+            ) : null}
+
             <header className="space-y-3">
-              {showTicketStep || showProductStep ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="-ml-2 h-auto rounded-xl px-2 py-1.5 text-sm text-[#8E8E93] hover:bg-white/5 hover:text-white"
-                  onClick={() => setWorkflow(null)}
-                >
-                  <ChevronLeft className="mr-0.5 size-4" aria-hidden />
-                  Elegir otra opción
-                </Button>
-              ) : null}
               <p className="text-sm text-[#8E8E93]">{data.productora.name}</p>
-              <h1 className="text-2xl font-bold tracking-tight text-white">
+              <h1 className="text-2xl font-bold tracking-tight text-white sm:text-[1.75rem] sm:leading-tight">
                 {data.event.name}
               </h1>
               <p className="text-sm text-[#8E8E93]">{formatEventDay(data.event.date)}</p>

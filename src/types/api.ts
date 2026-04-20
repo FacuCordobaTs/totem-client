@@ -39,6 +39,7 @@ export type PublicEventDetailResponse = {
     name: string
     date: string
     location: string | null
+    imageUrl?: string | null
     ticketsAvailableFrom: Date | string | null
     consumptionsAvailableFrom: Date | string | null
   }
