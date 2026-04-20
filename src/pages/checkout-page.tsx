@@ -46,7 +46,7 @@ export function CheckoutPage() {
   const [email, setEmail] = useState("")
   const [phone, setPhone] = useState("")
   const [paymentMethod, setPaymentMethod] =
-    useState<(typeof paymentOptions)[number]["value"]>("CARD")
+    useState<(typeof paymentOptions)[number]["value"]>("MERCADOPAGO")
 
   const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -124,6 +124,13 @@ export function CheckoutPage() {
           })),
         }),
       })
+
+      if (data.mercadoPago && data.initPoint) {
+        clearCart()
+        window.location.assign(data.initPoint)
+        return
+      }
+
       setPurchaseSummary({
         receiptToken: data.receiptToken,
         eventName: snapshot.eventName,
@@ -304,6 +311,12 @@ export function CheckoutPage() {
 
             <div className="space-y-3">
               <p className="text-sm font-medium text-[#8E8E93]">Medio de pago</p>
+              {paymentMethod === "MERCADOPAGO" ? (
+                <p className="text-sm leading-relaxed text-[#8E8E93]">
+                  Serás redirigido a Mercado Pago para pagar con tarjeta, dinero en cuenta u otros
+                  medios disponibles.
+                </p>
+              ) : null}
               <div className="flex flex-col gap-2">
                 {paymentOptions.map((opt) => (
                   <label

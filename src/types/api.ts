@@ -51,6 +51,10 @@ export type GuestCheckoutResponse = {
   message: string
   receiptToken: string
   saleId: string
+  /** Checkout Pro: abrir en la misma venta. */
+  initPoint?: string
+  preferenceId?: string
+  mercadoPago?: boolean
 }
 
 export type ReceiptApiResponse = {
@@ -59,6 +63,7 @@ export type ReceiptApiResponse = {
     id: string
     totalAmount: string
     paymentMethod: PaymentMethod
+    status?: "PENDING" | "PAYMENT_FAILED" | "COMPLETED" | "REFUNDED"
     createdAt: string | null
   }
   event: {

@@ -441,6 +441,9 @@ export function EventDetailPage() {
                 {formatMoneyArsExact(totalStr)}
               </span>
             </div>
+            <p className="text-center text-xs leading-relaxed text-[#8E8E93]">
+              El pago online se procesa de forma segura con Mercado Pago (Checkout Pro).
+            </p>
             <Button
               className="h-12 w-full rounded-xl bg-white text-base font-semibold text-black hover:bg-zinc-200"
               disabled={!canContinue}
