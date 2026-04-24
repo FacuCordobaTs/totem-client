@@ -55,7 +55,13 @@ export type GuestCheckoutResponse = {
   initPoint?: string
   preferenceId?: string
   mercadoPago?: boolean
+  /** Tarjeta: ir al comprobante y pagar con Brick. */
+  payOnReceipt?: boolean
 }
+
+export type ProcessBrickResponse =
+  | { success: true; status: "approved" | "pending" }
+  | { success: false; status: string; message?: string }
 
 export type ReceiptApiResponse = {
   receiptToken: string
@@ -65,6 +71,10 @@ export type ReceiptApiResponse = {
     paymentMethod: PaymentMethod
     status?: "PENDING" | "PAYMENT_FAILED" | "COMPLETED" | "REFUNDED"
     createdAt: string | null
+    paid: boolean
+    paidAt: string | null
+    cucuruAlias: string | null
+    cucuruCvu: string | null
   }
   event: {
     id: string
@@ -72,7 +82,7 @@ export type ReceiptApiResponse = {
     date: string
     location: string | null
   }
-  productora: { name: string }
+  productora: { name: string; mpPublicKey?: string | null }
   tickets: Array<{
     id: string
     qrHash: string

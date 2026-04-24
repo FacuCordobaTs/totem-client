@@ -16,10 +16,7 @@ import { formatMoneyArsExact } from "@/lib/format"
 type Step = "review" | "contact" | "success"
 
 const paymentOptions = [
-  { value: "CARD" as const, label: "Tarjeta" },
-  { value: "MERCADOPAGO" as const, label: "Mercado Pago" },
-  { value: "TRANSFER" as const, label: "Transferencia" },
-  { value: "CASH" as const, label: "Efectivo" },
+  { value: "TRANSFER" as const, label: "Transferencia (Cucuru)" },
 ]
 
 type PurchaseSummary = {
@@ -45,8 +42,6 @@ export function CheckoutPage() {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [phone, setPhone] = useState("")
-  const [paymentMethod, setPaymentMethod] =
-    useState<(typeof paymentOptions)[number]["value"]>("MERCADOPAGO")
 
   const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -107,7 +102,7 @@ export function CheckoutPage() {
         method: "POST",
         body: JSON.stringify({
           eventId: snapshot.eventId,
-          paymentMethod,
+          paymentMethod: "TRANSFER",
           clientTotal: totalStr,
           contact: {
             name: name.trim(),
@@ -125,9 +120,12 @@ export function CheckoutPage() {
         }),
       })
 
-      if (data.mercadoPago && data.initPoint) {
+      if (data.payOnReceipt && data.receiptToken) {
         clearCart()
-        window.location.assign(data.initPoint)
+        navigate(`/receipt/${data.receiptToken}`, {
+          replace: true,
+          state: { fromCheckout: true },
+        })
         return
       }
 
@@ -155,17 +153,18 @@ export function CheckoutPage() {
           </div>
           <div className="space-y-3">
             <h1 className="text-2xl font-bold tracking-tight text-white">
-              Compra exitosa
+              Pedido registrado
             </h1>
             <p className="mx-auto max-w-sm text-sm leading-relaxed text-[#8E8E93]">
-              Ya podés ver tus códigos en el comprobante.
+              Seguí las instrucciones en el comprobante para transferir y recibir tus códigos por
+              email.
             </p>
           </div>
           <div className="w-full space-y-4 rounded-2xl bg-[#1C1C1E] p-6 text-left">
             <p className="text-sm font-medium text-white">{purchaseSummary.eventName}</p>
             <p className="text-sm text-[#8E8E93]">{purchaseSummary.productoraName}</p>
             <div className="border-t border-zinc-800/50 pt-4 ml-4">
-              <p className="text-sm text-[#8E8E93]">Total</p>
+              <p className="text-sm text-[#8E8E93]">Total a transferir</p>
               <p className="mt-1 text-lg font-bold tabular-nums text-white">
                 {formatMoneyArsExact(purchaseSummary.total)}
               </p>
@@ -291,7 +290,9 @@ export function CheckoutPage() {
                   className="h-11 rounded-xl border-zinc-700/80 bg-black/30 text-white placeholder:text-zinc-600"
                   autoComplete="email"
                 />
-                <p className="text-sm text-[#8E8E93]">Para enviarte las entradas.</p>
+                <p className="text-sm text-[#8E8E93]">
+                  Te enviaremos los códigos por email cuando se acredite la transferencia.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="co-phone" className="text-sm text-[#8E8E93]">
@@ -311,28 +312,23 @@ export function CheckoutPage() {
 
             <div className="space-y-3">
               <p className="text-sm font-medium text-[#8E8E93]">Medio de pago</p>
-              {paymentMethod === "MERCADOPAGO" ? (
-                <p className="text-sm leading-relaxed text-[#8E8E93]">
-                  Serás redirigido a Mercado Pago para pagar con tarjeta, dinero en cuenta u otros
-                  medios disponibles.
-                </p>
-              ) : null}
+              <p className="text-sm leading-relaxed text-[#8E8E93]">
+                Vas a recibir un alias o CVU en el comprobante. Transferí el importe exacto; cuando
+                Cucuru confirme el cobro, habilitamos tus QR y te enviamos el email.
+              </p>
               <div className="flex flex-col gap-2">
                 {paymentOptions.map((opt) => (
                   <label
                     key={opt.value}
-                    className={`flex cursor-pointer items-center gap-3 rounded-xl px-4 py-3 text-sm ${
-                      paymentMethod === opt.value
-                        ? "bg-white/10 text-white"
-                        : "text-[#8E8E93] hover:bg-white/5"
-                    }`}
+                    className="flex cursor-default items-center gap-3 rounded-xl bg-white/10 px-4 py-3 text-sm text-white"
                   >
                     <input
                       type="radio"
                       name="pay"
                       className="accent-white"
-                      checked={paymentMethod === opt.value}
-                      onChange={() => setPaymentMethod(opt.value)}
+                      checked
+                      readOnly
+                      aria-label={opt.label}
                     />
                     {opt.label}
                   </label>
@@ -350,7 +346,7 @@ export function CheckoutPage() {
                 }
                 onClick={() => void submitPurchase()}
               >
-                {busy ? "Procesando…" : `Pagar ${formatMoneyArsExact(clientTotal)}`}
+                {busy ? "Procesando…" : `Continuar · ${formatMoneyArsExact(clientTotal)}`}
               </Button>
               <Button
                 type="button"

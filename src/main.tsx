@@ -1,5 +1,6 @@
 import { StrictMode, useEffect, type ReactNode } from "react"
 import { createRoot } from "react-dom/client"
+import { Toaster } from "sonner"
 import "./index.css"
 import { createBrowserRouter, Navigate } from "react-router"
 import { RouterProvider } from "react-router/dom"
@@ -68,6 +69,9 @@ const router = createBrowserRouter([
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <RouterProvider router={router} />
+    <>
+      <RouterProvider router={router} />
+      <Toaster theme="dark" position="top-center" richColors closeButton />
+    </>
   </StrictMode>
 )
