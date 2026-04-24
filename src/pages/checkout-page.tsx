@@ -44,6 +44,8 @@ export function CheckoutPage() {
   const [phone, setPhone] = useState("")
 
   const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** When true, skip "empty cart → back to event" guard (e.g. after checkout OK we clear cart before leaving). */
+  const leavingCheckoutRef = useRef(false)
 
   const clientTotal = useMemo(
     () => (cart ? computeCartTotalString(cart) : "0.00"),
@@ -65,8 +67,13 @@ export function CheckoutPage() {
   )
 
   useEffect(() => {
+    leavingCheckoutRef.current = false
+  }, [eventId])
+
+  useEffect(() => {
     if (!eventId) return
     if (purchaseSummary) return
+    if (leavingCheckoutRef.current) return
     if (!cart || cart.eventId !== eventId) {
       navigate(`/e/${eventId}`, { replace: true })
     }
@@ -121,11 +128,12 @@ export function CheckoutPage() {
       })
 
       if (data.payOnReceipt && data.receiptToken) {
-        clearCart()
+        leavingCheckoutRef.current = true
         navigate(`/receipt/${data.receiptToken}`, {
           replace: true,
           state: { fromCheckout: true },
         })
+        clearCart()
         return
       }
 
