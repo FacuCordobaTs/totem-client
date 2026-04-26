@@ -1,3 +1,15 @@
+import Decimal from "decimal.js"
+
+/**
+ * Mercado Pago Bricks requires a `number` for `initialization.amount`.
+ * Use exact decimal string → number (2 dp) to avoid ad-hoc float math for totals.
+ */
+export function amountStringToSdkNumber(totalAmount: string): number {
+  return new Decimal(totalAmount || "0")
+    .toDecimalPlaces(2, Decimal.ROUND_HALF_UP)
+    .toNumber()
+}
+
 export function formatMoneyArs(value: string | number): string {
   const n = typeof value === "string" ? Number(value) : value
   if (Number.isNaN(n)) return "$ —"

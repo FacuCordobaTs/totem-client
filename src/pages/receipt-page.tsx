@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useState } from "react"
-import { Link, useLocation, useParams } from "react-router"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { Link, useLocation, useParams, useSearchParams } from "react-router"
 import QRCode from "qrcode"
-import { Copy, MoreHorizontal, X } from "lucide-react"
+import { Copy, MoreHorizontal, X, Loader2 } from "lucide-react"
+import { initMercadoPago, CardPayment } from "@mercadopago/sdk-react"
 import { toast } from "sonner"
-import { publicApiFetch } from "@/lib/api"
-import type { ReceiptApiResponse } from "@/types/api"
+import { getApiBase, publicApiFetch } from "@/lib/api"
+import type { ProcessBrickResponse, ReceiptApiResponse } from "@/types/api"
 import { Button } from "@/components/ui/button"
 import {
+  amountStringToSdkNumber,
   consumptionStatusLabel,
   formatEventDate,
   formatEventDay,
@@ -16,6 +18,8 @@ import {
   truncateHash,
 } from "@/lib/format"
 import { AppleSheet } from "@/components/apple-sheet"
+
+const MP_CHECKOUT_LAUNCHED_KEY = "mpCheckoutLaunched"
 
 function QrBlock({
   hash,
@@ -95,6 +99,7 @@ async function copyText(label: string, value: string) {
 export function ReceiptPage() {
   const { receiptToken } = useParams<{ receiptToken: string }>()
   const location = useLocation()
+  const [searchParams] = useSearchParams()
   const fromCheckout =
     (location.state as { fromCheckout?: boolean } | null)?.fromCheckout === true
 
@@ -102,6 +107,22 @@ export function ReceiptPage() {
   const [error, setError] = useState<string | null>(null)
   const [showPurchaseBanner, setShowPurchaseBanner] = useState(fromCheckout)
   const [moreOpen, setMoreOpen] = useState(false)
+  const [mpPreferenceLoading, setMpPreferenceLoading] = useState(false)
+  const [mpBrickLoading, setMpBrickLoading] = useState(false)
+  const [mpSessionLaunched, setMpSessionLaunched] = useState(false)
+  const hadPendingPaymentRef = useRef(false)
+
+  const mpCheckoutReturnParams = useMemo(
+    () =>
+      !!(
+        searchParams.get("collection_id") ||
+        searchParams.get("payment_id") ||
+        searchParams.get("collection_status") ||
+        searchParams.get("preference_id") ||
+        searchParams.get("status")
+      ),
+    [searchParams]
+  )
 
   useEffect(() => {
     if (!fromCheckout) return
@@ -128,23 +149,188 @@ export function ReceiptPage() {
     void load()
   }, [load])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!data) return
-    if (data.sale.paid === true) return
-    if (data.sale.status === "PAYMENT_FAILED") return
+    if (data.sale.paid) return
+    if (data.sale.status !== "PENDING" || data.sale.paymentMethod !== "CARD")
+      return
+    const pk = data.productora.mpPublicKey
+    if (pk == null || pk === "") return
+    try {
+      initMercadoPago(pk, { locale: "es-AR" })
+    } catch (e) {
+      console.error("[Mercado Pago] initMercadoPago", e)
+    }
+  }, [
+    data?.productora?.mpPublicKey,
+    data?.sale?.id,
+    data?.sale?.paid,
+    data?.sale?.status,
+    data?.sale?.paymentMethod,
+  ])
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !data?.sale.id) return
+    if (data.sale.paid) {
+      setMpSessionLaunched(false)
+      return
+    }
+    setMpSessionLaunched(
+      sessionStorage.getItem(MP_CHECKOUT_LAUNCHED_KEY) === data.sale.id
+    )
+  }, [data?.sale.id, data?.sale.paid, receiptToken])
+
+  const shouldPoll =
+    data != null &&
+    data.sale.paid === false &&
+    data.sale.status === "PENDING"
+
+  useEffect(() => {
+    if (!shouldPoll) return
+    void load()
     const id = window.setInterval(() => {
       void load()
-    }, 12000)
-    return () => window.clearInterval(id)
-  }, [data, load])
+    }, 4000)
+    const onVis = () => {
+      if (document.visibilityState === "visible") void load()
+    }
+    document.addEventListener("visibilitychange", onVis)
+    return () => {
+      window.clearInterval(id)
+      document.removeEventListener("visibilitychange", onVis)
+    }
+  }, [shouldPoll, load])
+
+  useEffect(() => {
+    if (!data) return
+    const pending = !data.sale.paid && data.sale.status === "PENDING"
+    if (pending) hadPendingPaymentRef.current = true
+    if (data.sale.paid && hadPendingPaymentRef.current) {
+      toast.success("¡Pago confirmado!")
+      hadPendingPaymentRef.current = false
+      sessionStorage.removeItem(MP_CHECKOUT_LAUNCHED_KEY)
+    }
+  }, [data])
 
   if (!receiptToken) return null
 
   const showPaidContent = data?.sale.paid === true
-  const showPendingTransfer =
+  const showTransferBlock =
     data != null &&
     data.sale.paid === false &&
-    data.sale.status !== "PAYMENT_FAILED"
+    data.sale.status !== "PAYMENT_FAILED" &&
+    data.sale.paymentMethod === "TRANSFER"
+  const showCardBrick =
+    data != null &&
+    data.sale.paid === false &&
+    data.sale.status === "PENDING" &&
+    data.sale.paymentMethod === "CARD"
+  const showMpCheckoutCta =
+    data != null &&
+    data.sale.paid === false &&
+    data.sale.status === "PENDING" &&
+    data.sale.paymentMethod === "MERCADOPAGO"
+  const showMpVerifying =
+    showMpCheckoutCta && (mpSessionLaunched || mpCheckoutReturnParams)
+
+  const handleCardPaymentSubmit = async (formData: {
+    token: string
+    issuer_id: string
+    payment_method_id: string
+    transaction_amount: number
+    installments: number
+    payer: { email?: string; identification?: { type?: string; number?: string } }
+  }) => {
+    if (!receiptToken) return
+    setMpBrickLoading(true)
+    try {
+      const res = await fetch(`${getApiBase()}/api/mp/process-brick`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token: formData.token,
+          installments: formData.installments,
+          payment_method_id: formData.payment_method_id,
+          issuer_id: formData.issuer_id,
+          payer: {
+            email: formData.payer?.email,
+            identification: formData.payer?.identification
+              ? {
+                  type: formData.payer.identification.type,
+                  number: formData.payer.identification.number,
+                }
+              : undefined,
+          },
+          receiptToken,
+        }),
+      })
+      const json = (await res.json()) as ProcessBrickResponse
+      if (!res.ok) {
+        toast.error("No se pudo procesar el pago", {
+          description:
+            (typeof json.error === "string" && json.error) || "Intentá de nuevo",
+        })
+        throw new Error("mp_http_error")
+      }
+      if (json.success && json.status === "approved") {
+        void load()
+        return
+      }
+      if (json.success && json.status === "pending") {
+        void load()
+        toast.message("Pago en proceso", {
+          description: "Te avisamos cuando se acredite. Podés dejar esta pantalla abierta.",
+        })
+        return
+      }
+      if (json.success && json.status === "rejected") {
+        toast.error("Pago rechazado", {
+          description:
+            (typeof json.message === "string" && json.message) ||
+            "Revisá los datos o probá con otra tarjeta.",
+        })
+        throw new Error("mp_rejected")
+      }
+      toast.error("No se pudo completar el pago", { description: "Intentá de nuevo." })
+      throw new Error("mp_error")
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : ""
+      if (!["mp_http_error", "mp_rejected", "mp_error"].includes(msg)) {
+        toast.error("Error de conexión al procesar el pago")
+      }
+    } finally {
+      setMpBrickLoading(false)
+    }
+  }
+
+  const handleMercadoPagoPreference = async () => {
+    if (!data?.sale.id) return
+    setMpPreferenceLoading(true)
+    try {
+      const res = await fetch(`${getApiBase()}/api/mp/crear-preferencia-externo`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ saleId: data.sale.id }),
+      })
+      const json = (await res.json()) as {
+        success?: boolean
+        url_pago?: string
+        error?: string
+      }
+      if (json.success && json.url_pago) {
+        sessionStorage.setItem(MP_CHECKOUT_LAUNCHED_KEY, data.sale.id)
+        window.location.href = json.url_pago
+        return
+      }
+      toast.error("No se pudo iniciar el pago", {
+        description: json.error || "Intentá de nuevo.",
+      })
+    } catch {
+      toast.error("Error de conexión", { description: "Intentá de nuevo." })
+    } finally {
+      setMpPreferenceLoading(false)
+    }
+  }
 
   return (
     <div className="min-h-dvh pb-28">
@@ -185,11 +371,27 @@ export function ReceiptPage() {
                   <span className="font-semibold text-white">Listo.</span> Mostrá los QR en ingreso o
                   barra cuando te lo pidan.
                 </>
-              ) : (
+              ) : data.sale.paymentMethod === "TRANSFER" ? (
                 <>
                   <span className="font-semibold text-white">Pendiente de pago.</span> Transferí el
                   monto exacto al alias o CVU indicado abajo. Cuando se acredite, habilitamos tus
                   códigos y te enviamos el email.
+                </>
+              ) : data.sale.paymentMethod === "CARD" ? (
+                <>
+                  <span className="font-semibold text-white">Pendiente de pago.</span> Completá el
+                  pago con tarjeta abajo. Cuando se acredite, habilitamos tus códigos en esta
+                  pantalla.
+                </>
+              ) : data.sale.paymentMethod === "MERCADOPAGO" ? (
+                <>
+                  <span className="font-semibold text-white">Pendiente de pago.</span> Aboná con
+                  Mercado Pago; al volver, verificamos el pago automáticamente.
+                </>
+              ) : (
+                <>
+                  <span className="font-semibold text-white">Pendiente de pago.</span> Cuando se
+                  acredite, habilitamos tus códigos.
                 </>
               )}
             </p>
@@ -228,7 +430,7 @@ export function ReceiptPage() {
               </div>
             ) : null}
 
-            {showPendingTransfer ? (
+            {showTransferBlock ? (
               <section className="space-y-5 rounded-2xl border border-amber-500/20 bg-amber-950/15 px-4 py-6">
                 <div className="space-y-2">
                   <h2 className="text-xl font-semibold tracking-tight text-amber-100">
@@ -305,6 +507,97 @@ export function ReceiptPage() {
                   onClick={() => void load()}
                 >
                   Ya transferí — actualizar
+                </Button>
+              </section>
+            ) : null}
+
+            {showCardBrick && data.productora.mpPublicKey ? (
+              <section className="space-y-4 rounded-2xl border border-zinc-800/80 bg-[#1C1C1E] px-4 py-6">
+                <h2 className="text-lg font-semibold text-white">Pago con tarjeta</h2>
+                <p className="text-sm leading-relaxed text-[#8E8E93]">
+                  Usá un medio seguro con Mercado Pago. No compartas esta pantalla mientras
+                  completás el pago.
+                </p>
+                <div className="rounded-xl bg-black/30 p-2">
+                  <CardPayment
+                    key={`brick-${receiptToken}`}
+                    locale="es-AR"
+                    initialization={{
+                      amount: amountStringToSdkNumber(data.sale.totalAmount),
+                    }}
+                    customization={{
+                      paymentMethods: { maxInstallments: 12 },
+                    }}
+                    onSubmit={async (formData) => {
+                      await handleCardPaymentSubmit(formData)
+                    }}
+                    onError={() => {
+                      toast.error("No se pudo cargar el formulario de pago", {
+                        description: "Actualizá la página o probá más tarde.",
+                      })
+                    }}
+                  />
+                </div>
+                {mpBrickLoading ? (
+                  <p className="flex items-center justify-center gap-2 text-sm text-[#8E8E93]">
+                    <Loader2 className="size-4 animate-spin" aria-hidden />
+                    Procesando pago…
+                  </p>
+                ) : null}
+              </section>
+            ) : null}
+
+            {showCardBrick && !data.productora.mpPublicKey ? (
+              <div className="rounded-2xl border border-red-500/20 bg-red-950/20 px-4 py-5 text-sm text-[#8E8E93]">
+                Este evento no tiene habilitada la clave pública de Mercado Pago. Contactá a la
+                productora o elegí transferencia.
+              </div>
+            ) : null}
+
+            {showMpCheckoutCta ? (
+              <section className="space-y-4 rounded-2xl border border-[#009EE3]/25 bg-zinc-900/50 px-4 py-6">
+                <h2 className="text-lg font-semibold text-white">Mercado Pago</h2>
+                {showMpVerifying ? (
+                  <div
+                    className="flex flex-col items-center justify-center gap-3 py-8"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <Loader2 className="size-8 animate-spin text-[#009EE3]" aria-hidden />
+                    <p className="text-center text-sm text-[#8E8E93]">
+                      Verificando pago en Mercado Pago…
+                    </p>
+                    <p className="text-center text-xs text-zinc-500">
+                      No cierres esta pestaña. Actualizamos el estado automáticamente.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm leading-relaxed text-[#8E8E93]">
+                      Te llevamos a Mercado Pago para abonar con el medio que prefieras. Al volver,
+                      comprobamos el pago automáticamente.
+                    </p>
+                    <Button
+                      type="button"
+                      className="h-14 w-full rounded-xl bg-[#009EE3] text-base font-bold text-white hover:bg-[#008ed4]"
+                      disabled={mpPreferenceLoading}
+                      onClick={() => void handleMercadoPagoPreference()}
+                    >
+                      {mpPreferenceLoading ? (
+                        <Loader2 className="size-6 animate-spin" aria-hidden />
+                      ) : (
+                        "Ir a Mercado Pago"
+                      )}
+                    </Button>
+                  </>
+                )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-11 w-full rounded-xl text-[#8E8E93] hover:bg-white/5 hover:text-white"
+                  onClick={() => void load()}
+                >
+                  Actualizar estado
                 </Button>
               </section>
             ) : null}
@@ -477,24 +770,31 @@ export function ReceiptPage() {
                 <p className="mt-3 break-all font-mono text-[11px] leading-relaxed text-[#8E8E93]">
                   Pedido: {truncateHash(receiptToken, 12, 8)}
                 </p>
-                <ul className="mt-4 space-y-3">
-                  {data.tickets.map((t, i) => (
-                    <li
-                      key={t.id}
-                      className="font-mono text-[11px] leading-relaxed text-[#8E8E93]"
-                    >
-                      Entrada {i + 1}: {truncateHash(t.qrHash, 10, 6)}
-                    </li>
-                  ))}
-                  {data.consumptions.map((c, i) => (
-                    <li
-                      key={c.id}
-                      className="font-mono text-[11px] leading-relaxed text-[#8E8E93]"
-                    >
-                      Consumo {i + 1}: {truncateHash(c.qrHash, 10, 6)}
-                    </li>
-                  ))}
-                </ul>
+                {data.sale.paid ? (
+                  <ul className="mt-4 space-y-3">
+                    {data.tickets.map((t, i) => (
+                      <li
+                        key={t.id}
+                        className="font-mono text-[11px] leading-relaxed text-[#8E8E93]"
+                      >
+                        Entrada {i + 1}: {truncateHash(t.qrHash, 10, 6)}
+                      </li>
+                    ))}
+                    {data.consumptions.map((c, i) => (
+                      <li
+                        key={c.id}
+                        className="font-mono text-[11px] leading-relaxed text-[#8E8E93]"
+                      >
+                        Consumo {i + 1}: {truncateHash(c.qrHash, 10, 6)}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-4 text-[11px] leading-relaxed text-zinc-500">
+                    Los códigos de entradas y consumos se mostrarán aquí para soporte una vez
+                    acreditado el pago.
+                  </p>
+                )}
               </div>
             </div>
           </div>

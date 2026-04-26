@@ -16,8 +16,25 @@ import { formatMoneyArsExact } from "@/lib/format"
 type Step = "review" | "contact" | "success"
 
 const paymentOptions = [
-  { value: "TRANSFER" as const, label: "Transferencia (Cucuru)" },
-]
+  { value: "TRANSFER" as const, label: "Transferencia" },
+  { value: "CARD" as const, label: "Tarjeta de crédito/débito" },
+  { value: "MERCADOPAGO" as const, label: "Mercado Pago" },
+] as const
+
+type CheckoutPaymentMethod = (typeof paymentOptions)[number]["value"]
+
+function contactPaymentHint(method: CheckoutPaymentMethod): string {
+  switch (method) {
+    case "TRANSFER":
+      return "Vas a recibir un alias o CVU en el comprobante. Transferí el importe exacto; cuando se acredite el pago, habilitamos tus códigos QR y te avisamos por email."
+    case "CARD":
+      return "Pagarás con tarjeta de forma segura en el comprobante: completá el formulario de Mercado Pago (Bricks) y, al acreditarse, se habilitan los QR en esa misma pantalla."
+    case "MERCADOPAGO":
+      return "Serás redirigido a Mercado Pago (Checkout Pro) para completar el pago. Al volver a Totem, verificamos el pago y habilitamos tus códigos automáticamente."
+    default:
+      return ""
+  }
+}
 
 type PurchaseSummary = {
   receiptToken: string
@@ -42,6 +59,8 @@ export function CheckoutPage() {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [phone, setPhone] = useState("")
+  const [paymentMethod, setPaymentMethod] =
+    useState<CheckoutPaymentMethod>("TRANSFER")
 
   const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   /** When true, skip "empty cart → back to event" guard (e.g. after checkout OK we clear cart before leaving). */
@@ -109,7 +128,7 @@ export function CheckoutPage() {
         method: "POST",
         body: JSON.stringify({
           eventId: snapshot.eventId,
-          paymentMethod: "TRANSFER",
+          paymentMethod,
           clientTotal: totalStr,
           contact: {
             name: name.trim(),
@@ -164,15 +183,15 @@ export function CheckoutPage() {
               Pedido registrado
             </h1>
             <p className="mx-auto max-w-sm text-sm leading-relaxed text-[#8E8E93]">
-              Seguí las instrucciones en el comprobante para transferir y recibir tus códigos por
-              email.
+              Abrí el comprobante: ahí te indicamos cómo completar el pago. Cuando se acredite, tus
+              códigos se habilitan y te avisamos por email.
             </p>
           </div>
           <div className="w-full space-y-4 rounded-2xl bg-[#1C1C1E] p-6 text-left">
             <p className="text-sm font-medium text-white">{purchaseSummary.eventName}</p>
             <p className="text-sm text-[#8E8E93]">{purchaseSummary.productoraName}</p>
             <div className="border-t border-zinc-800/50 pt-4 ml-4">
-              <p className="text-sm text-[#8E8E93]">Total a transferir</p>
+              <p className="text-sm text-[#8E8E93]">Total</p>
               <p className="mt-1 text-lg font-bold tabular-nums text-white">
                 {formatMoneyArsExact(purchaseSummary.total)}
               </p>
@@ -299,7 +318,9 @@ export function CheckoutPage() {
                   autoComplete="email"
                 />
                 <p className="text-sm text-[#8E8E93]">
-                  Te enviaremos los códigos por email cuando se acredite la transferencia.
+                  {paymentMethod === "TRANSFER"
+                    ? "Te enviaremos los códigos por email cuando se acredite el pago."
+                    : "Te enviaremos la confirmación y los códigos a este email cuando el pago quede acreditado."}
                 </p>
               </div>
               <div className="space-y-2">
@@ -320,28 +341,27 @@ export function CheckoutPage() {
 
             <div className="space-y-3">
               <p className="text-sm font-medium text-[#8E8E93]">Medio de pago</p>
-              <p className="text-sm leading-relaxed text-[#8E8E93]">
-                Vas a recibir un alias o CVU en el comprobante. Transferí el importe exacto; cuando
-                Cucuru confirme el cobro, habilitamos tus QR y te enviamos el email.
-              </p>
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2" role="radiogroup" aria-label="Medio de pago">
                 {paymentOptions.map((opt) => (
                   <label
                     key={opt.value}
-                    className="flex cursor-default items-center gap-3 rounded-xl bg-white/10 px-4 py-3 text-sm text-white"
+                    className="flex cursor-pointer items-center gap-3 rounded-xl bg-white/10 px-4 py-3 text-sm text-white"
                   >
                     <input
                       type="radio"
                       name="pay"
                       className="accent-white"
-                      checked
-                      readOnly
+                      checked={paymentMethod === opt.value}
+                      onChange={() => setPaymentMethod(opt.value)}
                       aria-label={opt.label}
                     />
                     {opt.label}
                   </label>
                 ))}
               </div>
+              <p className="text-sm leading-relaxed text-[#8E8E93]">
+                {contactPaymentHint(paymentMethod)}
+              </p>
             </div>
 
             {err ? <p className="text-sm text-red-400">{err}</p> : null}

@@ -59,9 +59,13 @@ export type GuestCheckoutResponse = {
   payOnReceipt?: boolean
 }
 
-export type ProcessBrickResponse =
-  | { success: true; status: "approved" | "pending" }
-  | { success: false; status: string; message?: string }
+export type ProcessBrickResponse = {
+  success: boolean
+  status?: string
+  payment_id?: string
+  message?: string
+  error?: string
+}
 
 export type ReceiptApiResponse = {
   receiptToken: string
