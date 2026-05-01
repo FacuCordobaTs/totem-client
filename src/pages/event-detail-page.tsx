@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams } from "react-router"
 import { ArrowUpRight, ChevronLeft, Minus, Plus } from "lucide-react"
-import { AnimatePresence, motion, type Transition, type Variants } from "motion/react"
+import { AnimatePresence, motion, type Transition } from "motion/react"
 import { publicApiFetch } from "@/lib/api"
 import type { PublicEventDetailResponse } from "@/types/api"
 import {
@@ -236,11 +236,7 @@ export function EventDetailPage() {
       </motion.div>
 
       <div
-        className={`relative z-10 mx-auto flex min-h-[calc(100dvh-env(safe-area-inset-top)-3rem)] w-full max-w-lg flex-col justify-end px-5 pt-10 sm:px-8 ${
-          showFooter
-            ? "pb-[calc(10.5rem+max(1rem,env(safe-area-inset-bottom)))]"
-            : "pb-[max(1rem,env(safe-area-inset-bottom))]"
-        }`}
+        className={`relative z-10 mx-auto flex min-h-dvh max-h-dvh w-full max-w-lg flex-col justify-end overflow-y-auto overscroll-contain px-5 pt-10 sm:px-8 ${showFooter ? "pb-40" : "pb-6"}`}
       >
         {error ? (
           <p className="text-sm text-red-300">{error}</p>
@@ -340,47 +336,40 @@ export function EventDetailPage() {
                           </Button>
                         ) : null}
 
-                        <div className="max-h-[min(48vh,520px)] overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] pr-1">
-                          <AnimatePresence mode="wait" initial={false}>
-                            {showChooser ? (
-                              <ChooserStep
-                                key="chooser"
-                                hasTicketCatalog={hasTicketCatalog}
-                                anyTicketPurchasable={anyTicketPurchasable}
-                                hasProductCatalog={hasProductCatalog}
-                                productsPurchasable={productsPurchasable}
-                                ticketsFrom={ticketsFrom}
-                                ticketsOpen={ticketsWindow.open}
-                                consFrom={consFrom}
-                                consOpen={consWindow.open}
-                                onChooseTickets={chooseTicketsWorkflow}
-                                onChooseProducts={chooseProductsWorkflow}
-                              />
-                            ) : null}
-                            {showTicketStep ? (
-                              <TicketStep
-                                key="tickets"
-                                data={data}
-                                ticketsFrom={ticketsFrom}
-                                ticketsWindow={ticketsWindow}
-                                ticketTypeId={ticketTypeId}
-                                setTicketTypeId={setTicketTypeId}
-                                qty={qty}
-                                setQty={setQty}
-                                selectedType={selectedType}
-                              />
-                            ) : null}
-                            {showProductStep ? (
-                              <ProductStep
-                                key="products"
-                                data={data}
-                                consFrom={consFrom}
-                                consWindow={consWindow}
-                                drinks={drinks}
-                                setDrinkQty={setDrinkQty}
-                              />
-                            ) : null}
-                          </AnimatePresence>
+                        <div className="w-full">
+                          {showChooser ? (
+                            <ChooserStep
+                              hasTicketCatalog={hasTicketCatalog}
+                              anyTicketPurchasable={anyTicketPurchasable}
+                              hasProductCatalog={hasProductCatalog}
+                              productsPurchasable={productsPurchasable}
+                              ticketsFrom={ticketsFrom}
+                              ticketsOpen={ticketsWindow.open}
+                              consFrom={consFrom}
+                              consOpen={consWindow.open}
+                              onChooseTickets={chooseTicketsWorkflow}
+                              onChooseProducts={chooseProductsWorkflow}
+                            />
+                          ) : showTicketStep ? (
+                            <TicketStep
+                              data={data}
+                              ticketsFrom={ticketsFrom}
+                              ticketsWindow={ticketsWindow}
+                              ticketTypeId={ticketTypeId}
+                              setTicketTypeId={setTicketTypeId}
+                              qty={qty}
+                              setQty={setQty}
+                              selectedType={selectedType}
+                            />
+                          ) : showProductStep ? (
+                            <ProductStep
+                              data={data}
+                              consFrom={consFrom}
+                              consWindow={consWindow}
+                              drinks={drinks}
+                              setDrinkQty={setDrinkQty}
+                            />
+                          ) : null}
                         </div>
                       </motion.div>
                     )}
@@ -449,33 +438,21 @@ export function EventDetailPage() {
   )
 }
 
-const stepVariants: Variants = {
-  initial: { opacity: 0, y: 14, filter: "blur(8px)" },
-  animate: {
-    opacity: 1,
-    y: 0,
-    filter: "blur(0px)",
-    transition: { duration: 0.34, ease: [0.22, 1, 0.36, 1] as const },
-  },
-  exit: {
-    opacity: 0,
-    y: -8,
-    filter: "blur(8px)",
-    transition: { duration: 0.2, ease: [0.4, 0, 1, 1] as const },
-  },
+const STEP_ENTER: Transition = {
+  duration: 0.3,
+  ease: [0.22, 1, 0.36, 1] as const,
 }
 
 function StepShell({ children }: { children: React.ReactNode }) {
   return (
-    <motion.section
-      variants={stepVariants}
-      initial="initial"
-      animate="animate"
-      exit="exit"
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={STEP_ENTER}
       className="space-y-5 pb-2"
     >
       {children}
-    </motion.section>
+    </motion.div>
   )
 }
 
