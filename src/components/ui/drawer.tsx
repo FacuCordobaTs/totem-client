@@ -57,8 +57,8 @@ function DrawerContent({
           "group/drawer-content fixed z-50 flex h-auto flex-col",
           // bottom drawer (default)
           "data-[vaul-drawer-direction=bottom]:inset-x-0 data-[vaul-drawer-direction=bottom]:bottom-0 data-[vaul-drawer-direction=bottom]:mt-24 data-[vaul-drawer-direction=bottom]:max-h-[92vh] data-[vaul-drawer-direction=bottom]:rounded-t-[28px]",
-          // glass on desktop; coarse pointer strips blur in index.css and uses solid tint
-          "border border-white/[0.12] border-b-0 bg-white/[0.06] shadow-[0_-32px_80px_-20px_rgba(0,0,0,0.7),0_0_0_0.5px_rgba(255,255,255,0.06)_inset] backdrop-blur-xl supports-[backdrop-filter]:bg-black/25",
+          // glassmorphism
+          "border border-white/[0.12] border-b-0 bg-white/[0.06] shadow-[0_-32px_80px_-20px_rgba(0,0,0,0.7),0_0_0_0.5px_rgba(255,255,255,0.06)_inset] backdrop-blur-xl backdrop-saturate-800 supports-[backdrop-filter]:bg-black/[0.2]",
           // subtle inner highlight
           "before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:rounded-t-[28px] before:bg-gradient-to-r before:from-transparent before:via-white/30 before:to-transparent",
           className

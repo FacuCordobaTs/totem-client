@@ -1,7 +1,5 @@
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -35,55 +33,12 @@ import {
 
 type PurchaseWorkflow = "tickets" | "products"
 
-type MotionPerf = "desktop" | "mobile" | "reduced"
-
-const MotionPerfContext = createContext<MotionPerf>("desktop")
-
-function useMotionPerf() {
-  return useContext(MotionPerfContext)
-}
-
-function readMotionPerf(): MotionPerf {
-  if (typeof window === "undefined") return "desktop"
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return "reduced"
-  if (window.matchMedia("(pointer: coarse)").matches || window.innerWidth < 640)
-    return "mobile"
-  return "desktop"
-}
-
-function useMotionPerfProfile(): MotionPerf {
-  const [perf, setPerf] = useState<MotionPerf>("desktop")
-  useLayoutEffect(() => {
-    const sync = () => setPerf(readMotionPerf())
-    sync()
-    const mqRm = window.matchMedia("(prefers-reduced-motion: reduce)")
-    const mqTouch = window.matchMedia("(pointer: coarse)")
-    mqRm.addEventListener("change", sync)
-    mqTouch.addEventListener("change", sync)
-    window.addEventListener("resize", sync)
-    return () => {
-      mqRm.removeEventListener("change", sync)
-      mqTouch.removeEventListener("change", sync)
-      window.removeEventListener("resize", sync)
-    }
-  }, [])
-  return perf
-}
-
 const HEIGHT_EASE: Transition = {
   duration: 0.38,
   ease: [0.22, 1, 0.36, 1] as const,
 }
-/** Touch: skip height tween — avoids layout work each frame while drawer settles */
-const HEIGHT_SNAP: Transition = { duration: 0 }
-const EASE_OUT: Transition = {
-  duration: 0.32,
-  ease: [0.22, 1, 0.36, 1] as const,
-}
-const EASE_FAST: Transition = {
-  duration: 0.22,
-  ease: [0.22, 1, 0.36, 1] as const,
-}
+const EASE_OUT: Transition = { duration: 0.32, ease: [0.22, 1, 0.36, 1] }
+const EASE_FAST: Transition = { duration: 0.22, ease: [0.22, 1, 0.36, 1] }
 
 function useMeasuredHeight<T extends HTMLElement>() {
   const ref = useRef<T | null>(null)
@@ -259,144 +214,6 @@ export function EventDetailPage() {
 
   const ctaDisabled = !data || !hasAnyCatalog || !anythingPurchasable
 
-  const motionPerf = useMotionPerfProfile()
-
-  const heroMotion = useMemo(() => {
-    switch (motionPerf) {
-      case "reduced":
-        return {
-          initial: { opacity: 1 },
-          animate: { opacity: 1 },
-          transition: { duration: 0 },
-        }
-      case "mobile":
-        return {
-          initial: { opacity: 0 },
-          animate: { opacity: 1 },
-          transition: {
-            duration: 0.35,
-            ease: [0.22, 1, 0.36, 1] as const,
-          },
-        }
-      default:
-        return {
-          initial: { scale: 1.06, opacity: 0 },
-          animate: { scale: 1, opacity: 1 },
-          transition: {
-            duration: 1.2,
-            ease: [0.16, 1, 0.3, 1] as const,
-          },
-        }
-    }
-  }, [motionPerf])
-
-  const stackVariants = useMemo(
-    () => ({
-      hidden: {},
-      show: {
-        transition:
-          motionPerf === "desktop"
-            ? { staggerChildren: 0.08, delayChildren: 0.1 }
-            : motionPerf === "mobile"
-              ? { staggerChildren: 0.03, delayChildren: 0.04 }
-              : { staggerChildren: 0, delayChildren: 0 },
-      },
-    }),
-    [motionPerf]
-  )
-
-  const titleBlockVariants = useMemo(
-    (): Variants => ({
-      hidden:
-        motionPerf === "reduced"
-          ? { opacity: 0 }
-          : motionPerf === "mobile"
-            ? { opacity: 0, y: 10 }
-            : { opacity: 0, y: 14 },
-      show: {
-        opacity: 1,
-        y: 0,
-        transition:
-          motionPerf === "desktop"
-            ? EASE_OUT
-            : motionPerf === "mobile"
-              ? {
-                  duration: 0.22,
-                  ease: [0.22, 1, 0.36, 1] as const,
-                }
-              : { duration: 0 },
-      },
-    }),
-    [motionPerf]
-  )
-
-  const drawerSlotVariants = useMemo(
-    (): Variants => ({
-      hidden:
-        motionPerf === "reduced"
-          ? { opacity: 0 }
-          : motionPerf === "mobile"
-            ? { opacity: 0, y: 12 }
-            : { opacity: 0, y: 18 },
-      show: {
-        opacity: 1,
-        y: 0,
-        transition:
-          motionPerf === "desktop"
-            ? EASE_OUT
-            : motionPerf === "mobile"
-              ? {
-                  duration: 0.24,
-                  ease: [0.22, 1, 0.36, 1] as const,
-                }
-              : { duration: 0 },
-      },
-    }),
-    [motionPerf]
-  )
-
-  const trustLineVariants = useMemo(
-    () => ({
-      hidden: { opacity: 0 },
-      show: {
-        opacity: 1,
-        transition:
-          motionPerf === "desktop"
-            ? { duration: 0.6, delay: 0.2 }
-            : motionPerf === "mobile"
-              ? { duration: 0.22, delay: 0.04 }
-              : { duration: 0 },
-      },
-    }),
-    [motionPerf]
-  )
-
-  const topBarMotion = useMemo(
-    () =>
-      motionPerf === "desktop"
-        ? {
-            initial: { opacity: 0, y: -8 },
-            animate: { opacity: 1, y: 0 },
-            transition: {
-              duration: 0.6,
-              delay: 0.2,
-              ease: [0.22, 1, 0.36, 1] as const,
-            },
-          }
-        : motionPerf === "mobile"
-          ? {
-              initial: { opacity: 0 },
-              animate: { opacity: 1, y: 0 },
-              transition: { duration: 0.28, delay: 0.04 },
-            }
-          : {
-              initial: { opacity: 1 },
-              animate: { opacity: 1, y: 0 },
-              transition: { duration: 0 },
-            },
-    [motionPerf]
-  )
-
   if (!eventId) return null
 
   const hero = data?.event.imageUrl ?? null
@@ -411,9 +228,9 @@ export function EventDetailPage() {
             src={hero}
             alt={data?.event.name ?? ""}
             className="h-full w-full object-cover"
-            initial={heroMotion.initial}
-            animate={heroMotion.animate}
-            transition={heroMotion.transition}
+            initial={{ scale: 1.06, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
             loading="eager"
             decoding="async"
           />
@@ -433,13 +250,13 @@ export function EventDetailPage() {
 
       {/* Top bar */}
       <motion.div
-        initial={topBarMotion.initial}
-        animate={topBarMotion.animate}
-        transition={topBarMotion.transition}
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
         className="relative z-10 flex items-center justify-between px-6 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-8"
       >
         {data ? (
-          <span className="totem-productora-chip inline-flex items-center rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs font-medium text-white/85 backdrop-blur-md">
+          <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs font-medium text-white/85 backdrop-blur-md">
             {data.productora.name}
           </span>
         ) : (
@@ -457,10 +274,19 @@ export function EventDetailPage() {
           <motion.div
             initial="hidden"
             animate="show"
-            variants={stackVariants}
+            variants={{
+              hidden: {},
+              show: { transition: { staggerChildren: 0.08, delayChildren: 0.1 } },
+            }}
             className="space-y-6"
           >
-            <motion.div variants={titleBlockVariants} className="space-y-2">
+            <motion.div
+              variants={{
+                hidden: { opacity: 0, y: 14 },
+                show: { opacity: 1, y: 0, transition: EASE_OUT },
+              }}
+              className="space-y-2"
+            >
               <p className="text-xs font-medium uppercase tracking-[0.18em] text-white/55">
                 {formatEventDay(data.event.date)}
               </p>
@@ -472,7 +298,12 @@ export function EventDetailPage() {
               ) : null}
             </motion.div>
 
-            <motion.div variants={drawerSlotVariants}>
+            <motion.div
+              variants={{
+                hidden: { opacity: 0, y: 18 },
+                show: { opacity: 1, y: 0, transition: EASE_OUT },
+              }}
+            >
               <Drawer
                 open={drawerOpen}
                 onOpenChange={(open) => {
@@ -513,8 +344,7 @@ export function EventDetailPage() {
 
                 <DrawerContent>
                   <DrawerTitle className="sr-only">Comprar</DrawerTitle>
-                  <MotionPerfContext.Provider value={motionPerf}>
-                    <DrawerBody
+                  <DrawerBody
                     data={data}
                     showChooser={showChooser}
                     showTicketStep={showTicketStep}
@@ -543,12 +373,17 @@ export function EventDetailPage() {
                     onBack={goBackToChooser}
                     onContinue={continueClick}
                   />
-                  </MotionPerfContext.Provider>
                 </DrawerContent>
               </Drawer>
             </motion.div>
 
-            <motion.p variants={trustLineVariants} className="text-center text-[11px] text-white/40">
+            <motion.p
+              variants={{
+                hidden: { opacity: 0 },
+                show: { opacity: 1, transition: { duration: 0.6, delay: 0.2 } },
+              }}
+              className="text-center text-[11px] text-white/40"
+            >
               Pago seguro con Mercado Pago
             </motion.p>
           </motion.div>
@@ -619,8 +454,6 @@ function DrawerBody(props: DrawerBodyProps) {
     onContinue,
   } = props
 
-  const perf = useMotionPerf()
-
   /** Footer + back row must not mount until chooser exit finishes — avoids measuring chooser height + chrome together (drawer spike). */
   const [checkoutChromeReady, setCheckoutChromeReady] = useState(
     () => !needsWorkflowChoice
@@ -650,46 +483,12 @@ function DrawerBody(props: DrawerBodyProps) {
 
   const [measureRef, height] = useMeasuredHeight<HTMLDivElement>()
 
-  const heightTransition = perf === "desktop" ? HEIGHT_EASE : HEIGHT_SNAP
-
-  const backTransition: Transition =
-    perf === "desktop"
-      ? EASE_FAST
-      : perf === "mobile"
-        ? { duration: 0.14, ease: [0.22, 1, 0.36, 1] as const }
-        : { duration: 0 }
-
-  const footerMotion =
-    perf === "desktop"
-      ? {
-          initial: { opacity: 0, y: 12 },
-          animate: { opacity: 1, y: 0 },
-          exit: { opacity: 0, y: 12 },
-          transition: EASE_OUT,
-        }
-      : perf === "mobile"
-        ? {
-            initial: { opacity: 0, y: 6 },
-            animate: { opacity: 1, y: 0 },
-            exit: { opacity: 0, y: 6 },
-            transition: { duration: 0.18, ease: [0.22, 1, 0.36, 1] as const },
-          }
-        : {
-            initial: { opacity: 1, y: 0 },
-            animate: { opacity: 1, y: 0 },
-            exit: { opacity: 0 },
-            transition: { duration: 0 },
-          }
-
   return (
     <motion.div
       animate={{ height }}
       initial={false}
-      transition={heightTransition}
-      style={{
-        overflow: "hidden",
-        ...(perf === "desktop" ? { willChange: "height" as const } : {}),
-      }}
+      transition={HEIGHT_EASE}
+      style={{ overflow: "hidden", willChange: "height" }}
     >
       <div ref={measureRef} className="flex flex-col">
         <div className="px-5 pt-5">
@@ -702,7 +501,7 @@ function DrawerBody(props: DrawerBodyProps) {
                 initial={{ opacity: 0, x: -8 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -8 }}
-                transition={backTransition}
+                transition={EASE_FAST}
               >
                 <Button
                   type="button"
@@ -779,32 +578,23 @@ function DrawerBody(props: DrawerBodyProps) {
           {showFooter && checkoutChromeReady ? (
             <motion.div
               key="footer"
-              initial={footerMotion.initial}
-              animate={footerMotion.animate}
-              exit={footerMotion.exit}
-              transition={footerMotion.transition}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 12 }}
+              transition={EASE_OUT}
               className="mt-2 flex flex-col gap-3 border-t border-white/[0.08] px-5 pt-4 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
             >
               <div className="flex items-baseline justify-between gap-4">
                 <span className="text-sm text-white/65">Total</span>
-                {perf === "desktop" ? (
-                  <motion.span
-                    key={totalStr}
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] as const }}
-                    className="text-2xl font-bold tabular-nums tracking-tight text-white"
-                  >
-                    {formatMoneyArsExact(totalStr)}
-                  </motion.span>
-                ) : (
-                  <span
-                    key={totalStr}
-                    className="text-2xl font-bold tabular-nums tracking-tight text-white"
-                  >
-                    {formatMoneyArsExact(totalStr)}
-                  </span>
-                )}
+                <motion.span
+                  key={totalStr}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                  className="text-2xl font-bold tabular-nums tracking-tight text-white"
+                >
+                  {formatMoneyArsExact(totalStr)}
+                </motion.span>
               </div>
               <Button
                 className="h-12 w-full rounded-2xl bg-white text-base font-semibold text-black shadow-[0_18px_44px_-18px_rgba(255,255,255,0.45)] transition-all hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_24px_56px_-16px_rgba(255,255,255,0.55)] disabled:translate-y-0 disabled:bg-white/30 disabled:text-white/60 disabled:shadow-none"
@@ -824,7 +614,7 @@ function DrawerBody(props: DrawerBodyProps) {
   )
 }
 
-const stepVariantsDesktop: Variants = {
+const stepVariants: Variants = {
   initial: { opacity: 0, y: 12, filter: "blur(8px)" },
   animate: {
     opacity: 1,
@@ -840,38 +630,10 @@ const stepVariantsDesktop: Variants = {
   },
 }
 
-const stepVariantsMobile: Variants = {
-  initial: { opacity: 0, y: 8 },
-  animate: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.22, ease: [0.22, 1, 0.36, 1] as const },
-  },
-  exit: {
-    opacity: 0,
-    y: -4,
-    transition: { duration: 0.12, ease: [0.4, 0, 1, 1] as const },
-  },
-}
-
-const stepVariantsReduced: Variants = {
-  initial: { opacity: 0 },
-  animate: { opacity: 1, transition: { duration: 0 } },
-  exit: { opacity: 0, transition: { duration: 0 } },
-}
-
 function StepShell({ children }: { children: React.ReactNode }) {
-  const perf = useMotionPerf()
-  const variants =
-    perf === "desktop"
-      ? stepVariantsDesktop
-      : perf === "mobile"
-        ? stepVariantsMobile
-        : stepVariantsReduced
-
   return (
     <motion.section
-      variants={variants}
+      variants={stepVariants}
       initial="initial"
       animate="animate"
       exit="exit"
@@ -959,18 +721,12 @@ function ChoiceCard({
   disabled: boolean
   onClick: () => void
 }) {
-  const perf = useMotionPerf()
-
   return (
     <motion.button
       type="button"
       disabled={disabled}
       onClick={onClick}
-      whileTap={
-        disabled || perf !== "desktop"
-          ? undefined
-          : { scale: 0.985 }
-      }
+      whileTap={disabled ? undefined : { scale: 0.985 }}
       className={`group/choice relative flex w-full items-center justify-between gap-4 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-5 text-left transition-colors duration-200 ${
         disabled
           ? "cursor-not-allowed opacity-40"
@@ -1010,15 +766,6 @@ function TicketStep({
   setQty: (next: number | ((q: number) => number)) => void
   selectedType: PublicEventDetailResponse["ticketTypes"][number] | undefined
 }) {
-  const perf = useMotionPerf()
-
-  const qtyTransition: Transition =
-    perf === "desktop"
-      ? EASE_OUT
-      : perf === "mobile"
-        ? { duration: 0.15, ease: [0.22, 1, 0.36, 1] as const }
-        : { duration: 0 }
-
   return (
     <StepShell>
       <div className="space-y-1">
@@ -1050,11 +797,7 @@ function TicketStep({
                   type="button"
                   disabled={disabled}
                   onClick={() => setTicketTypeId(t.id)}
-                  whileTap={
-                    disabled || perf !== "desktop"
-                      ? undefined
-                      : { scale: 0.99 }
-                  }
+                  whileTap={disabled ? undefined : { scale: 0.99 }}
                   className={`flex w-full items-center justify-between gap-4 rounded-2xl border px-4 py-4 text-left transition-all duration-200 ${
                     selected
                       ? "border-white/40 bg-white/[0.10] shadow-[0_0_0_1px_rgba(255,255,255,0.18)_inset]"
@@ -1070,25 +813,18 @@ function TicketStep({
                           : "border-white/30 bg-transparent"
                       }`}
                     >
-                      {perf === "desktop" ? (
-                        <AnimatePresence>
-                          {selected ? (
-                            <motion.span
-                              key="dot"
-                              initial={{ scale: 0 }}
-                              animate={{ scale: 1 }}
-                              exit={{ scale: 0 }}
-                              transition={{
-                                duration: 0.18,
-                                ease: [0.22, 1, 0.36, 1] as const,
-                              }}
-                              className="size-2 rounded-full bg-black"
-                            />
-                          ) : null}
-                        </AnimatePresence>
-                      ) : selected ? (
-                        <span className="size-2 rounded-full bg-black" />
-                      ) : null}
+                      <AnimatePresence>
+                        {selected ? (
+                          <motion.span
+                            key="dot"
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            exit={{ scale: 0 }}
+                            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                            className="size-2 rounded-full bg-black"
+                          />
+                        ) : null}
+                      </AnimatePresence>
                     </span>
                     <span className="font-medium text-white">{t.name}</span>
                   </span>
@@ -1109,7 +845,7 @@ function TicketStep({
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
-            transition={qtyTransition}
+            transition={EASE_OUT}
             className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3"
           >
             <span className="text-sm text-white/70">Cantidad</span>
@@ -1202,8 +938,6 @@ function Stepper({
   onDec: () => void
   onInc: () => void
 }) {
-  const perf = useMotionPerf()
-
   return (
     <div className="flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] p-1">
       <Button
@@ -1217,22 +951,18 @@ function Stepper({
         <Minus className="size-4" />
       </Button>
       <span className="relative grid min-w-7 place-items-center overflow-hidden text-center">
-        {perf === "desktop" ? (
-          <AnimatePresence mode="popLayout" initial={false}>
-            <motion.span
-              key={value}
-              initial={{ y: 8, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: -8, opacity: 0 }}
-              transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] as const }}
-              className="tabular-nums text-sm font-semibold text-white"
-            >
-              {value}
-            </motion.span>
-          </AnimatePresence>
-        ) : (
-          <span className="tabular-nums text-sm font-semibold text-white">{value}</span>
-        )}
+        <AnimatePresence mode="popLayout" initial={false}>
+          <motion.span
+            key={value}
+            initial={{ y: 8, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -8, opacity: 0 }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            className="tabular-nums text-sm font-semibold text-white"
+          >
+            {value}
+          </motion.span>
+        </AnimatePresence>
       </span>
       <Button
         type="button"
