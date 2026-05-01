@@ -1,11 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams } from "react-router"
 import { ArrowUpRight, ChevronLeft, Minus, Plus } from "lucide-react"
 import { AnimatePresence, motion, type Transition, type Variants } from "motion/react"
@@ -19,12 +12,6 @@ import {
 } from "@/lib/format"
 import { Button } from "@/components/ui/button"
 import {
-  Drawer,
-  DrawerContent,
-  DrawerTitle,
-  DrawerTrigger,
-} from "@/components/ui/drawer"
-import {
   computeCartTotalString,
   useCartStore,
   type CartDrinkLine,
@@ -33,28 +20,10 @@ import {
 
 type PurchaseWorkflow = "tickets" | "products"
 
-const HEIGHT_EASE: Transition = {
-  duration: 0.38,
-  ease: [0.22, 1, 0.36, 1] as const,
-}
 const EASE_OUT: Transition = { duration: 0.32, ease: [0.22, 1, 0.36, 1] }
-const EASE_FAST: Transition = { duration: 0.22, ease: [0.22, 1, 0.36, 1] }
-
-function useMeasuredHeight<T extends HTMLElement>() {
-  const ref = useRef<T | null>(null)
-  const [height, setHeight] = useState<number | "auto">("auto")
-  useLayoutEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const ro = new ResizeObserver((entries) => {
-      const next = entries[0]?.borderBoxSize?.[0]?.blockSize ?? el.offsetHeight
-      setHeight(next)
-    })
-    ro.observe(el)
-    setHeight(el.offsetHeight)
-    return () => ro.disconnect()
-  }, [])
-  return [ref, height] as const
+const EASE_SMOOTH: Transition = {
+  duration: 0.52,
+  ease: [0.22, 1, 0.36, 1] as const,
 }
 
 function useWindowOpen(iso: Date | string | null | undefined) {
@@ -76,7 +45,7 @@ export function EventDetailPage() {
 
   const [data, setData] = useState<PublicEventDetailResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [purchaseOpen, setPurchaseOpen] = useState(false)
   const [workflow, setWorkflow] = useState<PurchaseWorkflow | null>(null)
   const [ticketTypeId, setTicketTypeId] = useState<string>("")
   const [qty, setQty] = useState(0)
@@ -202,7 +171,7 @@ export function EventDetailPage() {
   const showChooser = !!data && needsWorkflowChoice && workflow == null
   const showTicketStep = !!data && workflow === "tickets"
   const showProductStep = !!data && workflow === "products"
-  const showFooter = !!data && (showTicketStep || showProductStep)
+  const showFooter = !!data && purchaseOpen && (showTicketStep || showProductStep)
 
   const ctaLabel = !data
     ? "Cargando…"
@@ -214,13 +183,17 @@ export function EventDetailPage() {
 
   const ctaDisabled = !data || !hasAnyCatalog || !anythingPurchasable
 
+  const startPurchase = () => {
+    if (ctaDisabled) return
+    setPurchaseOpen(true)
+  }
+
   if (!eventId) return null
 
   const hero = data?.event.imageUrl ?? null
 
   return (
-    <div className="relative min-h-dvh overflow-hidden bg-black">
-      {/* Full-bleed flyer */}
+    <div className="relative min-h-dvh overflow-x-hidden bg-black">
       <div className="fixed inset-0 -z-0">
         {hero ? (
           <motion.img
@@ -237,7 +210,6 @@ export function EventDetailPage() {
         ) : (
           <div className="h-full w-full bg-gradient-to-b from-zinc-900 via-zinc-950 to-black" />
         )}
-        {/* Layered gradients for legibility */}
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/55 via-black/15 to-black/95"
@@ -248,7 +220,6 @@ export function EventDetailPage() {
         />
       </div>
 
-      {/* Top bar */}
       <motion.div
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -256,7 +227,7 @@ export function EventDetailPage() {
         className="relative z-10 flex items-center justify-between px-6 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-8"
       >
         {data ? (
-          <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs font-medium text-white/85">
+          <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs font-medium text-white/85 backdrop-blur-xl">
             {data.productora.name}
           </span>
         ) : (
@@ -264,358 +235,222 @@ export function EventDetailPage() {
         )}
       </motion.div>
 
-      {/* Foreground: title + CTA */}
-      <div className="relative z-10 mx-auto flex min-h-dvh w-full max-w-lg flex-col justify-end px-6 pb-12 pt-24 sm:px-8 sm:pb-14">
+      <div
+        className={`relative z-10 mx-auto flex min-h-[calc(100dvh-env(safe-area-inset-top)-3rem)] w-full max-w-lg flex-col justify-end px-5 pt-10 sm:px-8 ${
+          showFooter
+            ? "pb-[calc(10.5rem+max(1rem,env(safe-area-inset-bottom)))]"
+            : "pb-[max(1rem,env(safe-area-inset-bottom))]"
+        }`}
+      >
         {error ? (
           <p className="text-sm text-red-300">{error}</p>
         ) : !data ? (
           <p className="text-sm text-white/60">Cargando…</p>
         ) : (
-          <motion.div
-            initial="hidden"
-            animate="show"
-            variants={{
-              hidden: {},
-              show: { transition: { staggerChildren: 0.08, delayChildren: 0.1 } },
-            }}
-            className="space-y-6"
-          >
+          <>
             <motion.div
-              variants={{
-                hidden: { opacity: 0, y: 14 },
-                show: { opacity: 1, y: 0, transition: EASE_OUT },
+              animate={{
+                y: purchaseOpen ? -28 : 0,
               }}
-              className="space-y-2"
+              transition={EASE_SMOOTH}
+              className="w-full"
             >
-              <p className="text-xs font-medium uppercase tracking-[0.18em] text-white/55">
-                {formatEventDay(data.event.date)}
-              </p>
-              <h1 className="text-4xl font-black leading-[1.05] tracking-tight text-white drop-shadow-[0_2px_24px_rgba(0,0,0,0.5)] sm:text-5xl">
-                {data.event.name}
-              </h1>
-              {data.event.location ? (
-                <p className="text-sm text-white/70">{data.event.location}</p>
-              ) : null}
+              <div className="rounded-[28px] border border-white/[0.1] bg-black/55 px-5 py-5 shadow-[0_-28px_90px_-24px_rgba(0,0,0,0.95)] backdrop-blur-2xl backdrop-saturate-150 supports-[backdrop-filter]:bg-black/45">
+                <div className="space-y-2">
+                  <p className="text-xs font-medium uppercase tracking-[0.18em] text-white/55">
+                    {formatEventDay(data.event.date)}
+                  </p>
+                  <h1 className="text-3xl font-black leading-[1.08] tracking-tight text-white drop-shadow-[0_2px_28px_rgba(0,0,0,0.65)] sm:text-[2.125rem]">
+                    {data.event.name}
+                  </h1>
+                  {data.event.location ? (
+                    <p className="text-sm text-white/72">{data.event.location}</p>
+                  ) : null}
+                </div>
+
+                <div className="mt-6">
+                  <AnimatePresence mode="wait" initial={false}>
+                    {!purchaseOpen ? (
+                      <motion.div
+                        key="cta"
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{
+                          opacity: 0,
+                          y: -12,
+                          filter: "blur(8px)",
+                          transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] },
+                        }}
+                        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                      >
+                        <button
+                          type="button"
+                          disabled={ctaDisabled}
+                          onClick={startPurchase}
+                          className="group/cta relative flex h-14 w-full items-center justify-between gap-4 overflow-hidden rounded-2xl bg-white px-5 text-left text-base font-semibold text-black shadow-[0_24px_48px_-16px_rgba(255,255,255,0.35)] transition-[transform,box-shadow] duration-300 ease-out hover:-translate-y-0.5 hover:shadow-[0_28px_56px_-14px_rgba(255,255,255,0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 active:translate-y-0 disabled:cursor-not-allowed disabled:bg-white/30 disabled:text-white/60 disabled:shadow-none"
+                        >
+                          <span
+                            aria-hidden
+                            className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/70 to-transparent opacity-0 transition-all duration-700 ease-out group-hover/cta:translate-x-full group-hover/cta:opacity-100"
+                          />
+                          <span className="relative flex flex-col">
+                            <span className="text-[15px] leading-tight">{ctaLabel}</span>
+                            {anythingPurchasable && hasAnyCatalog ? (
+                              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-black/55">
+                                {needsWorkflowChoice
+                                  ? "entradas · consumos"
+                                  : hasTicketCatalog
+                                    ? "comprar entrada"
+                                    : "comprar consumos"}
+                              </span>
+                            ) : null}
+                          </span>
+                          <span className="relative grid size-9 place-items-center rounded-full bg-black/5 transition-transform duration-300 ease-out group-hover/cta:rotate-45 group-hover/cta:bg-black/10">
+                            <ArrowUpRight className="size-4" aria-hidden />
+                          </span>
+                        </button>
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="flow"
+                        initial={{ opacity: 0, y: 22, filter: "blur(10px)" }}
+                        animate={{
+                          opacity: 1,
+                          y: 0,
+                          filter: "blur(0px)",
+                          transition: { duration: 0.46, ease: [0.22, 1, 0.36, 1] },
+                        }}
+                        exit={{
+                          opacity: 0,
+                          y: 16,
+                          filter: "blur(8px)",
+                          transition: { duration: 0.22 },
+                        }}
+                        className="flex flex-col gap-5"
+                      >
+                        {(showTicketStep || showProductStep) && needsWorkflowChoice ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="-ml-2 h-auto self-start rounded-xl px-2 py-1.5 text-sm text-white/60 hover:bg-white/10 hover:text-white"
+                            onClick={goBackToChooser}
+                          >
+                            <ChevronLeft className="mr-0.5 size-4" aria-hidden />
+                            Elegir otra opción
+                          </Button>
+                        ) : null}
+
+                        <div className="max-h-[min(48vh,520px)] overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] pr-1">
+                          <AnimatePresence mode="wait" initial={false}>
+                            {showChooser ? (
+                              <ChooserStep
+                                key="chooser"
+                                hasTicketCatalog={hasTicketCatalog}
+                                anyTicketPurchasable={anyTicketPurchasable}
+                                hasProductCatalog={hasProductCatalog}
+                                productsPurchasable={productsPurchasable}
+                                ticketsFrom={ticketsFrom}
+                                ticketsOpen={ticketsWindow.open}
+                                consFrom={consFrom}
+                                consOpen={consWindow.open}
+                                onChooseTickets={chooseTicketsWorkflow}
+                                onChooseProducts={chooseProductsWorkflow}
+                              />
+                            ) : null}
+                            {showTicketStep ? (
+                              <TicketStep
+                                key="tickets"
+                                data={data}
+                                ticketsFrom={ticketsFrom}
+                                ticketsWindow={ticketsWindow}
+                                ticketTypeId={ticketTypeId}
+                                setTicketTypeId={setTicketTypeId}
+                                qty={qty}
+                                setQty={setQty}
+                                selectedType={selectedType}
+                              />
+                            ) : null}
+                            {showProductStep ? (
+                              <ProductStep
+                                key="products"
+                                data={data}
+                                consFrom={consFrom}
+                                consWindow={consWindow}
+                                drinks={drinks}
+                                setDrinkQty={setDrinkQty}
+                              />
+                            ) : null}
+                          </AnimatePresence>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </div>
             </motion.div>
 
-            <motion.div
-              variants={{
-                hidden: { opacity: 0, y: 18 },
-                show: { opacity: 1, y: 0, transition: EASE_OUT },
-              }}
-            >
-              <Drawer
-                open={drawerOpen}
-                onOpenChange={(open) => {
-                  setDrawerOpen(open)
-                  if (!open && needsWorkflowChoice) {
-                    // restart chooser when fully closed so reopening feels fresh
-                    window.setTimeout(() => setWorkflow(null), 250)
-                  }
-                }}
+            {!purchaseOpen ? (
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="mt-5 text-center text-[11px] text-white/40"
               >
-                <DrawerTrigger asChild>
-                  <button
-                    type="button"
-                    disabled={ctaDisabled}
-                    className="group/cta relative flex h-14 w-full items-center justify-between gap-4 overflow-hidden rounded-2xl bg-white px-6 text-left text-base font-semibold text-black shadow-[0_24px_48px_-16px_rgba(255,255,255,0.35)] transition-[transform,box-shadow] duration-300 ease-out hover:-translate-y-0.5 hover:shadow-[0_28px_56px_-14px_rgba(255,255,255,0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 active:translate-y-0 disabled:cursor-not-allowed disabled:bg-white/30 disabled:text-white/60 disabled:shadow-none"
-                  >
-                    <span
-                      aria-hidden
-                      className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/70 to-transparent opacity-0 transition-all duration-700 ease-out group-hover/cta:translate-x-full group-hover/cta:opacity-100"
-                    />
-                    <span className="relative flex flex-col">
-                      <span className="text-[15px] leading-tight">{ctaLabel}</span>
-                      {anythingPurchasable && hasAnyCatalog ? (
-                        <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-black/55">
-                          {needsWorkflowChoice
-                            ? "entradas · consumos"
-                            : hasTicketCatalog
-                              ? "comprar entrada"
-                              : "comprar consumos"}
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className="relative grid size-9 place-items-center rounded-full bg-black/5 transition-transform duration-300 ease-out group-hover/cta:rotate-45 group-hover/cta:bg-black/10">
-                      <ArrowUpRight className="size-4" aria-hidden />
-                    </span>
-                  </button>
-                </DrawerTrigger>
+                Pago seguro con Mercado Pago
+              </motion.p>
+            ) : null}
 
-                <DrawerContent>
-                  <DrawerTitle className="sr-only">Comprar</DrawerTitle>
-                  <DrawerBody
-                    data={data}
-                    showChooser={showChooser}
-                    showTicketStep={showTicketStep}
-                    showProductStep={showProductStep}
-                    needsWorkflowChoice={needsWorkflowChoice}
-                    hasTicketCatalog={hasTicketCatalog}
-                    hasProductCatalog={hasProductCatalog}
-                    anyTicketPurchasable={anyTicketPurchasable}
-                    productsPurchasable={productsPurchasable}
-                    ticketsFrom={ticketsFrom}
-                    ticketsWindow={ticketsWindow}
-                    consFrom={consFrom}
-                    consWindow={consWindow}
-                    ticketTypeId={ticketTypeId}
-                    setTicketTypeId={setTicketTypeId}
-                    qty={qty}
-                    setQty={setQty}
-                    drinks={drinks}
-                    setDrinkQty={setDrinkQty}
-                    selectedType={selectedType}
-                    showFooter={showFooter}
-                    canContinue={canContinue}
-                    totalStr={totalStr}
-                    onChooseTickets={chooseTicketsWorkflow}
-                    onChooseProducts={chooseProductsWorkflow}
-                    onBack={goBackToChooser}
-                    onContinue={continueClick}
-                  />
-                </DrawerContent>
-              </Drawer>
-            </motion.div>
+            <AnimatePresence>
+              {showFooter ? (
+                <motion.div
+                  key="checkout-bar"
+                  initial={{ opacity: 0, y: 28 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 20 }}
+                  transition={EASE_OUT}
+                  className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/[0.08] bg-black/75 px-5 pt-4 backdrop-blur-xl pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-8"
+                >
+                  <div className="mx-auto flex w-full max-w-lg flex-col gap-3">
+                    <div className="flex items-baseline justify-between gap-4">
+                      <span className="text-sm text-white/65">Total</span>
+                      <motion.span
+                        key={totalStr}
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                        className="text-xl font-bold tabular-nums tracking-tight text-white sm:text-2xl"
+                      >
+                        {formatMoneyArsExact(totalStr)}
+                      </motion.span>
+                    </div>
+                    <Button
+                      className="h-12 w-full rounded-2xl bg-white text-base font-semibold text-black shadow-[0_18px_44px_-18px_rgba(255,255,255,0.45)] transition-all hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_24px_56px_-16px_rgba(255,255,255,0.55)] disabled:translate-y-0 disabled:bg-white/30 disabled:text-white/60 disabled:shadow-none"
+                      disabled={!canContinue}
+                      onClick={continueClick}
+                    >
+                      Continuar al pago
+                    </Button>
+                    <p className="text-center text-[11px] leading-relaxed text-white/45">
+                      Pago procesado de forma segura con Mercado Pago.
+                    </p>
+                  </div>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
 
-            <motion.p
-              variants={{
-                hidden: { opacity: 0 },
-                show: { opacity: 1, transition: { duration: 0.6, delay: 0.2 } },
-              }}
-              className="text-center text-[11px] text-white/40"
-            >
-              Pago seguro con Mercado Pago
-            </motion.p>
-          </motion.div>
+            {data && !hasTicketCatalog && !hasProductCatalog ? (
+              <p className="mt-4 text-center text-sm text-white/55">
+                Este evento no tiene venta online por el momento.
+              </p>
+            ) : null}
+          </>
         )}
       </div>
     </div>
   )
 }
 
-type DrawerBodyProps = {
-  data: PublicEventDetailResponse
-  showChooser: boolean
-  showTicketStep: boolean
-  showProductStep: boolean
-  needsWorkflowChoice: boolean
-  hasTicketCatalog: boolean
-  hasProductCatalog: boolean
-  anyTicketPurchasable: boolean
-  productsPurchasable: boolean
-  ticketsFrom: Date | string | null
-  ticketsWindow: { open: boolean; msLeft: number }
-  consFrom: Date | string | null
-  consWindow: { open: boolean; msLeft: number }
-  ticketTypeId: string
-  setTicketTypeId: (id: string) => void
-  qty: number
-  setQty: (next: number | ((q: number) => number)) => void
-  drinks: Record<string, number>
-  setDrinkQty: (productId: string, next: number) => void
-  selectedType: PublicEventDetailResponse["ticketTypes"][number] | undefined
-  showFooter: boolean
-  canContinue: boolean
-  totalStr: string
-  onChooseTickets: () => void
-  onChooseProducts: () => void
-  onBack: () => void
-  onContinue: () => void
-}
-
-function DrawerBody(props: DrawerBodyProps) {
-  const {
-    data,
-    showChooser,
-    showTicketStep,
-    showProductStep,
-    needsWorkflowChoice,
-    hasTicketCatalog,
-    hasProductCatalog,
-    anyTicketPurchasable,
-    productsPurchasable,
-    ticketsFrom,
-    ticketsWindow,
-    consFrom,
-    consWindow,
-    ticketTypeId,
-    setTicketTypeId,
-    qty,
-    setQty,
-    drinks,
-    setDrinkQty,
-    selectedType,
-    showFooter,
-    canContinue,
-    totalStr,
-    onChooseTickets,
-    onChooseProducts,
-    onBack,
-    onContinue,
-  } = props
-
-  /** Footer + back row must not mount until chooser exit finishes — avoids measuring chooser height + chrome together (drawer spike). */
-  const [checkoutChromeReady, setCheckoutChromeReady] = useState(
-    () => !needsWorkflowChoice
-  )
-  const prevShowChooserRef = useRef(showChooser)
-
-  useEffect(() => {
-    const wasChooser = prevShowChooserRef.current
-    prevShowChooserRef.current = showChooser
-
-    if (showChooser) {
-      setCheckoutChromeReady(false)
-      return
-    }
-    if (wasChooser && !showChooser && needsWorkflowChoice) {
-      setCheckoutChromeReady(false)
-    }
-  }, [showChooser, needsWorkflowChoice])
-
-  const stepKey = showChooser
-    ? "chooser"
-    : showTicketStep
-      ? "tickets"
-      : showProductStep
-        ? "products"
-        : "empty"
-
-  const [measureRef, height] = useMeasuredHeight<HTMLDivElement>()
-
-  return (
-    <motion.div
-      animate={{ height }}
-      initial={false}
-      transition={HEIGHT_EASE}
-      style={{ overflow: "hidden", willChange: "height" }}
-    >
-      <div ref={measureRef} className="flex flex-col">
-        <div className="px-5 pt-5">
-          <AnimatePresence initial={false}>
-            {(showTicketStep || showProductStep) &&
-            needsWorkflowChoice &&
-            checkoutChromeReady ? (
-              <motion.div
-                key="back"
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -8 }}
-                transition={EASE_FAST}
-              >
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="-ml-2 h-auto self-start rounded-xl px-2 py-1.5 text-sm text-white/60 hover:bg-white/10 hover:text-white"
-                  onClick={onBack}
-                >
-                  <ChevronLeft className="mr-0.5 size-4" aria-hidden />
-                  Elegir otra opción
-                </Button>
-              </motion.div>
-            ) : null}
-          </AnimatePresence>
-        </div>
-
-        <div className="relative px-5">
-          <AnimatePresence
-            mode="wait"
-            initial={false}
-            onExitComplete={() => {
-              if (
-                needsWorkflowChoice &&
-                !showChooser &&
-                (showTicketStep || showProductStep)
-              ) {
-                setCheckoutChromeReady(true)
-              }
-            }}
-          >
-            {stepKey === "chooser" ? (
-              <ChooserStep
-                key="chooser"
-                hasTicketCatalog={hasTicketCatalog}
-                anyTicketPurchasable={anyTicketPurchasable}
-                hasProductCatalog={hasProductCatalog}
-                productsPurchasable={productsPurchasable}
-                ticketsFrom={ticketsFrom}
-                ticketsOpen={ticketsWindow.open}
-                consFrom={consFrom}
-                consOpen={consWindow.open}
-                onChooseTickets={onChooseTickets}
-                onChooseProducts={onChooseProducts}
-              />
-            ) : null}
-
-            {stepKey === "tickets" ? (
-              <TicketStep
-                key="tickets"
-                data={data}
-                ticketsFrom={ticketsFrom}
-                ticketsWindow={ticketsWindow}
-                ticketTypeId={ticketTypeId}
-                setTicketTypeId={setTicketTypeId}
-                qty={qty}
-                setQty={setQty}
-                selectedType={selectedType}
-              />
-            ) : null}
-
-            {stepKey === "products" ? (
-              <ProductStep
-                key="products"
-                data={data}
-                consFrom={consFrom}
-                consWindow={consWindow}
-                drinks={drinks}
-                setDrinkQty={setDrinkQty}
-              />
-            ) : null}
-          </AnimatePresence>
-        </div>
-
-        <AnimatePresence initial={false}>
-          {showFooter && checkoutChromeReady ? (
-            <motion.div
-              key="footer"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 12 }}
-              transition={EASE_OUT}
-              className="mt-2 flex flex-col gap-3 border-t border-white/[0.08] px-5 pt-4 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
-            >
-              <div className="flex items-baseline justify-between gap-4">
-                <span className="text-sm text-white/65">Total</span>
-                <motion.span
-                  key={totalStr}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-                  className="text-2xl font-bold tabular-nums tracking-tight text-white"
-                >
-                  {formatMoneyArsExact(totalStr)}
-                </motion.span>
-              </div>
-              <Button
-                className="h-12 w-full rounded-2xl bg-white text-base font-semibold text-black shadow-[0_18px_44px_-18px_rgba(255,255,255,0.45)] transition-all hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_24px_56px_-16px_rgba(255,255,255,0.55)] disabled:translate-y-0 disabled:bg-white/30 disabled:text-white/60 disabled:shadow-none"
-                disabled={!canContinue}
-                onClick={onContinue}
-              >
-                Continuar al pago
-              </Button>
-              <p className="text-center text-[11px] leading-relaxed text-white/45">
-                Pago procesado de forma segura con Mercado Pago.
-              </p>
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
-      </div>
-    </motion.div>
-  )
-}
-
 const stepVariants: Variants = {
-  initial: { opacity: 0, y: 12, filter: "blur(8px)" },
+  initial: { opacity: 0, y: 14, filter: "blur(8px)" },
   animate: {
     opacity: 1,
     y: 0,
@@ -624,9 +459,9 @@ const stepVariants: Variants = {
   },
   exit: {
     opacity: 0,
-    y: -6,
+    y: -8,
     filter: "blur(8px)",
-    transition: { duration: 0.18, ease: [0.4, 0, 1, 1] as const },
+    transition: { duration: 0.2, ease: [0.4, 0, 1, 1] as const },
   },
 }
 
@@ -673,7 +508,7 @@ function ChooserStep({
   return (
     <StepShell>
       <div className="space-y-1.5">
-        <h2 className="text-[22px] font-semibold tracking-tight text-white">
+        <h2 className="text-xl font-semibold tracking-tight text-white sm:text-[22px]">
           ¿Qué querés comprar?
         </h2>
         <p className="text-sm leading-relaxed text-white/60">
@@ -727,10 +562,10 @@ function ChoiceCard({
       disabled={disabled}
       onClick={onClick}
       whileTap={disabled ? undefined : { scale: 0.985 }}
-      className={`group/choice relative flex w-full items-center justify-between gap-4 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-5 text-left transition-colors duration-200 ${
+      className={`group/choice relative flex w-full items-center justify-between gap-4 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.06] px-5 py-5 text-left transition-colors duration-200 ${
         disabled
           ? "cursor-not-allowed opacity-40"
-          : "hover:border-white/25 hover:bg-white/[0.08]"
+          : "hover:border-white/25 hover:bg-white/[0.1]"
       }`}
     >
       <div className="min-w-0 flex flex-col">
@@ -739,7 +574,7 @@ function ChoiceCard({
       </div>
       <span
         aria-hidden
-        className="grid size-8 shrink-0 place-items-center rounded-full border border-white/10 bg-white/[0.04] text-white/70 transition-all duration-200 group-hover/choice:translate-x-0.5 group-hover/choice:border-white/25 group-hover/choice:bg-white/10 group-hover/choice:text-white"
+        className="grid size-8 shrink-0 place-items-center rounded-full border border-white/10 bg-white/[0.06] text-white/70 transition-all duration-200 group-hover/choice:translate-x-0.5 group-hover/choice:border-white/25 group-hover/choice:bg-white/10 group-hover/choice:text-white"
       >
         <ArrowUpRight className="size-4 -rotate-45" />
       </span>
@@ -769,7 +604,7 @@ function TicketStep({
   return (
     <StepShell>
       <div className="space-y-1">
-        <h2 className="text-[22px] font-semibold tracking-tight text-white">
+        <h2 className="text-xl font-semibold tracking-tight text-white sm:text-[22px]">
           Entradas
         </h2>
         {ticketsFrom != null && !ticketsWindow.open ? (
@@ -800,8 +635,8 @@ function TicketStep({
                   whileTap={disabled ? undefined : { scale: 0.99 }}
                   className={`flex w-full items-center justify-between gap-4 rounded-2xl border px-4 py-4 text-left transition-all duration-200 ${
                     selected
-                      ? "border-white/40 bg-white/[0.10] shadow-[0_0_0_1px_rgba(255,255,255,0.18)_inset]"
-                      : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]"
+                      ? "border-white/40 bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.18)_inset]"
+                      : "border-white/10 bg-white/[0.05] hover:border-white/22 hover:bg-white/[0.08]"
                   } ${disabled ? "opacity-40" : ""}`}
                 >
                   <span className="flex items-center gap-3">
@@ -846,7 +681,7 @@ function TicketStep({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
             transition={EASE_OUT}
-            className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3"
+            className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3"
           >
             <span className="text-sm text-white/70">Cantidad</span>
             <Stepper
@@ -877,7 +712,7 @@ function ProductStep({
   return (
     <StepShell>
       <div className="space-y-1">
-        <h2 className="text-[22px] font-semibold tracking-tight text-white">
+        <h2 className="text-xl font-semibold tracking-tight text-white sm:text-[22px]">
           Consumos
         </h2>
         {consFrom != null && !consWindow.open ? (
@@ -902,7 +737,7 @@ function ProductStep({
             return (
               <li
                 key={p.id}
-                className={`flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 ${
+                className={`flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 ${
                   disabled ? "opacity-40" : ""
                 }`}
               >
@@ -939,7 +774,7 @@ function Stepper({
   onInc: () => void
 }) {
   return (
-    <div className="flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] p-1">
+    <div className="flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.06] p-1">
       <Button
         type="button"
         variant="ghost"
