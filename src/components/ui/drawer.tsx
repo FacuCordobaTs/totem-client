@@ -35,7 +35,7 @@ function DrawerOverlay({
     <DrawerPrimitive.Overlay
       data-slot="drawer-overlay"
       className={cn(
-        "fixed inset-0 z-50 bg-black/55 backdrop-blur-[1px] data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+        "fixed inset-0 z-50 bg-black/55 -blur-[1px] data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         className
       )}
       {...props}
@@ -58,7 +58,7 @@ function DrawerContent({
           // bottom drawer (default)
           "data-[vaul-drawer-direction=bottom]:inset-x-0 data-[vaul-drawer-direction=bottom]:bottom-0 data-[vaul-drawer-direction=bottom]:mt-24 data-[vaul-drawer-direction=bottom]:max-h-[92vh] data-[vaul-drawer-direction=bottom]:rounded-t-[28px]",
           // glassmorphism
-          "border border-white/[0.12] border-b-0 bg-white/[0.06] shadow-[0_-32px_80px_-20px_rgba(0,0,0,0.7),0_0_0_0.5px_rgba(255,255,255,0.06)_inset] backdrop-blur-xl backdrop-saturate-800 supports-[backdrop-filter]:bg-black/[0.2]",
+          "border border-white/[0.12] border-b-0 bg-white/[0.06] shadow-[0_-32px_80px_-20px_rgba(0,0,0,0.7),0_0_0_0.5px_rgba(255,255,255,0.06)_inset] -blur-xl -saturate-800 supports-[-filter]:bg-black/[0.2]",
           // subtle inner highlight
           "before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:rounded-t-[28px] before:bg-gradient-to-r before:from-transparent before:via-white/30 before:to-transparent",
           className
