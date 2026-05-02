@@ -45,6 +45,19 @@ export function formatCountdown(ms: number): string {
   return `${sec}s`
 }
 
+/** Cuenta regresiva sin segundos — vistas principales (menos carga cognitiva). */
+export function formatCountdownCoarse(ms: number): string {
+  if (ms <= 0) return "En cualquier momento"
+  const s = Math.floor(ms / 1000)
+  const d = Math.floor(s / 86400)
+  const h = Math.floor((s % 86400) / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  if (d > 0) return `${d}d ${h}h`
+  if (h > 0) return `${h}h ${m}m`
+  if (m > 0) return `${m} min`
+  return "Menos de un minuto"
+}
+
 export function formatEventDate(d: Date | string | null | undefined): string {
   if (d == null) return "—"
   const date = typeof d === "string" ? new Date(d) : d

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams } from "react-router"
-import { ArrowUpRight, ChevronLeft, Minus, Plus } from "lucide-react"
+import { ArrowUpRight, ChevronLeft } from "lucide-react"
 import { AnimatePresence, motion, type Transition } from "motion/react"
 import { publicApiFetch } from "@/lib/api"
 import type { PublicEventDetailResponse } from "@/types/api"
@@ -47,8 +47,7 @@ export function EventDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [purchaseOpen, setPurchaseOpen] = useState(false)
   const [workflow, setWorkflow] = useState<PurchaseWorkflow | null>(null)
-  const [ticketTypeId, setTicketTypeId] = useState<string>("")
-  const [qty, setQty] = useState(0)
+  const [ticketQtys, setTicketQtys] = useState<Record<string, number>>({})
   const [drinks, setDrinks] = useState<Record<string, number>>({})
 
   const ticketsFrom = data?.event.ticketsAvailableFrom ?? null
@@ -61,12 +60,7 @@ export function EventDetailPage() {
     publicApiFetch<PublicEventDetailResponse>(`/public/events/${eventId}`)
       .then((r) => {
         setData(r)
-        const first = r.ticketTypes.find((t) => t.availableForPurchase)
-        setTicketTypeId(first?.id ?? r.ticketTypes[0]?.id ?? "")
-        const tOpen =
-          r.event.ticketsAvailableFrom == null ||
-          Date.now() >= new Date(r.event.ticketsAvailableFrom).getTime()
-        setQty(tOpen && first ? 1 : 0)
+        setTicketQtys({})
       })
       .catch(() => setError("No pudimos cargar el evento."))
   }, [eventId])
@@ -88,15 +82,33 @@ export function EventDetailPage() {
     else setWorkflow(null)
   }, [data])
 
-  const selectedType = useMemo(
-    () => data?.ticketTypes.find((t) => t.id === ticketTypeId),
-    [data, ticketTypeId]
-  )
-
   const ticketLines: CartTicketLine[] = useMemo(() => {
-    if (!selectedType || qty <= 0) return []
-    return [{ ticketTypeId: selectedType.id, quantity: qty, unitPrice: selectedType.price }]
-  }, [selectedType, qty])
+    if (!data) return []
+    const out: CartTicketLine[] = []
+    for (const t of data.ticketTypes) {
+      const q = ticketQtys[t.id] ?? 0
+      if (q <= 0) continue
+      out.push({ ticketTypeId: t.id, quantity: q, unitPrice: t.price })
+    }
+    return out
+  }, [data, ticketQtys])
+
+  const bumpTicket = (ticketTypeId: string) => {
+    setTicketQtys((prev) => ({
+      ...prev,
+      [ticketTypeId]: Math.min(99, (prev[ticketTypeId] ?? 0) + 1),
+    }))
+  }
+
+  const trimTicket = (ticketTypeId: string) => {
+    setTicketQtys((prev) => {
+      const next = (prev[ticketTypeId] ?? 0) - 1
+      const copy = { ...prev }
+      if (next <= 0) delete copy[ticketTypeId]
+      else copy[ticketTypeId] = next
+      return copy
+    })
+  }
 
   const drinkLines: CartDrinkLine[] = useMemo(() => {
     if (!data) return []
@@ -123,13 +135,20 @@ export function EventDetailPage() {
   const totalStr = cartPreview ? computeCartTotalString(cartPreview) : "0.00"
 
   const ticketsBuyable =
-    !!selectedType?.availableForPurchase && ticketsWindow.open && qty > 0
+    ticketsWindow.open &&
+    ticketLines.length > 0 &&
+    ticketLines.every((line) => {
+      const t = data?.ticketTypes.find((x) => x.id === line.ticketTypeId)
+      return t?.availableForPurchase === true
+    })
 
   const hasDrinks = drinkLines.length > 0
   const drinksBuyable = hasDrinks && consWindow.open
 
+  const ticketCount = ticketLines.reduce((a, l) => a + l.quantity, 0)
+
   const canContinue =
-    (qty > 0 && ticketsBuyable) || (hasDrinks && drinksBuyable)
+    (ticketCount > 0 && ticketsBuyable) || (hasDrinks && drinksBuyable)
 
   const setDrinkQty = (productId: string, next: number) => {
     setDrinks((prev) => {
@@ -152,7 +171,7 @@ export function EventDetailPage() {
   }
 
   const chooseProductsWorkflow = () => {
-    setQty(0)
+    setTicketQtys({})
     setWorkflow("products")
   }
 
@@ -355,11 +374,9 @@ export function EventDetailPage() {
                               data={data}
                               ticketsFrom={ticketsFrom}
                               ticketsWindow={ticketsWindow}
-                              ticketTypeId={ticketTypeId}
-                              setTicketTypeId={setTicketTypeId}
-                              qty={qty}
-                              setQty={setQty}
-                              selectedType={selectedType}
+                              ticketQtys={ticketQtys}
+                              bumpTicket={bumpTicket}
+                              trimTicket={trimTicket}
                             />
                           ) : showProductStep ? (
                             <ProductStep
@@ -497,7 +514,7 @@ function ChooserStep({
           title="Entradas"
           description={
             hasTicketCatalog && anyTicketPurchasable
-              ? "Elegí tipo y cantidad"
+              ? "Armá tu grupo combinando tipos"
               : ticketsFrom != null && !ticketsOpen
                 ? `Disponibles desde ${formatEventDate(ticketsFrom)}`
                 : "No hay entradas a la venta"
@@ -563,33 +580,39 @@ function TicketStep({
   data,
   ticketsFrom,
   ticketsWindow,
-  ticketTypeId,
-  setTicketTypeId,
-  qty,
-  setQty,
-  selectedType,
+  ticketQtys,
+  bumpTicket,
+  trimTicket,
 }: {
   data: PublicEventDetailResponse
   ticketsFrom: Date | string | null
   ticketsWindow: { open: boolean; msLeft: number }
-  ticketTypeId: string
-  setTicketTypeId: (id: string) => void
-  qty: number
-  setQty: (next: number | ((q: number) => number)) => void
-  selectedType: PublicEventDetailResponse["ticketTypes"][number] | undefined
+  ticketQtys: Record<string, number>
+  bumpTicket: (id: string) => void
+  trimTicket: (id: string) => void
 }) {
+  const saleOpen = ticketsWindow.open
+  const anyBuyable =
+    data.ticketTypes.some((t) => t.availableForPurchase) && saleOpen
+
   return (
     <StepShell>
       <div className="space-y-1">
         <h2 className="text-xl font-semibold tracking-tight text-white sm:text-[22px]">
           Entradas
         </h2>
-        {ticketsFrom != null && !ticketsWindow.open ? (
+        {ticketsFrom != null && !saleOpen ? (
           <p className="text-sm leading-relaxed text-white/60">
             Venta desde el {formatEventDate(ticketsFrom)} · en{" "}
             <span className="tabular-nums text-white/90">
               {formatCountdown(ticketsWindow.msLeft)}
             </span>
+          </p>
+        ) : saleOpen ? (
+          <p className="text-sm leading-relaxed text-white/60">
+            {anyBuyable
+              ? "Tocá una fila para sumarla al pedido. Podés combinar distintos tipos."
+              : "Por ahora no hay entradas disponibles para este evento."}
           </p>
         ) : null}
       </div>
@@ -601,75 +624,135 @@ function TicketStep({
       ) : (
         <ul className="flex flex-col gap-2">
           {data.ticketTypes.map((t) => {
-            const disabled = !t.availableForPurchase || !ticketsWindow.open
-            const selected = ticketTypeId === t.id
+            const disabled = !t.availableForPurchase || !saleOpen
+            const count = ticketQtys[t.id] ?? 0
+            const active = count > 0
             return (
               <li key={t.id}>
-                <motion.button
-                  type="button"
+                <TicketPickRow
+                  name={t.name}
+                  priceStr={formatMoneyArsExact(t.price)}
+                  count={count}
                   disabled={disabled}
-                  onClick={() => setTicketTypeId(t.id)}
-                  whileTap={disabled ? undefined : { scale: 0.99 }}
-                  className={`flex w-full items-center justify-between gap-4 rounded-2xl border px-4 py-4 text-left transition-all duration-200 ${
-                    selected
-                      ? "border-white/40 bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.18)_inset]"
-                      : "border-white/10 bg-white/[0.05] hover:border-white/22 hover:bg-white/[0.08]"
-                  } ${disabled ? "opacity-40" : ""}`}
-                >
-                  <span className="flex items-center gap-3">
-                    <span
-                      aria-hidden
-                      className={`relative grid size-5 place-items-center rounded-full border transition-colors ${
-                        selected
-                          ? "border-white bg-white"
-                          : "border-white/30 bg-transparent"
-                      }`}
-                    >
-                      <AnimatePresence>
-                        {selected ? (
-                          <motion.span
-                            key="dot"
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            exit={{ scale: 0 }}
-                            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-                            className="size-2 rounded-full bg-black"
-                          />
-                        ) : null}
-                      </AnimatePresence>
-                    </span>
-                    <span className="font-medium text-white">{t.name}</span>
-                  </span>
-                  <span className="shrink-0 tabular-nums text-sm text-white/70">
-                    {formatMoneyArsExact(t.price)}
-                  </span>
-                </motion.button>
+                  active={active}
+                  onAdd={() => bumpTicket(t.id)}
+                  onRemove={() => trimTicket(t.id)}
+                />
               </li>
             )
           })}
         </ul>
       )}
-
-      <AnimatePresence initial={false}>
-        {selectedType?.availableForPurchase && ticketsWindow.open ? (
-          <motion.div
-            key="qty"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
-            transition={EASE_OUT}
-            className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3"
-          >
-            <span className="text-sm text-white/70">Cantidad</span>
-            <Stepper
-              value={qty}
-              onDec={() => setQty((q) => Math.max(0, q - 1))}
-              onInc={() => setQty((q) => q + 1)}
-            />
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
     </StepShell>
+  )
+}
+
+function TicketPickRow({
+  name,
+  priceStr,
+  count,
+  disabled,
+  active,
+  onAdd,
+  onRemove,
+}: {
+  name: string
+  priceStr: string
+  count: number
+  disabled: boolean
+  active: boolean
+  onAdd: () => void
+  onRemove: () => void
+}) {
+  return (
+    <motion.div
+      layout
+      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+      className={`relative overflow-hidden rounded-2xl border transition-[border-color,box-shadow] duration-200 ${
+        active
+          ? "border-white/40 bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.18)_inset]"
+          : "border-white/10 bg-white/[0.05]"
+      } ${disabled ? "opacity-40" : ""}`}
+    >
+      <div className="flex min-h-[4.75rem]">
+        <motion.button
+          type="button"
+          layout
+          disabled={disabled}
+          onClick={onAdd}
+          whileTap={disabled ? undefined : { scale: 0.985 }}
+          aria-label={`Sumar una entrada ${name}`}
+          className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 px-4 py-3 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-white/40"
+        >
+          <span className="text-[15px] font-medium leading-tight text-white">
+            {name}
+          </span>
+          <span className="text-base font-semibold tabular-nums tracking-tight text-white/85">
+            {priceStr}
+          </span>
+          {!disabled ? (
+            <span className="pt-0.5 text-[11px] font-medium text-white/50">
+              {count > 0 ? "Tocá para sumar otra" : "Tocá para sumar una"}
+            </span>
+          ) : null}
+        </motion.button>
+
+        <AnimatePresence initial={false} mode="popLayout">
+          {active ? (
+            <motion.div
+              key="rail"
+              initial={{ opacity: 0, x: 16 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 12 }}
+              transition={EASE_OUT}
+              className="flex shrink-0 flex-col items-center justify-center gap-1.5 border-l border-white/10 py-2.5 pr-3 pl-2.5"
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <span className="relative grid min-w-[2.5rem] place-items-center overflow-hidden">
+                <AnimatePresence mode="popLayout" initial={false}>
+                  <motion.span
+                    key={count}
+                    initial={{ y: 10, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: -10, opacity: 0 }}
+                    transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                    className="tabular-nums text-2xl font-bold leading-none text-white"
+                    aria-live="polite"
+                  >
+                    {count}
+                  </motion.span>
+                </AnimatePresence>
+              </span>
+              <motion.button
+                type="button"
+                whileTap={{ scale: 0.96 }}
+                transition={{ duration: 0.12 }}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  onRemove()
+                }}
+                className="max-w-full rounded-xl border border-white/15 bg-white/[0.07] px-2.5 py-2 text-center text-[11px] font-semibold leading-tight text-white/85 outline-none transition-colors hover:border-white/25 hover:bg-white/12 focus-visible:ring-2 focus-visible:ring-white/35"
+                aria-label={`Sacar una entrada ${name}`}
+              >
+                Sacar una
+              </motion.button>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+      </div>
+
+      {!disabled ? (
+        <motion.div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 origin-left rounded-full bg-white/35"
+          initial={false}
+          animate={{ scaleX: active ? 1 : 0, opacity: active ? 0.55 : 0 }}
+          transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+        />
+      ) : null}
+    </motion.div>
   )
 }
 
@@ -699,6 +782,10 @@ function ProductStep({
               {formatCountdown(consWindow.msLeft)}
             </span>
           </p>
+        ) : consWindow.open && data.drinkProducts.length > 0 ? (
+          <p className="text-sm leading-relaxed text-white/60">
+            Tocá un producto para sumarlo al pedido. Podés combinar distintos ítems.
+          </p>
         ) : null}
       </div>
 
@@ -711,24 +798,17 @@ function ProductStep({
           {data.drinkProducts.map((p) => {
             const q = drinks[p.id] ?? 0
             const disabled = !consWindow.open
+            const active = q > 0
             return (
-              <li
-                key={p.id}
-                className={`flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 ${
-                  disabled ? "opacity-40" : ""
-                }`}
-              >
-                <div className="min-w-0">
-                  <p className="font-medium text-white">{p.name}</p>
-                  <p className="mt-0.5 text-[13px] text-white/55">
-                    {formatMoneyArsExact(p.price)} c/u
-                  </p>
-                </div>
-                <Stepper
-                  value={q}
+              <li key={p.id}>
+                <ProductPickRow
+                  name={p.name}
+                  unitPriceStr={`${formatMoneyArsExact(p.price)} c/u`}
+                  count={q}
                   disabled={disabled}
-                  onDec={() => setDrinkQty(p.id, q - 1)}
-                  onInc={() => setDrinkQty(p.id, q + 1)}
+                  active={active}
+                  onAdd={() => setDrinkQty(p.id, Math.min(99, q + 1))}
+                  onRemove={() => setDrinkQty(p.id, q - 1)}
                 />
               </li>
             )
@@ -739,53 +819,111 @@ function ProductStep({
   )
 }
 
-function Stepper({
-  value,
-  disabled = false,
-  onDec,
-  onInc,
+function ProductPickRow({
+  name,
+  unitPriceStr,
+  count,
+  disabled,
+  active,
+  onAdd,
+  onRemove,
 }: {
-  value: number
-  disabled?: boolean
-  onDec: () => void
-  onInc: () => void
+  name: string
+  unitPriceStr: string
+  count: number
+  disabled: boolean
+  active: boolean
+  onAdd: () => void
+  onRemove: () => void
 }) {
   return (
-    <div className="flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.06] p-1">
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        disabled={disabled || value <= 0}
-        className="size-8 rounded-full text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-30"
-        onClick={onDec}
-      >
-        <Minus className="size-4" />
-      </Button>
-      <span className="relative grid min-w-7 place-items-center overflow-hidden text-center">
-        <AnimatePresence mode="popLayout" initial={false}>
-          <motion.span
-            key={value}
-            initial={{ y: 8, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -8, opacity: 0 }}
-            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-            className="tabular-nums text-sm font-semibold text-white"
-          >
-            {value}
-          </motion.span>
+    <motion.div
+      layout
+      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+      className={`relative overflow-hidden rounded-2xl border transition-[border-color,box-shadow] duration-200 ${
+        active
+          ? "border-white/40 bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.18)_inset]"
+          : "border-white/10 bg-white/[0.05]"
+      } ${disabled ? "opacity-40" : ""}`}
+    >
+      <div className="flex min-h-[4.75rem]">
+        <motion.button
+          type="button"
+          layout
+          disabled={disabled}
+          onClick={onAdd}
+          whileTap={disabled ? undefined : { scale: 0.985 }}
+          aria-label={`Sumar un consumo ${name}`}
+          className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 px-4 py-3 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-white/40"
+        >
+          <span className="text-[15px] font-medium leading-tight text-white">
+            {name}
+          </span>
+          <span className="text-[13px] font-medium tabular-nums text-white/65">
+            {unitPriceStr}
+          </span>
+          {!disabled ? (
+            <span className="pt-0.5 text-[11px] font-medium text-white/50">
+              {count > 0 ? "Tocá para sumar otro" : "Tocá para sumar uno"}
+            </span>
+          ) : null}
+        </motion.button>
+
+        <AnimatePresence initial={false} mode="popLayout">
+          {active ? (
+            <motion.div
+              key="rail"
+              initial={{ opacity: 0, x: 16 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 12 }}
+              transition={EASE_OUT}
+              className="flex shrink-0 flex-col items-center justify-center gap-1.5 border-l border-white/10 py-2.5 pr-3 pl-2.5"
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <span className="relative grid min-w-[2.5rem] place-items-center overflow-hidden">
+                <AnimatePresence mode="popLayout" initial={false}>
+                  <motion.span
+                    key={count}
+                    initial={{ y: 10, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: -10, opacity: 0 }}
+                    transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                    className="tabular-nums text-2xl font-bold leading-none text-white"
+                    aria-live="polite"
+                  >
+                    {count}
+                  </motion.span>
+                </AnimatePresence>
+              </span>
+              <motion.button
+                type="button"
+                whileTap={{ scale: 0.96 }}
+                transition={{ duration: 0.12 }}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  onRemove()
+                }}
+                className="max-w-full rounded-xl border border-white/15 bg-white/[0.07] px-2.5 py-2 text-center text-[11px] font-semibold leading-tight text-white/85 outline-none transition-colors hover:border-white/25 hover:bg-white/12 focus-visible:ring-2 focus-visible:ring-white/35"
+                aria-label={`Sacar un consumo ${name}`}
+              >
+                Sacar uno
+              </motion.button>
+            </motion.div>
+          ) : null}
         </AnimatePresence>
-      </span>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        disabled={disabled}
-        className="size-8 rounded-full text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-30"
-        onClick={onInc}
-      >
-        <Plus className="size-4" />
-      </Button>
-    </div>
+      </div>
+
+      {!disabled ? (
+        <motion.div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 origin-left rounded-full bg-white/35"
+          initial={false}
+          animate={{ scaleX: active ? 1 : 0, opacity: active ? 0.55 : 0 }}
+          transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+        />
+      ) : null}
+    </motion.div>
   )
 }
