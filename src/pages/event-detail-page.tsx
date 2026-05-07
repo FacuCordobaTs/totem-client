@@ -838,8 +838,8 @@ function TicketPickRow({
       layout
       transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
       className={`relative overflow-hidden rounded-2xl shadow-lg mb-1 transition-colors duration-200 ${active
-        ? "bg-white/[0.3]"
-        : "bg-white/[0.15]"
+        ? "bg-white/[0.2]"
+        : "bg-white/[0.2]"
         } ${disabled ? "opacity-40" : ""}`}
     >
       <div className="flex min-h-[4.75rem]">
