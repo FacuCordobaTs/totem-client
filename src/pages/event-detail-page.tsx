@@ -333,22 +333,7 @@ export function EventDetailPage() {
         transition={STORE_TRANSITION}
       />
 
-      {!showStore ? (
-        <motion.div
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
-          className="relative z-10 flex items-center justify-between px-6 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-8"
-        >
-          {data ? (
-            <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs font-medium text-white/85 backdrop-blur-xl">
-              {data.productora.name}
-            </span>
-          ) : (
-            <span />
-          )}
-        </motion.div>
-      ) : null}
+
 
       <div
         className={
@@ -366,7 +351,6 @@ export function EventDetailPage() {
             {showStore ? (
               <ConsumosMarketplace
                 eventName={data.event.name}
-                productoraName={data.productora.name}
                 products={data.drinkProducts}
                 consFrom={consFrom}
                 consWindow={consWindow}
@@ -945,7 +929,6 @@ function TicketPickRow({
 
 function ConsumosMarketplace({
   eventName,
-  productoraName,
   products,
   consFrom,
   consWindow,
@@ -954,7 +937,6 @@ function ConsumosMarketplace({
   onBack,
 }: {
   eventName: string
-  productoraName: string
   products: PublicEventDetailResponse["drinkProducts"]
   consFrom: Date | string | null
   consWindow: { open: boolean; msLeft: number }
@@ -984,9 +966,7 @@ function ConsumosMarketplace({
             <ChevronLeft className="size-5" />
           </Button>
           <div className="min-w-0 flex-1 pt-0.5">
-            <p className="text-[11px] font-medium uppercase tracking-wider text-white/45">
-              {productoraName}
-            </p>
+
             <h2 className="text-lg font-bold leading-snug tracking-tight text-white">
               Consumos
             </h2>
