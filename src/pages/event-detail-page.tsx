@@ -366,7 +366,7 @@ export function EventDetailPage() {
                 transition={EASE_SMOOTH}
                 className="w-full"
               >
-                <div className="rounded-[28px] border border-white/[0.1] px-5 py-5 shadow-[0_-28px_90px_-24px_rgba(0,0,0,0.95)] backdrop-blur-xl backdrop-saturate-150 supports-[backdrop-filter]:bg-black/35">
+                <div className="rounded-[28px] border border-white/[0.1] px-5 py-5 shadow-[0_-28px_90px_-24px_rgba(0,0,0,0.95)] backdrop-blur-xl backdrop-saturate-150 supports-[backdrop-filter]:bg-black/30">
                   <div className="space-y-2">
                     <p className="text-xs font-medium uppercase tracking-[0.18em] text-white/55">
                       {formatEventDay(data.event.date)}
@@ -837,9 +837,9 @@ function TicketPickRow({
     <motion.div
       layout
       transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-      className={`relative overflow-hidden rounded-2xl transition-colors duration-200 ${active
-        ? "bg-white/[0.12]"
-        : "bg-white/[0.05]"
+      className={`relative overflow-hidden rounded-2xl shadow-lg mb-1 transition-colors duration-200 ${active
+        ? "bg-white/[0.3]"
+        : "bg-white/[0.15]"
         } ${disabled ? "opacity-40" : ""}`}
     >
       <div className="flex min-h-[4.75rem]">
