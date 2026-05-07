@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams } from "react-router"
-import { ArrowUpRight, ChevronLeft, ShoppingBag } from "lucide-react"
+import { ArrowUpRight, ChevronLeft, Minus } from "lucide-react"
 import { AnimatePresence, motion, type Transition } from "motion/react"
 import Decimal from "decimal.js"
 import { publicApiFetch } from "@/lib/api"
@@ -77,14 +77,13 @@ export function EventDetailPage() {
 
   const hasTicketCatalog = (data?.ticketTypes.length ?? 0) > 0
   const hasProductCatalog = (data?.drinkProducts.length ?? 0) > 0
-  const needsWorkflowChoice = hasTicketCatalog && hasProductCatalog
 
   useEffect(() => {
     if (!data) return
     const hasT = data.ticketTypes.length > 0
     const hasP = data.drinkProducts.length > 0
-    if (hasT && !hasP) setWorkflow("tickets")
-    else if (!hasT && hasP) setWorkflow("products")
+    if (hasT) setWorkflow("tickets")
+    else if (hasP) setWorkflow("products")
     else setWorkflow(null)
   }, [data])
 
@@ -155,7 +154,6 @@ export function EventDetailPage() {
   const drinkUnitCount = drinkLines.reduce((a, l) => a + l.quantity, 0)
   const bolsaUnitCount = ticketCount + drinkUnitCount
 
-  const showChooser = !!data && needsWorkflowChoice && workflow == null
   const showTicketStep = !!data && workflow === "tickets"
   const showProductStep = !!data && workflow === "products"
 
@@ -168,8 +166,7 @@ export function EventDetailPage() {
   const heroFooterShowsTicketsStep =
     purchaseOpen &&
     commerceSurface === "hero" &&
-    showTicketStep &&
-    !showChooser
+    showTicketStep
 
   const footerCtaIsContinueToStore =
     heroFooterShowsTicketsStep && hasProductCatalog
@@ -197,32 +194,8 @@ export function EventDetailPage() {
     navigate(`/checkout/${eventId}`)
   }
 
-  const chooseTicketsWorkflow = () => {
-    setDrinks({})
-    setWorkflow("tickets")
-    setCommerceSurface("hero")
-  }
-
-  const chooseProductsWorkflow = () => {
-    setTicketQtys({})
-    setWorkflow("products")
-    setCommerceSurface("store")
-  }
-
-  const goBackToChooser = () => {
-    if (!needsWorkflowChoice) return
-    setWorkflow(null)
-    setCommerceSurface("hero")
-  }
-
   const storeBack = () => {
     if (workflow === "tickets" && hasProductCatalog) {
-      setCommerceSurface("hero")
-      return
-    }
-    if (needsWorkflowChoice && workflow === "products") {
-      setWorkflow(null)
-      setDrinks({})
       setCommerceSurface("hero")
       return
     }
@@ -256,6 +229,7 @@ export function EventDetailPage() {
   const showFooter =
     !!data &&
     purchaseOpen &&
+    bolsaUnitCount > 0 &&
     (commerceSurface === "store" ||
       ((showTicketStep || showProductStep) && commerceSurface === "hero"))
 
@@ -379,8 +353,8 @@ export function EventDetailPage() {
       <div
         className={
           showStore
-            ? `relative z-10 mx-auto flex min-h-dvh max-h-dvh w-full max-w-lg flex-col overflow-y-auto overscroll-contain px-4 pt-[max(0.5rem,env(safe-area-inset-top))] sm:px-5 ${showFooter ? "pb-40" : "pb-6"}`
-            : `relative z-10 mx-auto flex min-h-dvh max-h-dvh w-full max-w-lg flex-col justify-end overflow-y-auto overscroll-contain px-5 pt-10 sm:px-8 ${showFooter ? "pb-40" : "pb-6"}`
+            ? `relative z-10 mx-auto flex min-h-dvh max-h-dvh w-full max-w-lg flex-col overflow-y-auto overscroll-contain px-4 pt-[max(0.5rem,env(safe-area-inset-top))] sm:px-5 ${purchaseOpen ? "pb-40" : "pb-6"}`
+            : `relative z-10 mx-auto flex min-h-dvh max-h-dvh w-full max-w-lg flex-col justify-end overflow-y-auto overscroll-contain px-5 pt-10 sm:px-8 ${purchaseOpen ? "pb-40" : "pb-6"}`
         }
       >
         {error ? (
@@ -401,129 +375,104 @@ export function EventDetailPage() {
                 onBack={storeBack}
               />
             ) : (
-            <motion.div
-              animate={{
-                y: purchaseOpen ? -28 : 0,
-              }}
-              transition={EASE_SMOOTH}
-              className="w-full"
-            >
-              <div className="rounded-[28px] border border-white/[0.1] bg-black/75 px-5 py-5 shadow-[0_-28px_90px_-24px_rgba(0,0,0,0.95)] backdrop-blur-lg backdrop-saturate-150 supports-[backdrop-filter]:bg-black/45">
-                <div className="space-y-2">
-                  <p className="text-xs font-medium uppercase tracking-[0.18em] text-white/55">
-                    {formatEventDay(data.event.date)}
-                  </p>
-                  <h1 className="text-3xl font-black leading-[1.08] tracking-tight text-white drop-shadow-[0_2px_28px_rgba(0,0,0,0.65)] sm:text-[2.125rem]">
-                    {data.event.name}
-                  </h1>
-                  {data.event.location ? (
-                    <p className="text-sm text-white/72">{data.event.location}</p>
-                  ) : null}
-                </div>
+              <motion.div
+                animate={{
+                  y: purchaseOpen ? -28 : 0,
+                }}
+                transition={EASE_SMOOTH}
+                className="w-full"
+              >
+                <div className="rounded-[28px] border border-white/[0.1] px-5 py-5 shadow-[0_-28px_90px_-24px_rgba(0,0,0,0.95)] backdrop-blur-xl backdrop-saturate-150 supports-[backdrop-filter]:bg-black/35">
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium uppercase tracking-[0.18em] text-white/55">
+                      {formatEventDay(data.event.date)}
+                    </p>
+                    <h1 className="text-3xl font-black leading-[1.08] tracking-tight text-white drop-shadow-[0_2px_28px_rgba(0,0,0,0.65)] sm:text-[2.125rem]">
+                      {data.event.name}
+                    </h1>
+                    {data.event.location ? (
+                      <p className="text-sm text-white/72">{data.event.location}</p>
+                    ) : null}
+                  </div>
 
-                <div className="mt-6">
-                  <AnimatePresence mode="wait" initial={false}>
-                    {!purchaseOpen ? (
-                      <motion.div
-                        key="cta"
-                        initial={{ opacity: 0, y: 12 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{
-                          opacity: 0,
-                          y: -12,
-                          filter: "blur(8px)",
-                          transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] },
-                        }}
-                        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-                      >
-                        <button
-                          type="button"
-                          disabled={ctaDisabled}
-                          onClick={startPurchase}
-                          className="group/cta relative flex h-14 w-full items-center justify-between gap-4 overflow-hidden rounded-2xl bg-white px-5 text-left text-base font-semibold text-black shadow-[0_24px_48px_-16px_rgba(255,255,255,0.35)] transition-[transform,box-shadow] duration-300 ease-out hover:-translate-y-0.5 hover:shadow-[0_28px_56px_-14px_rgba(255,255,255,0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 active:translate-y-0 disabled:cursor-not-allowed disabled:bg-white/30 disabled:text-white/60 disabled:shadow-none"
+                  <div className="mt-6">
+                    <AnimatePresence mode="wait" initial={false}>
+                      {!purchaseOpen ? (
+                        <motion.div
+                          key="cta"
+                          initial={{ opacity: 0, y: 12 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{
+                            opacity: 0,
+                            y: -12,
+                            filter: "blur(8px)",
+                            transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] },
+                          }}
+                          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
                         >
-                          <span
-                            aria-hidden
-                            className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/70 to-transparent opacity-0 transition-all duration-700 ease-out group-hover/cta:translate-x-full group-hover/cta:opacity-100"
-                          />
-                          <span className="relative flex flex-col">
-                            <span className="text-[15px] leading-tight">{ctaLabel}</span>
-                            {anythingPurchasable && hasAnyCatalog ? (
-                              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-black/55">
-                                {needsWorkflowChoice
-                                  ? "entradas · consumos"
-                                  : hasTicketCatalog
-                                    ? "comprar entrada"
-                                    : "comprar consumos"}
-                              </span>
-                            ) : null}
-                          </span>
-                          <span className="relative grid size-9 place-items-center rounded-full bg-black/5 transition-transform duration-300 ease-out group-hover/cta:rotate-45 group-hover/cta:bg-black/10">
-                            <ArrowUpRight className="size-4" aria-hidden />
-                          </span>
-                        </button>
-                      </motion.div>
-                    ) : (
-                      <motion.div
-                        key="flow"
-                        initial={{ opacity: 0, y: 22, filter: "blur(10px)" }}
-                        animate={{
-                          opacity: 1,
-                          y: 0,
-                          filter: "blur(0px)",
-                          transition: { duration: 0.46, ease: [0.22, 1, 0.36, 1] },
-                        }}
-                        exit={{
-                          opacity: 0,
-                          y: 16,
-                          filter: "blur(8px)",
-                          transition: { duration: 0.22 },
-                        }}
-                        className="flex flex-col gap-5"
-                      >
-                        {(showTicketStep || showProductStep) && needsWorkflowChoice ? (
-                          <Button
+                          <button
                             type="button"
-                            variant="ghost"
-                            className="-ml-2 h-auto self-start rounded-xl px-2 py-1.5 text-sm text-white/60 hover:bg-white/10 hover:text-white"
-                            onClick={goBackToChooser}
+                            disabled={ctaDisabled}
+                            onClick={startPurchase}
+                            className="group/cta relative flex h-14 w-full items-center justify-between gap-4 overflow-hidden rounded-2xl bg-white px-5 text-left text-base font-semibold text-black shadow-[0_24px_48px_-16px_rgba(255,255,255,0.35)] transition-[transform,box-shadow] duration-300 ease-out hover:-translate-y-0.5 hover:shadow-[0_28px_56px_-14px_rgba(255,255,255,0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 active:translate-y-0 disabled:cursor-not-allowed disabled:bg-white/30 disabled:text-white/60 disabled:shadow-none"
                           >
-                            <ChevronLeft className="mr-0.5 size-4" aria-hidden />
-                            Elegir otra opción
-                          </Button>
-                        ) : null}
-
-                        <div className="w-full">
-                          {showChooser ? (
-                            <ChooserStep
-                              hasTicketCatalog={hasTicketCatalog}
-                              anyTicketPurchasable={anyTicketPurchasable}
-                              hasProductCatalog={hasProductCatalog}
-                              productsPurchasable={productsPurchasable}
-                              ticketsFrom={ticketsFrom}
-                              ticketsOpen={ticketsWindow.open}
-                              consFrom={consFrom}
-                              consOpen={consWindow.open}
-                              onChooseTickets={chooseTicketsWorkflow}
-                              onChooseProducts={chooseProductsWorkflow}
+                            <span
+                              aria-hidden
+                              className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/70 to-transparent opacity-0 transition-all duration-700 ease-out group-hover/cta:translate-x-full group-hover/cta:opacity-100"
                             />
-                          ) : showTicketStep ? (
-                            <TicketStep
-                              data={data}
-                              ticketsFrom={ticketsFrom}
-                              ticketsWindow={ticketsWindow}
-                              ticketQtys={ticketQtys}
-                              bumpTicket={bumpTicket}
-                              trimTicket={trimTicket}
-                            />
-                          ) : null}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                            <span className="relative flex flex-col">
+                              <span className="text-[15px] leading-tight">{ctaLabel}</span>
+                              {anythingPurchasable && hasAnyCatalog ? (
+                                <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-black/55">
+                                  {hasTicketCatalog && hasProductCatalog
+                                    ? "entradas · consumos"
+                                    : hasTicketCatalog
+                                      ? "comprar entrada"
+                                      : "comprar consumos"}
+                                </span>
+                              ) : null}
+                            </span>
+                            <span className="relative grid size-9 place-items-center rounded-full bg-black/5 transition-transform duration-300 ease-out group-hover/cta:rotate-45 group-hover/cta:bg-black/10">
+                              <ArrowUpRight className="size-4" aria-hidden />
+                            </span>
+                          </button>
+                        </motion.div>
+                      ) : (
+                        <motion.div
+                          key="flow"
+                          initial={{ opacity: 0, y: 22, filter: "blur(10px)" }}
+                          animate={{
+                            opacity: 1,
+                            y: 0,
+                            filter: "blur(0px)",
+                            transition: { duration: 0.46, ease: [0.22, 1, 0.36, 1] },
+                          }}
+                          exit={{
+                            opacity: 0,
+                            y: 16,
+                            filter: "blur(8px)",
+                            transition: { duration: 0.22 },
+                          }}
+                          className="flex flex-col gap-5"
+                        >
+                          <div className="w-full">
+                            {showTicketStep ? (
+                              <TicketStep
+                                data={data}
+                                ticketsFrom={ticketsFrom}
+                                ticketsWindow={ticketsWindow}
+                                ticketQtys={ticketQtys}
+                                bumpTicket={bumpTicket}
+                                trimTicket={trimTicket}
+                              />
+                            ) : null}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 </div>
-              </div>
-            </motion.div>
+              </motion.div>
             )}
 
             {!purchaseOpen ? (
@@ -548,7 +497,9 @@ export function EventDetailPage() {
                 >
                   <div className="mx-auto flex w-full max-w-lg flex-col gap-3">
                     <div className="flex items-center justify-between gap-3">
-                      <span className="text-sm text-white/65">Total</span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-sm text-white/65">Total</span>
+                      </div>
                       <div className="flex items-center gap-2">
                         <motion.span
                           key={totalStr}
@@ -559,21 +510,6 @@ export function EventDetailPage() {
                         >
                           {formatMoneyArsExact(totalStr)}
                         </motion.span>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          aria-label="Abrir tu bolsa"
-                          onClick={() => setBolsaOpen(true)}
-                          className="relative size-11 shrink-0 rounded-xl border-white/20 bg-white/[0.07] text-white hover:bg-white/12"
-                        >
-                          <ShoppingBag className="size-5" aria-hidden />
-                          {bolsaUnitCount > 0 ? (
-                            <span className="absolute -right-1 -top-1 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold text-black">
-                              {bolsaUnitCount > 99 ? "99+" : bolsaUnitCount}
-                            </span>
-                          ) : null}
-                        </Button>
                       </div>
                     </div>
                     <Button
@@ -583,9 +519,6 @@ export function EventDetailPage() {
                     >
                       {footerCtaLabel}
                     </Button>
-                    <p className="text-center text-[11px] leading-relaxed text-white/45">
-                      Pago procesado de forma segura con Mercado Pago.
-                    </p>
                   </div>
                 </motion.div>
               ) : null}
@@ -826,108 +759,7 @@ function StepShell({ children }: { children: React.ReactNode }) {
   )
 }
 
-function ChooserStep({
-  hasTicketCatalog,
-  anyTicketPurchasable,
-  hasProductCatalog,
-  productsPurchasable,
-  ticketsFrom,
-  ticketsOpen,
-  consFrom,
-  consOpen,
-  onChooseTickets,
-  onChooseProducts,
-}: {
-  hasTicketCatalog: boolean
-  anyTicketPurchasable: boolean
-  hasProductCatalog: boolean
-  productsPurchasable: boolean
-  ticketsFrom: Date | string | null
-  ticketsOpen: boolean
-  consFrom: Date | string | null
-  consOpen: boolean
-  onChooseTickets: () => void
-  onChooseProducts: () => void
-}) {
-  const ticketsDisabled = !hasTicketCatalog || !anyTicketPurchasable
-  const productsDisabled = !hasProductCatalog || !productsPurchasable
 
-  return (
-    <StepShell>
-      <div className="space-y-1.5">
-        <h2 className="text-xl font-semibold tracking-tight text-white sm:text-[22px]">
-          ¿Qué querés comprar?
-        </h2>
-        <p className="text-sm leading-relaxed text-white/60">
-          Elegí entradas para el evento o consumos para canjear en el momento.
-        </p>
-      </div>
-      <div className="flex flex-col gap-3">
-        <ChoiceCard
-          title="Entradas"
-          description={
-            hasTicketCatalog && anyTicketPurchasable
-              ? "Armá tu grupo combinando tipos"
-              : ticketsFrom != null && !ticketsOpen
-                ? `Disponibles desde ${formatEventDate(ticketsFrom)}`
-                : "No hay entradas a la venta"
-          }
-          disabled={ticketsDisabled}
-          onClick={onChooseTickets}
-        />
-        <ChoiceCard
-          title="Consumos"
-          description={
-            hasProductCatalog && productsPurchasable
-              ? "Bebidas y productos del evento"
-              : consFrom != null && !consOpen
-                ? `Disponibles desde ${formatEventDate(consFrom)}`
-                : "No hay consumos para este evento"
-          }
-          disabled={productsDisabled}
-          onClick={onChooseProducts}
-        />
-      </div>
-    </StepShell>
-  )
-}
-
-function ChoiceCard({
-  title,
-  description,
-  disabled,
-  onClick,
-}: {
-  title: string
-  description: string
-  disabled: boolean
-  onClick: () => void
-}) {
-  return (
-    <motion.button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      whileTap={disabled ? undefined : { scale: 0.985 }}
-      className={`group/choice relative flex w-full items-center justify-between gap-4 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.06] px-5 py-5 text-left transition-colors duration-200 ${
-        disabled
-          ? "cursor-not-allowed opacity-40"
-          : "hover:border-white/25 hover:bg-white/[0.1]"
-      }`}
-    >
-      <div className="min-w-0 flex flex-col">
-        <span className="text-[15px] font-semibold text-white">{title}</span>
-        <span className="mt-0.5 text-[13px] text-white/55">{description}</span>
-      </div>
-      <span
-        aria-hidden
-        className="grid size-8 shrink-0 place-items-center rounded-full border border-white/10 bg-white/[0.06] text-white/70 transition-all duration-200 group-hover/choice:translate-x-0.5 group-hover/choice:border-white/25 group-hover/choice:bg-white/10 group-hover/choice:text-white"
-      >
-        <ArrowUpRight className="size-4 -rotate-45" />
-      </span>
-    </motion.button>
-  )
-}
 
 function TicketStep({
   data,
@@ -951,7 +783,7 @@ function TicketStep({
   return (
     <StepShell>
       <div className="space-y-1">
-        <h2 className="text-xl font-semibold tracking-tight text-white sm:text-[22px]">
+        <h2 className="text-xl font-extrabold tracking-tight text-white sm:text-[22px]">
           Entradas
         </h2>
         {ticketsFrom != null && !saleOpen ? (
@@ -964,7 +796,7 @@ function TicketStep({
         ) : saleOpen ? (
           <p className="text-sm leading-relaxed text-white/60">
             {anyBuyable
-              ? "Tocá una fila para sumarla al pedido. Podés combinar distintos tipos."
+              ? ""
               : "Por ahora no hay entradas disponibles para este evento."}
           </p>
         ) : null}
@@ -975,7 +807,7 @@ function TicketStep({
           Sin entradas a la venta.
         </p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="flex max-h-[320px] flex-col gap-2 overflow-y-auto overscroll-contain pr-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {data.ticketTypes.map((t) => {
             const disabled = !t.availableForPurchase || !saleOpen
             const count = ticketQtys[t.id] ?? 0
@@ -1021,11 +853,10 @@ function TicketPickRow({
     <motion.div
       layout
       transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-      className={`relative overflow-hidden rounded-2xl border transition-[border-color,box-shadow] duration-200 ${
-        active
-          ? "border-white/40 bg-white/[0.12] shadow-[0_0_0_1px_rgba(255,255,255,0.18)_inset]"
-          : "border-white/10 bg-white/[0.05]"
-      } ${disabled ? "opacity-40" : ""}`}
+      className={`relative overflow-hidden rounded-2xl transition-colors duration-200 ${active
+        ? "bg-white/[0.12]"
+        : "bg-white/[0.05]"
+        } ${disabled ? "opacity-40" : ""}`}
     >
       <div className="flex min-h-[4.75rem]">
         <motion.button
@@ -1035,63 +866,66 @@ function TicketPickRow({
           onClick={onAdd}
           whileTap={disabled ? undefined : { scale: 0.985 }}
           aria-label={`Sumar una entrada ${name}`}
-          className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 px-4 py-3 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-white/40"
+          className="flex min-w-0 flex-1 flex-row items-center gap-3 px-4 py-3 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-white/40"
         >
-          <span className="text-[15px] font-medium leading-tight text-white">
-            {name}
-          </span>
-          <span className="text-base font-semibold tabular-nums tracking-tight text-white/85">
-            {priceStr}
-          </span>
-          {!disabled ? (
-            <span className="pt-0.5 text-[11px] font-medium text-white/50">
-              {count > 0 ? "Tocá para sumar otra" : "Tocá para sumar una"}
+          <AnimatePresence mode="popLayout" initial={false}>
+            {active ? (
+              <motion.div
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -8 }}
+                transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                className="flex shrink-0 items-center justify-center gap-1.5"
+              >
+                <div className="relative grid place-items-center">
+                  <AnimatePresence mode="popLayout" initial={false}>
+                    <motion.span
+                      key={count}
+                      initial={{ y: 10, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      exit={{ y: -10, opacity: 0 }}
+                      transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                      className="tabular-nums text-[22px] font-bold leading-none text-white"
+                      aria-live="polite"
+                    >
+                      {count}
+                    </motion.span>
+                  </AnimatePresence>
+                </div>
+                <span className="text-[13px] font-semibold text-white/40">x</span>
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
+          <motion.div layout className="flex py-2 min-w-0 flex-col justify-center gap-0.5">
+            <span className="text-lg font-bold mb-1leading-tight text-white">
+              {name}
             </span>
-          ) : null}
+            <span className="text-base font-semibold tabular-nums tracking-tight text-white/85">
+              {priceStr}
+            </span>
+          </motion.div>
         </motion.button>
 
         <AnimatePresence initial={false} mode="popLayout">
           {active ? (
-            <motion.div
+            <motion.button
               key="rail"
+              type="button"
               initial={{ opacity: 0, x: 16 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 12 }}
               transition={EASE_OUT}
-              className="flex shrink-0 flex-col items-center justify-center gap-1.5 border-l border-white/10 py-2.5 pr-3 pl-2.5"
-              onClick={(e) => e.stopPropagation()}
-              onPointerDown={(e) => e.stopPropagation()}
+              whileTap={{ scale: 0.96 }}
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                onRemove()
+              }}
+              className="flex w-[4.75rem] shrink-0 flex-col items-center justify-center border-l border-white/10 px-2 text-center text-[12px] font-medium leading-tight text-white/70 outline-none transition-colors hover:bg-white/[0.05] hover:text-white/90 focus-visible:ring-2 focus-visible:ring-white/35"
+              aria-label={`Sacar una entrada ${name}`}
             >
-              <span className="relative grid min-w-[2.5rem] place-items-center overflow-hidden">
-                <AnimatePresence mode="popLayout" initial={false}>
-                  <motion.span
-                    key={count}
-                    initial={{ y: 10, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    exit={{ y: -10, opacity: 0 }}
-                    transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-                    className="tabular-nums text-2xl font-bold leading-none text-white"
-                    aria-live="polite"
-                  >
-                    {count}
-                  </motion.span>
-                </AnimatePresence>
-              </span>
-              <motion.button
-                type="button"
-                whileTap={{ scale: 0.96 }}
-                transition={{ duration: 0.12 }}
-                onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  onRemove()
-                }}
-                className="max-w-full rounded-xl border border-white/15 bg-white/[0.07] px-2.5 py-2 text-center text-[11px] font-semibold leading-tight text-white/85 outline-none transition-colors hover:border-white/25 hover:bg-white/12 focus-visible:ring-2 focus-visible:ring-white/35"
-                aria-label={`Sacar una entrada ${name}`}
-              >
-                Sacar una
-              </motion.button>
-            </motion.div>
+              <Minus className="size-5" aria-hidden />
+            </motion.button>
           ) : null}
         </AnimatePresence>
       </div>
@@ -1223,11 +1057,10 @@ function ProductMarketTile({
   return (
     <motion.div
       layout
-      className={`relative flex flex-col overflow-hidden rounded-2xl border bg-zinc-950 transition-colors duration-200 ${
-        active
-          ? "border-white/30 ring-1 ring-white/20"
-          : "border-white/[0.12]"
-      } ${disabled ? "opacity-45" : ""}`}
+      className={`relative flex flex-col overflow-hidden rounded-2xl border bg-zinc-950 transition-colors duration-200 ${active
+        ? "border-white/30 ring-1 ring-white/20"
+        : "border-white/[0.12]"
+        } ${disabled ? "opacity-45" : ""}`}
     >
       <button
         type="button"
