@@ -33,6 +33,7 @@ export type PublicDrinkProductItem = {
   name: string
   price: string
   saleType?: PublicProductSaleType
+  imageUrl?: string | null
 }
 
 export type PublicEventDetailResponse = {

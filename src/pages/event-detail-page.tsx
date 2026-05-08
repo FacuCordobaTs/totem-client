@@ -877,6 +877,7 @@ function ConsumosMarketplace({
                     <li key={p.id}>
                       <ProductShelfRow
                         name={p.name}
+                        imageUrl={p.imageUrl?.trim() || null}
                         priceStr={formatMoneyArsExact(p.price)}
                         disabled={!saleOpen}
                         onAdd={() => {
@@ -908,6 +909,7 @@ function ConsumosMarketplace({
                     <li key={p.id}>
                       <ProductShelfRow
                         name={p.name}
+                        imageUrl={p.imageUrl?.trim() || null}
                         priceStr={formatMoneyArsExact(p.price)}
                         disabled={!saleOpen}
                         onAdd={() => {
@@ -1010,17 +1012,20 @@ function ShelfRailButton({
 
 function ProductShelfRow({
   name,
+  imageUrl,
   priceStr,
   disabled,
   onAdd,
 }: {
   name: string
+  imageUrl?: string | null
   priceStr: string
   disabled: boolean
   onAdd: () => void
 }) {
   const initial = name.trim().charAt(0).toUpperCase() || "?"
   const [addedPulse, setAddedPulse] = useState(false)
+  const showPhoto = Boolean(imageUrl)
 
   return (
     <motion.button
@@ -1037,7 +1042,7 @@ function ProductShelfRow({
     >
       <motion.div
         aria-hidden
-        className="relative flex size-[4.5rem] shrink-0 items-center justify-center rounded-xl bg-gradient-to-b from-white/[0.1] to-white/[0.03]"
+        className="relative flex size-[4.5rem] shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-b from-white/[0.1] to-white/[0.03]"
         animate={
           addedPulse
             ? { scale: [1, 1.06, 1], boxShadow: ["0 0 0 0 rgba(34,197,94,0)", "0 0 0 10px rgba(34,197,94,0.12)", "0 0 0 0 rgba(34,197,94,0)"] }
@@ -1045,9 +1050,19 @@ function ProductShelfRow({
         }
         transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
       >
-        <span className="flex size-11 items-center justify-center rounded-xl border border-white/10 bg-black/45 text-lg font-semibold text-white/92">
-          {initial}
-        </span>
+        {showPhoto ? (
+          <img
+            src={imageUrl!}
+            alt=""
+            className="absolute inset-0 size-full object-cover"
+            loading="lazy"
+            decoding="async"
+          />
+        ) : (
+          <span className="flex size-11 items-center justify-center rounded-xl border border-white/10 bg-black/45 text-lg font-semibold text-white/92">
+            {initial}
+          </span>
+        )}
         <AnimatePresence>
           {addedPulse ? (
             <motion.span
