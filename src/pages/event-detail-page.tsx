@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams } from "react-router"
-import { ArrowUpRight, ChevronLeft, Minus } from "lucide-react"
+import { ChevronLeft, Minus } from "lucide-react"
 import { AnimatePresence, motion, type Transition } from "motion/react"
 import Decimal from "decimal.js"
 import { publicApiFetch } from "@/lib/api"
