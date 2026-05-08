@@ -314,13 +314,13 @@ export function EventDetailPage() {
         <motion.div
           aria-hidden
           className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/55 via-black/15 to-black/95"
-          animate={{ opacity: flyerVisible ? 1 : 0 }}
+          animate={{ opacity: flyerVisible ? (purchaseOpen ? 1 : 0.2) : 0 }}
           transition={STORE_TRANSITION}
         />
         <motion.div
           aria-hidden
           className="pointer-events-none absolute inset-x-0 bottom-0 h-[55%] bg-gradient-to-t from-black via-black/70 to-transparent"
-          animate={{ opacity: flyerVisible ? 1 : 0 }}
+          animate={{ opacity: flyerVisible ? (purchaseOpen ? 1 : 0.5) : 0 }}
           transition={STORE_TRANSITION}
         />
       </div>
@@ -339,7 +339,7 @@ export function EventDetailPage() {
         className={
           showStore
             ? `relative z-10 mx-auto flex min-h-dvh max-h-dvh w-full max-w-lg flex-col overflow-y-auto overscroll-contain px-4 pt-[max(0.5rem,env(safe-area-inset-top))] sm:px-5 ${purchaseOpen ? "pb-40" : "pb-6"}`
-            : `relative z-10 mx-auto flex min-h-dvh max-h-dvh w-full max-w-lg flex-col justify-end overflow-y-auto overscroll-contain px-5 pt-10 sm:px-8 ${purchaseOpen ? "pb-40" : "pb-6"}`
+            : `relative z-10 mx-auto flex min-h-dvh max-h-dvh w-full max-w-lg flex-col justify-end overflow-y-auto overscroll-contain px-5 pt-10 sm:px-8 ${purchaseOpen ? "pb-40" : "pb-32"}`
         }
       >
         {error ? (
@@ -360,124 +360,114 @@ export function EventDetailPage() {
               />
             ) : (
               <motion.div
+                layout
                 animate={{
                   y: purchaseOpen ? -28 : 0,
                   marginBottom: showFooter && commerceSurface === "hero" ? -130 : 0
                 }}
                 transition={EASE_SMOOTH}
-                className="w-full"
+                className={purchaseOpen ? "w-full" : "mx-auto w-auto"}
               >
-                <div className="rounded-[28px] border border-white/[0.1] px-5 py-5 shadow-[0_-28px_90px_-24px_rgba(0,0,0,0.95)] backdrop-blur-xl backdrop-saturate-150 supports-[backdrop-filter]:bg-black/30">
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium uppercase tracking-[0.18em] text-white/55">
-                      {formatEventDay(data.event.date)}
-                    </p>
-                    <h1 className="text-3xl font-black leading-[1.08] tracking-tight text-white drop-shadow-[0_2px_28px_rgba(0,0,0,0.65)] sm:text-[2.125rem]">
-                      {data.event.name}
-                    </h1>
-                    {data.event.location ? (
-                      <p className="text-sm text-white/72">{data.event.location}</p>
-                    ) : null}
-                  </div>
-
-                  <div className="mt-6">
-                    <AnimatePresence mode="wait" initial={false}>
-                      {!purchaseOpen ? (
-                        <motion.div
-                          key="cta"
-                          initial={{ opacity: 0, y: 12 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{
-                            opacity: 0,
-                            y: -12,
-                            filter: "blur(8px)",
-                            transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] },
-                          }}
-                          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-                        >
-                          <button
-                            type="button"
-                            disabled={ctaDisabled}
-                            onClick={startPurchase}
-                            className="group/cta relative flex h-14 w-full items-center justify-center gap-4 overflow-hidden rounded-2xl bg-white px-5 text-left text-base font-semibold text-black shadow-[0_24px_48px_-16px_rgba(255,255,255,0.35)] transition-[transform,box-shadow] duration-300 ease-out hover:-translate-y-0.5 hover:shadow-[0_28px_56px_-14px_rgba(255,255,255,0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 active:translate-y-0 disabled:cursor-not-allowed disabled:bg-white/30 disabled:text-white/60 disabled:shadow-none"
-                          >
-                            <span className="text-[15px] leading-tight">{ctaLabel}</span>
-                          </button>
-                        </motion.div>
-                      ) : (
-                        <motion.div
-                          key="flow"
-                          initial={{ opacity: 0, y: 22, filter: "blur(10px)" }}
-                          animate={{
-                            opacity: 1,
-                            y: 0,
-                            filter: "blur(0px)",
-                            transition: { duration: 0.46, ease: [0.22, 1, 0.36, 1] },
-                          }}
-                          exit={{
-                            opacity: 0,
-                            y: 16,
-                            filter: "blur(8px)",
-                            transition: { duration: 0.22 },
-                          }}
-                          className="flex flex-col gap-5"
-                        >
-                          <div className="w-full">
-                            {showTicketStep ? (
-                              <TicketStep
-                                data={data}
-                                ticketsFrom={ticketsFrom}
-                                ticketsWindow={ticketsWindow}
-                                ticketQtys={ticketQtys}
-                                bumpTicket={bumpTicket}
-                                trimTicket={trimTicket}
-                              />
-                            ) : null}
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-
-                  <AnimatePresence>
-                    {showFooter && commerceSurface === "hero" ? (
+                <motion.div
+                  layout
+                  className={
+                    purchaseOpen
+                      ? "rounded-[28px] border border-white/[0.1] px-5 py-5 shadow-[0_-28px_90px_-24px_rgba(0,0,0,0.95)] backdrop-blur-xl backdrop-saturate-150 supports-[backdrop-filter]:bg-black/30"
+                      : `cursor-pointer rounded-full border border-white/[0.1] bg-black/30 px-10 py-3.5 shadow-2xl backdrop-blur-xl backdrop-saturate-150 transition-transform supports-[backdrop-filter]:bg-black/30 ${ctaDisabled ? "cursor-not-allowed opacity-50" : "active:scale-95 hover:bg-black/40"}`
+                  }
+                  onClick={!purchaseOpen && !ctaDisabled ? startPurchase : undefined}
+                >
+                  <AnimatePresence mode="wait" initial={false}>
+                    {!purchaseOpen ? (
                       <motion.div
-                        key="island-checkout-bar"
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={EASE_SMOOTH}
-                        className="overflow-hidden"
+                        key="cta-btn"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.15 }}
+                        className="flex items-center justify-center"
                       >
-                        <div className="mt-5 flex flex-col gap-3 border-t border-white/[0.08] pt-5">
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-1">
-                              <span className="text-sm font-medium text-white/65">Total</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <motion.span
-                                key={totalStr}
-                                initial={{ opacity: 0, y: 6 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-                                className="text-xl font-bold tabular-nums tracking-tight text-white sm:text-2xl"
-                              >
-                                {formatMoneyArsExact(totalStr)}
-                              </motion.span>
+                        <span className="text-[15px] font-semibold tracking-wide text-white">{ctaLabel}</span>
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="island-content"
+                        initial={{ opacity: 0, filter: "blur(10px)", y: 12 }}
+                        animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
+                        exit={{ opacity: 0, filter: "blur(8px)", y: 8 }}
+                        transition={{ duration: 0.46, ease: [0.22, 1, 0.36, 1] }}
+                      >
+                        <div className="space-y-2">
+                          <p className="text-xs font-medium uppercase tracking-[0.18em] text-white/55">
+                            {formatEventDay(data.event.date)}
+                          </p>
+                          <h1 className="text-3xl font-black leading-[1.08] tracking-tight text-white drop-shadow-[0_2px_28px_rgba(0,0,0,0.65)] sm:text-[2.125rem]">
+                            {data.event.name}
+                          </h1>
+                          {data.event.location ? (
+                            <p className="text-sm text-white/72">{data.event.location}</p>
+                          ) : null}
+                        </div>
+
+                        <div className="mt-6">
+                          <div className="flex flex-col gap-5">
+                            <div className="w-full">
+                              {showTicketStep ? (
+                                <TicketStep
+                                  data={data}
+                                  ticketsFrom={ticketsFrom}
+                                  ticketsWindow={ticketsWindow}
+                                  ticketQtys={ticketQtys}
+                                  bumpTicket={bumpTicket}
+                                  trimTicket={trimTicket}
+                                />
+                              ) : null}
                             </div>
                           </div>
-                          <Button
-                            className="h-12 w-full rounded-2xl bg-white text-base font-semibold text-black shadow-[0_18px_44px_-18px_rgba(255,255,255,0.45)] transition-all hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_24px_56px_-16px_rgba(255,255,255,0.55)] disabled:translate-y-0 disabled:bg-white/30 disabled:text-white/60 disabled:shadow-none"
-                            disabled={!primaryFooterEnabled}
-                            onClick={primaryFooterAction}
-                          >
-                            {footerCtaLabel}
-                          </Button>
                         </div>
+
+                        <AnimatePresence>
+                          {showFooter && commerceSurface === "hero" ? (
+                            <motion.div
+                              key="island-checkout-bar"
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: "auto" }}
+                              exit={{ opacity: 0, height: 0 }}
+                              transition={EASE_SMOOTH}
+                              className="overflow-hidden"
+                            >
+                              <div className="mt-5 flex flex-col gap-3 border-t border-white/[0.08] pt-5">
+                                <div className="flex items-center justify-between gap-3">
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-sm font-medium text-white/65">Total</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <motion.span
+                                      key={totalStr}
+                                      initial={{ opacity: 0, y: 6 }}
+                                      animate={{ opacity: 1, y: 0 }}
+                                      transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                                      className="text-xl font-bold tabular-nums tracking-tight text-white sm:text-2xl"
+                                    >
+                                      {formatMoneyArsExact(totalStr)}
+                                    </motion.span>
+                                  </div>
+                                </div>
+                                <Button
+                                  className="h-14 w-full rounded-2xl bg-white text-base font-semibold text-black shadow-[0_18px_44px_-18px_rgba(255,255,255,0.45)] transition-all hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_24px_56px_-16px_rgba(255,255,255,0.55)] disabled:translate-y-0 disabled:bg-white/30 disabled:text-white/60 disabled:shadow-none"
+                                  disabled={!primaryFooterEnabled}
+                                  onClick={primaryFooterAction}
+                                >
+                                  {footerCtaLabel}
+                                </Button>
+                              </div>
+                            </motion.div>
+                          ) : null}
+                        </AnimatePresence>
                       </motion.div>
-                    ) : null}
+                    )}
                   </AnimatePresence>
-                </div>
+                </motion.div>
               </motion.div>
             )}
 
