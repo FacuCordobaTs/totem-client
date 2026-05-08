@@ -399,27 +399,9 @@ export function EventDetailPage() {
                             type="button"
                             disabled={ctaDisabled}
                             onClick={startPurchase}
-                            className="group/cta relative flex h-14 w-full items-center justify-between gap-4 overflow-hidden rounded-2xl bg-white px-5 text-left text-base font-semibold text-black shadow-[0_24px_48px_-16px_rgba(255,255,255,0.35)] transition-[transform,box-shadow] duration-300 ease-out hover:-translate-y-0.5 hover:shadow-[0_28px_56px_-14px_rgba(255,255,255,0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 active:translate-y-0 disabled:cursor-not-allowed disabled:bg-white/30 disabled:text-white/60 disabled:shadow-none"
+                            className="group/cta relative flex h-14 w-full items-center justify-center gap-4 overflow-hidden rounded-2xl bg-white px-5 text-left text-base font-semibold text-black shadow-[0_24px_48px_-16px_rgba(255,255,255,0.35)] transition-[transform,box-shadow] duration-300 ease-out hover:-translate-y-0.5 hover:shadow-[0_28px_56px_-14px_rgba(255,255,255,0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 active:translate-y-0 disabled:cursor-not-allowed disabled:bg-white/30 disabled:text-white/60 disabled:shadow-none"
                           >
-                            <span
-                              aria-hidden
-                              className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/70 to-transparent opacity-0 transition-all duration-700 ease-out group-hover/cta:translate-x-full group-hover/cta:opacity-100"
-                            />
-                            <span className="relative flex flex-col">
-                              <span className="text-[15px] leading-tight">{ctaLabel}</span>
-                              {anythingPurchasable && hasAnyCatalog ? (
-                                <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-black/55">
-                                  {hasTicketCatalog && hasProductCatalog
-                                    ? "entradas · consumos"
-                                    : hasTicketCatalog
-                                      ? "comprar entrada"
-                                      : "comprar consumos"}
-                                </span>
-                              ) : null}
-                            </span>
-                            <span className="relative grid size-9 place-items-center rounded-full bg-black/5 transition-transform duration-300 ease-out group-hover/cta:rotate-45 group-hover/cta:bg-black/10">
-                              <ArrowUpRight className="size-4" aria-hidden />
-                            </span>
+                            <span className="text-[15px] leading-tight">{ctaLabel}</span>
                           </button>
                         </motion.div>
                       ) : (
