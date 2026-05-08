@@ -26,10 +26,13 @@ export type PublicTicketTypeItem = {
   availableForPurchase: boolean
 }
 
+export type PublicProductSaleType = "BOTTLE" | "GLASS"
+
 export type PublicDrinkProductItem = {
   id: string
   name: string
   price: string
+  saleType?: PublicProductSaleType
 }
 
 export type PublicEventDetailResponse = {

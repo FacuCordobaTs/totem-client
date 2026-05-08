@@ -1,10 +1,21 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
 import { useNavigate, useParams } from "react-router"
-import { ChevronLeft, Minus } from "lucide-react"
+import {
+  BottleWine,
+  Check,
+  ChevronLeft,
+  Minus,
+  ShoppingCart,
+  Wine,
+} from "lucide-react"
 import { AnimatePresence, motion, type Transition } from "motion/react"
 import Decimal from "decimal.js"
 import { publicApiFetch } from "@/lib/api"
-import type { PublicEventDetailResponse } from "@/types/api"
+import type {
+  PublicDrinkProductItem,
+  PublicEventDetailResponse,
+  PublicProductSaleType,
+} from "@/types/api"
 import {
   formatCountdown,
   formatEventDate,
@@ -53,7 +64,6 @@ export function EventDetailPage() {
   const [workflow, setWorkflow] = useState<PurchaseWorkflow | null>(null)
   const [ticketQtys, setTicketQtys] = useState<Record<string, number>>({})
   const [drinks, setDrinks] = useState<Record<string, number>>({})
-  const [bolsaOpen, setBolsaOpen] = useState(false)
 
   const ticketsFrom = data?.event.ticketsAvailableFrom ?? null
   const consFrom = data?.event.consumptionsAvailableFrom ?? null
@@ -255,27 +265,8 @@ export function EventDetailPage() {
       setCommerceSurface("hero")
       setTicketQtys({})
       setDrinks({})
-      setBolsaOpen(false)
     }
   }, [purchaseOpen])
-
-  useEffect(() => {
-    if (!bolsaOpen) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setBolsaOpen(false)
-    }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [bolsaOpen])
-
-  useEffect(() => {
-    if (!bolsaOpen) return
-    const prev = document.body.style.overflow
-    document.body.style.overflow = "hidden"
-    return () => {
-      document.body.style.overflow = prev
-    }
-  }, [bolsaOpen])
 
   if (!eventId) return null
 
@@ -351,11 +342,14 @@ export function EventDetailPage() {
             {showStore ? (
               <ConsumosMarketplace
                 eventName={data.event.name}
-                products={data.drinkProducts}
+                data={data}
                 consFrom={consFrom}
                 consWindow={consWindow}
                 drinks={drinks}
                 setDrinkQty={setDrinkQty}
+                ticketLines={ticketLines}
+                trimTicket={trimTicket}
+                cartUnitCount={bolsaUnitCount}
                 onBack={storeBack}
               />
             ) : (
@@ -510,23 +504,6 @@ export function EventDetailPage() {
               ) : null}
             </AnimatePresence>
 
-            {data && showFooter ? (
-              <TuBolsaDrawer
-                open={bolsaOpen}
-                onClose={() => setBolsaOpen(false)}
-                data={data}
-                ticketLines={ticketLines}
-                drinkLines={drinkLines}
-                totalStr={totalStr}
-                footerCtaLabel={footerCtaLabel}
-                primaryFooterEnabled={primaryFooterEnabled}
-                onPrimaryAction={() => {
-                  primaryFooterAction()
-                  setBolsaOpen(false)
-                }}
-              />
-            ) : null}
-
             {data && !hasTicketCatalog && !hasProductCatalog ? (
               <p className="mt-4 text-center text-sm text-white/55">
                 Este evento no tiene venta online por el momento.
@@ -536,194 +513,6 @@ export function EventDetailPage() {
         )}
       </div>
     </div>
-  )
-}
-
-const BOLSA_DRAWER_HEIGHT = "58vh"
-
-function TuBolsaDrawer({
-  open,
-  onClose,
-  data,
-  ticketLines,
-  drinkLines,
-  totalStr,
-  footerCtaLabel,
-  primaryFooterEnabled,
-  onPrimaryAction,
-}: {
-  open: boolean
-  onClose: () => void
-  data: PublicEventDetailResponse
-  ticketLines: CartTicketLine[]
-  drinkLines: CartDrinkLine[]
-  totalStr: string
-  footerCtaLabel: string
-  primaryFooterEnabled: boolean
-  onPrimaryAction: () => void
-}) {
-  const hasTickets = ticketLines.length > 0
-  const hasConsumos = drinkLines.length > 0
-  const isEmpty = !hasTickets && !hasConsumos
-
-  return (
-    <AnimatePresence>
-      {open ? (
-        <motion.div
-          key="bolsa-root"
-          className="fixed inset-0 z-[60] flex items-end justify-center sm:items-end"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <motion.button
-            type="button"
-            aria-label="Cerrar"
-            className="absolute inset-0 bg-black/65 backdrop-blur-[2px]"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-          />
-          <motion.div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="bolsa-titulo"
-            className="relative z-10 flex w-full max-w-lg flex-col rounded-t-[1.35rem] border border-white/[0.12] border-b-0 bg-[#0c0c0c] shadow-[0_-12px_48px_-8px_rgba(0,0,0,0.85)]"
-            style={{ height: BOLSA_DRAWER_HEIGHT, maxHeight: BOLSA_DRAWER_HEIGHT }}
-            initial={{ y: "100%" }}
-            animate={{ y: 0 }}
-            exit={{ y: "100%" }}
-            transition={EASE_OUT}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="shrink-0 px-5 pb-3 pt-4">
-              <div
-                aria-hidden
-                className="mx-auto mb-4 h-1 w-10 shrink-0 rounded-full bg-white/20"
-              />
-              <h2
-                id="bolsa-titulo"
-                className="text-center text-lg font-bold tracking-tight text-white"
-              >
-                Tu bolsa
-              </h2>
-            </div>
-
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-2">
-              {isEmpty ? (
-                <p className="py-8 text-center text-sm text-white/50">
-                  Todavía no agregaste nada. Elegí entradas o consumos para verlos
-                  acá.
-                </p>
-              ) : (
-                <div className="space-y-6 pb-2">
-                  {hasTickets ? (
-                    <section className="space-y-3">
-                      <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/45">
-                        Entradas
-                      </h3>
-                      <ul className="space-y-2">
-                        {ticketLines.map((line) => {
-                          const t = data.ticketTypes.find(
-                            (x) => x.id === line.ticketTypeId
-                          )
-                          const name = t?.name ?? "Entrada"
-                          const sub = new Decimal(line.unitPrice)
-                            .mul(line.quantity)
-                            .toFixed(2)
-                          return (
-                            <li
-                              key={line.ticketTypeId}
-                              className="flex items-start justify-between gap-3 rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2.5"
-                            >
-                              <div className="min-w-0">
-                                <p className="text-sm font-medium text-white">
-                                  {name}
-                                </p>
-                                <p className="mt-0.5 text-xs text-white/45">
-                                  {line.quantity} ×{" "}
-                                  {formatMoneyArsExact(line.unitPrice)}
-                                </p>
-                              </div>
-                              <span className="shrink-0 text-sm font-semibold tabular-nums text-white/90">
-                                {formatMoneyArsExact(sub)}
-                              </span>
-                            </li>
-                          )
-                        })}
-                      </ul>
-                    </section>
-                  ) : null}
-
-                  {hasTickets && hasConsumos ? (
-                    <div
-                      className="h-px w-full bg-gradient-to-r from-transparent via-white/15 to-transparent"
-                      aria-hidden
-                    />
-                  ) : null}
-
-                  {hasConsumos ? (
-                    <section className="space-y-3">
-                      <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/45">
-                        Consumos
-                      </h3>
-                      <ul className="space-y-2">
-                        {drinkLines.map((line) => {
-                          const p = data.drinkProducts.find(
-                            (x) => x.id === line.productId
-                          )
-                          const name = p?.name ?? "Producto"
-                          const sub = new Decimal(line.unitPrice)
-                            .mul(line.quantity)
-                            .toFixed(2)
-                          return (
-                            <li
-                              key={line.productId}
-                              className="flex items-start justify-between gap-3 rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2.5"
-                            >
-                              <div className="min-w-0">
-                                <p className="text-sm font-medium text-white">
-                                  {name}
-                                </p>
-                                <p className="mt-0.5 text-xs text-white/45">
-                                  {line.quantity} ×{" "}
-                                  {formatMoneyArsExact(line.unitPrice)}
-                                </p>
-                              </div>
-                              <span className="shrink-0 text-sm font-semibold tabular-nums text-white/90">
-                                {formatMoneyArsExact(sub)}
-                              </span>
-                            </li>
-                          )
-                        })}
-                      </ul>
-                    </section>
-                  ) : null}
-                </div>
-              )}
-            </div>
-
-            <div className="shrink-0 space-y-3 border-t border-white/[0.1] bg-[#0c0c0c] px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-              <div className="flex items-baseline justify-between gap-4">
-                <span className="text-sm text-white/65">Total</span>
-                <span className="text-xl font-bold tabular-nums tracking-tight text-white">
-                  {formatMoneyArsExact(totalStr)}
-                </span>
-              </div>
-              <Button
-                className="h-12 w-full rounded-2xl bg-white text-base font-semibold text-black shadow-[0_14px_36px_-12px_rgba(255,255,255,0.35)] transition-all hover:bg-white disabled:bg-white/30 disabled:text-white/60 disabled:shadow-none"
-                disabled={!primaryFooterEnabled}
-                onClick={onPrimaryAction}
-              >
-                {footerCtaLabel}
-              </Button>
-            </div>
-          </motion.div>
-        </motion.div>
-      ) : null}
-    </AnimatePresence>
   )
 }
 
@@ -929,33 +718,88 @@ function TicketPickRow({
   )
 }
 
+type StoreShelf = "glass" | "bottle" | "cart"
+
+const STORE_SHELF_TRANSITION: Transition = {
+  duration: 0.42,
+  ease: [0.22, 1, 0.36, 1] as const,
+}
+
+function productSaleType(p: PublicDrinkProductItem): PublicProductSaleType {
+  return p.saleType ?? "GLASS"
+}
+
+function saleTypeLabel(t: PublicProductSaleType): string {
+  return t === "BOTTLE" ? "Botella" : "Copa"
+}
+
 function ConsumosMarketplace({
   eventName,
-  products,
+  data,
   consFrom,
   consWindow,
   drinks,
   setDrinkQty,
+  ticketLines,
+  trimTicket,
+  cartUnitCount,
   onBack,
 }: {
   eventName: string
-  products: PublicEventDetailResponse["drinkProducts"]
+  data: PublicEventDetailResponse
   consFrom: Date | string | null
   consWindow: { open: boolean; msLeft: number }
   drinks: Record<string, number>
   setDrinkQty: (productId: string, next: number) => void
+  ticketLines: CartTicketLine[]
+  trimTicket: (ticketTypeId: string) => void
+  cartUnitCount: number
   onBack: () => void
 }) {
+  const products = data.drinkProducts
   const saleOpen = consWindow.open
+  const [shelf, setShelf] = useState<StoreShelf>("glass")
+
+  const drinkLines: CartDrinkLine[] = useMemo(() => {
+    const out: CartDrinkLine[] = []
+    for (const [pid, q] of Object.entries(drinks)) {
+      if (q <= 0) continue
+      const p = data.drinkProducts.find((x) => x.id === pid)
+      if (p) out.push({ productId: pid, quantity: q, unitPrice: p.price })
+    }
+    return out
+  }, [data.drinkProducts, drinks])
+
+  const glassProducts = useMemo(
+    () => products.filter((p) => productSaleType(p) === "GLASS"),
+    [products]
+  )
+  const bottleProducts = useMemo(
+    () => products.filter((p) => productSaleType(p) === "BOTTLE"),
+    [products]
+  )
+
+  const hint =
+    shelf === "cart"
+      ? "Gestioná entradas y consumos. Solo desde acá podés sacar ítems."
+      : shelf === "glass"
+        ? "Tocá un producto para sumarlo al carrito. Las copas se agregan de a una."
+        : "Tocá un producto para sumarlo al carrito. Las botellas se agregan de a una."
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       transition={STORE_TRANSITION}
-      className="flex min-h-0 flex-1 flex-col"
+      className="relative flex min-h-0 flex-1 flex-col"
     >
-      <header className="sticky top-0 z-10 -mx-4 mb-4 border-b border-white/[0.07] bg-black/80 px-2 py-3 backdrop-blur-md sm:-mx-5">
+      <ConsumosShelfRail
+        shelf={shelf}
+        onShelf={setShelf}
+        cartUnitCount={cartUnitCount}
+      />
+
+      <header className="sticky top-0 z-10 -mx-4 mb-4 border-b border-white/[0.07] bg-black/80 px-2 py-3 pr-16 backdrop-blur-md sm:-mx-5 sm:pr-[4.5rem]">
         <div className="flex items-start gap-2">
           <Button
             type="button"
@@ -968,7 +812,6 @@ function ConsumosMarketplace({
             <ChevronLeft className="size-5" />
           </Button>
           <div className="min-w-0 flex-1 pt-0.5">
-
             <h2 className="text-lg font-bold leading-snug tracking-tight text-white">
               Consumos
             </h2>
@@ -984,118 +827,418 @@ function ConsumosMarketplace({
             {formatCountdown(consWindow.msLeft)}
           </span>
         </p>
-      ) : saleOpen && products.length > 0 ? (
-        <p className="mb-4 text-sm text-white/55">
-          Tocá un producto para agregarlo al carrito.
-        </p>
+      ) : products.length > 0 ? (
+        <p className="mb-4 text-sm text-white/55">{hint}</p>
       ) : null}
 
-      {products.length === 0 ? (
-        <p className="text-sm text-white/55">
-          No hay consumos digitales para este evento.
-        </p>
-      ) : (
-        <ul className="grid grid-cols-2 gap-3 pb-4">
-          {products.map((p) => {
-            const q = drinks[p.id] ?? 0
-            const disabled = !saleOpen
-            return (
-              <li key={p.id} className="min-w-0">
-                <ProductMarketTile
-                  name={p.name}
-                  priceStr={formatMoneyArsExact(p.price)}
-                  quantity={q}
-                  disabled={disabled}
-                  onAdd={() => setDrinkQty(p.id, Math.min(99, q + 1))}
-                  onRemove={() => setDrinkQty(p.id, q - 1)}
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-8 pr-14 sm:pr-[4.5rem]">
+        {products.length === 0 ? (
+          <p className="text-sm text-white/55">
+            No hay consumos digitales para este evento.
+          </p>
+        ) : (
+          <AnimatePresence mode="wait" initial={false}>
+            {shelf === "cart" ? (
+              <motion.div
+                key="panel-cart"
+                role="tabpanel"
+                aria-labelledby="shelf-cart"
+                initial={{ opacity: 0, x: 36, filter: "blur(10px)" }}
+                animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
+                exit={{ opacity: 0, x: -28, filter: "blur(8px)" }}
+                transition={STORE_SHELF_TRANSITION}
+              >
+                <StoreCartPanel
+                  data={data}
+                  ticketLines={ticketLines}
+                  drinkLines={drinkLines}
+                  trimTicket={trimTicket}
+                  setDrinkQty={setDrinkQty}
+                  drinks={drinks}
                 />
-              </li>
-            )
-          })}
-        </ul>
-      )}
+              </motion.div>
+            ) : shelf === "glass" ? (
+              <motion.div
+                key="panel-glass"
+                role="tabpanel"
+                aria-labelledby="shelf-glass"
+                initial={{ opacity: 0, x: -36, filter: "blur(10px)" }}
+                animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
+                exit={{ opacity: 0, x: 28, filter: "blur(8px)" }}
+                transition={STORE_SHELF_TRANSITION}
+              >
+                <ul className="flex flex-col gap-3">
+                  {glassProducts.length === 0 ? (
+                    <li className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-8 text-center text-sm text-white/50">
+                      No hay productos tipo copa en este evento.
+                    </li>
+                  ) : null}
+                  {glassProducts.map((p) => (
+                    <li key={p.id}>
+                      <ProductShelfRow
+                        name={p.name}
+                        priceStr={formatMoneyArsExact(p.price)}
+                        disabled={!saleOpen}
+                        onAdd={() => {
+                          const q = drinks[p.id] ?? 0
+                          setDrinkQty(p.id, Math.min(99, q + 1))
+                        }}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="panel-bottle"
+                role="tabpanel"
+                aria-labelledby="shelf-bottle"
+                initial={{ opacity: 0, x: 36, filter: "blur(10px)" }}
+                animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
+                exit={{ opacity: 0, x: -28, filter: "blur(8px)" }}
+                transition={STORE_SHELF_TRANSITION}
+              >
+                <ul className="flex flex-col gap-3">
+                  {bottleProducts.length === 0 ? (
+                    <li className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-8 text-center text-sm text-white/50">
+                      No hay productos tipo botella en este evento.
+                    </li>
+                  ) : null}
+                  {bottleProducts.map((p) => (
+                    <li key={p.id}>
+                      <ProductShelfRow
+                        name={p.name}
+                        priceStr={formatMoneyArsExact(p.price)}
+                        disabled={!saleOpen}
+                        onAdd={() => {
+                          const q = drinks[p.id] ?? 0
+                          setDrinkQty(p.id, Math.min(99, q + 1))
+                        }}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        )}
+      </div>
     </motion.div>
   )
 }
 
-function ProductMarketTile({
+function ConsumosShelfRail({
+  shelf,
+  onShelf,
+  cartUnitCount,
+}: {
+  shelf: StoreShelf
+  onShelf: (s: StoreShelf) => void
+  cartUnitCount: number
+}) {
+  return (
+    <nav
+      className="pointer-events-auto fixed right-0 top-1/2 z-40 flex -translate-y-1/2 flex-col gap-px rounded-l-[1.15rem] border border-white/[0.12] border-r-0 bg-zinc-950/[0.96] py-1 pl-1 shadow-[-14px_0_44px_-10px_rgba(0,0,0,0.88)] backdrop-blur-xl pr-[max(0.35rem,env(safe-area-inset-right))]"
+      aria-label="Secciones"
+    >
+      <motion.div layout className="flex flex-col gap-px" transition={STORE_SHELF_TRANSITION}>
+        <ShelfRailButton
+          id="shelf-glass"
+          label="Ver copas"
+          active={shelf === "glass"}
+          onClick={() => onShelf("glass")}
+        >
+          <Wine className="size-[1.35rem]" strokeWidth={2} aria-hidden />
+        </ShelfRailButton>
+        <ShelfRailButton
+          id="shelf-bottle"
+          label="Ver botellas"
+          active={shelf === "bottle"}
+          onClick={() => onShelf("bottle")}
+        >
+          <BottleWine className="size-[1.35rem]" strokeWidth={2} aria-hidden />
+        </ShelfRailButton>
+        <ShelfRailButton
+          id="shelf-cart"
+          label="Ver carrito"
+          active={shelf === "cart"}
+          onClick={() => onShelf("cart")}
+        >
+          <span className="relative inline-flex">
+            <ShoppingCart className="size-[1.35rem]" strokeWidth={2} aria-hidden />
+            {cartUnitCount > 0 ? (
+              <span className="absolute -right-2 -top-2 flex min-h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold tabular-nums text-black shadow-sm">
+                {cartUnitCount > 99 ? "99+" : cartUnitCount}
+              </span>
+            ) : null}
+          </span>
+        </ShelfRailButton>
+      </motion.div>
+    </nav>
+  )
+}
+
+function ShelfRailButton({
+  id,
+  label,
+  active,
+  onClick,
+  children,
+}: {
+  id: string
+  label: string
+  active: boolean
+  onClick: () => void
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      id={id}
+      aria-label={label}
+      aria-pressed={active}
+      onClick={onClick}
+      className={`relative flex size-[3.25rem] items-center justify-center rounded-l-xl outline-none transition-colors focus-visible:ring-2 focus-visible:ring-white/35 ${active
+        ? "bg-white text-black shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]"
+        : "text-white/72 hover:bg-white/[0.08] hover:text-white"
+        }`}
+    >
+      {children}
+    </button>
+  )
+}
+
+function ProductShelfRow({
   name,
   priceStr,
-  quantity,
   disabled,
   onAdd,
-  onRemove,
 }: {
   name: string
   priceStr: string
-  quantity: number
   disabled: boolean
   onAdd: () => void
-  onRemove: () => void
 }) {
   const initial = name.trim().charAt(0).toUpperCase() || "?"
-  const active = quantity > 0
+  const [addedPulse, setAddedPulse] = useState(false)
 
   return (
-    <motion.div
-      layout
-      className={`relative flex flex-col overflow-hidden rounded-2xl border bg-zinc-950 transition-colors duration-200 ${active
-        ? "border-white/30 ring-1 ring-white/20"
-        : "border-white/[0.12]"
-        } ${disabled ? "opacity-45" : ""}`}
+    <motion.button
+      type="button"
+      disabled={disabled}
+      onClick={() => {
+        if (disabled) return
+        onAdd()
+        setAddedPulse(true)
+        window.setTimeout(() => setAddedPulse(false), 520)
+      }}
+      whileTap={disabled ? undefined : { scale: 0.985 }}
+      className={`relative flex w-full gap-3 overflow-hidden rounded-2xl border border-white/[0.12] bg-zinc-950 p-3.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-white/30 disabled:pointer-events-none disabled:opacity-45`}
     >
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={onAdd}
-        className="flex aspect-square w-full flex-col p-3 text-left outline-none transition-transform active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-white/30 disabled:pointer-events-none"
+      <motion.div
+        aria-hidden
+        className="relative flex size-[4.5rem] shrink-0 items-center justify-center rounded-xl bg-gradient-to-b from-white/[0.1] to-white/[0.03]"
+        animate={
+          addedPulse
+            ? { scale: [1, 1.06, 1], boxShadow: ["0 0 0 0 rgba(34,197,94,0)", "0 0 0 10px rgba(34,197,94,0.12)", "0 0 0 0 rgba(34,197,94,0)"] }
+            : {}
+        }
+        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
       >
-        <div className="flex min-h-0 flex-1 items-center justify-center rounded-xl bg-gradient-to-b from-white/[0.08] to-white/[0.02]">
-          <span
-            aria-hidden
-            className="flex size-[52px] items-center justify-center rounded-2xl border border-white/10 bg-black/40 text-xl font-semibold text-white/90"
-          >
-            {initial}
-          </span>
-        </div>
-        <div className="mt-3 min-h-0">
-          <p className="line-clamp-2 text-left text-[13px] font-semibold leading-snug text-white">
-            {name}
-          </p>
-          <p className="mt-1 text-left text-xs font-medium tabular-nums text-white/55">
-            {priceStr}
-          </p>
-        </div>
-        {quantity > 0 ? (
-          <span className="absolute right-2 top-2 flex min-w-[1.75rem] items-center justify-center rounded-lg bg-white px-2 py-0.5 text-xs font-bold text-black tabular-nums shadow-sm">
-            {quantity}
-          </span>
-        ) : null}
-      </button>
-
-      <AnimatePresence initial={false}>
-        {active ? (
-          <motion.div
-            key="sacar"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-            className="overflow-hidden border-t border-white/[0.08]"
-          >
-            <button
-              type="button"
-              className="w-full bg-white/[0.06] py-2.5 text-center text-[11px] font-semibold text-white/75 transition-colors hover:bg-white/10 hover:text-white"
-              onClick={(e) => {
-                e.stopPropagation()
-                onRemove()
-              }}
+        <span className="flex size-11 items-center justify-center rounded-xl border border-white/10 bg-black/45 text-lg font-semibold text-white/92">
+          {initial}
+        </span>
+        <AnimatePresence>
+          {addedPulse ? (
+            <motion.span
+              key="chk"
+              initial={{ opacity: 0, scale: 0.6 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.85 }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl bg-black/55"
             >
-              Sacar uno
-            </button>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-    </motion.div>
+              <Check className="size-8 text-emerald-400" strokeWidth={2.5} aria-hidden />
+            </motion.span>
+          ) : null}
+        </AnimatePresence>
+      </motion.div>
+      <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 pr-1">
+        <p className="text-[15px] font-bold leading-snug text-white">{name}</p>
+        <p className="text-sm font-semibold tabular-nums text-white/55">{priceStr}</p>
+      </div>
+    </motion.button>
+  )
+}
+
+function StoreCartPanel({
+  data,
+  ticketLines,
+  drinkLines,
+  trimTicket,
+  setDrinkQty,
+  drinks,
+}: {
+  data: PublicEventDetailResponse
+  ticketLines: CartTicketLine[]
+  drinkLines: CartDrinkLine[]
+  trimTicket: (ticketTypeId: string) => void
+  setDrinkQty: (productId: string, next: number) => void
+  drinks: Record<string, number>
+}) {
+  const hasTickets = ticketLines.length > 0
+  const hasConsumos = drinkLines.length > 0
+  const isEmpty = !hasTickets && !hasConsumos
+
+  if (isEmpty) {
+    return (
+      <div className="rounded-2xl border border-dashed border-white/[0.12] bg-white/[0.02] px-5 py-14 text-center">
+        <ShoppingCart className="mx-auto mb-4 size-10 text-white/25" aria-hidden />
+        <p className="text-base font-semibold text-white/80">Carrito vacío</p>
+        <p className="mt-2 text-sm leading-relaxed text-white/45">
+          Elegí copas o botellas y sumalos con un toque. Acá vas a ver entradas y
+          consumos, y vas a poder sacarlos si cambiás de idea.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-8">
+      {hasTickets ? (
+        <section className="space-y-4">
+          <h3 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/40">
+            Entradas
+          </h3>
+          <ul className="flex flex-col gap-4">
+            {ticketLines.map((line) => {
+              const t = data.ticketTypes.find((x) => x.id === line.ticketTypeId)
+              const name = t?.name ?? "Entrada"
+              const initial = name.trim().charAt(0).toUpperCase() || "?"
+              const sub = new Decimal(line.unitPrice).mul(line.quantity).toFixed(2)
+              return (
+                <li key={line.ticketTypeId}>
+                  <motion.article
+                    layout
+                    transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+                    className="rounded-2xl border border-white/[0.1] bg-gradient-to-b from-white/[0.08] to-white/[0.02] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+                  >
+                    <div className="flex gap-3 sm:gap-4">
+                      <div
+                        aria-hidden
+                        className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-black/40 text-lg font-bold text-white/90"
+                      >
+                        {initial}
+                      </div>
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <div>
+                          <p className="text-base font-bold leading-snug text-white">{name}</p>
+                          <p className="mt-0.5 text-sm text-white/45">
+                            Entrada ·{" "}
+                            <span className="tabular-nums text-white/65">{line.quantity}</span>{" "}
+                            {line.quantity === 1 ? "unidad" : "unidades"}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm">
+                          <span className="text-white/50">
+                            {formatMoneyArsExact(line.unitPrice)} c/u
+                          </span>
+                          <span className="text-white/35">·</span>
+                          <span className="text-base font-bold tabular-nums text-white">
+                            {formatMoneyArsExact(sub)}
+                          </span>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="mt-0.5 size-10 shrink-0 rounded-xl border border-white/10 text-white/75 hover:bg-white/10 hover:text-white"
+                        onClick={() => trimTicket(line.ticketTypeId)}
+                        aria-label={`Quitar una entrada ${name}`}
+                      >
+                        <Minus className="size-5" />
+                      </Button>
+                    </div>
+                  </motion.article>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+      ) : null}
+
+      {hasTickets && hasConsumos ? (
+        <div
+          className="h-px w-full bg-gradient-to-r from-transparent via-white/18 to-transparent"
+          aria-hidden
+        />
+      ) : null}
+
+      {hasConsumos ? (
+        <section className="space-y-4">
+          <h3 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/40">
+            Consumos
+          </h3>
+          <ul className="flex flex-col gap-4">
+            {drinkLines.map((line) => {
+              const p = data.drinkProducts.find((x) => x.id === line.productId)
+              const name = p?.name ?? "Producto"
+              const initial = name.trim().charAt(0).toUpperCase() || "?"
+              const sub = new Decimal(line.unitPrice).mul(line.quantity).toFixed(2)
+              const st = p ? productSaleType(p) : "GLASS"
+              const q = drinks[line.productId] ?? 0
+              return (
+                <li key={line.productId}>
+                  <motion.article
+                    layout
+                    transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+                    className="rounded-2xl border border-white/[0.1] bg-gradient-to-b from-white/[0.08] to-white/[0.02] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+                  >
+                    <div className="flex gap-3 sm:gap-4">
+                      <div
+                        aria-hidden
+                        className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-black/40 text-lg font-bold text-white/90"
+                      >
+                        {initial}
+                      </div>
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <div>
+                          <p className="text-base font-bold leading-snug text-white">{name}</p>
+                          <p className="mt-0.5 text-sm text-white/45">
+                            {saleTypeLabel(st)} ·{" "}
+                            <span className="tabular-nums text-white/65">{line.quantity}</span>{" "}
+                            {line.quantity === 1 ? "unidad" : "unidades"}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm">
+                          <span className="text-white/50">
+                            {formatMoneyArsExact(line.unitPrice)} c/u
+                          </span>
+                          <span className="text-white/35">·</span>
+                          <span className="text-base font-bold tabular-nums text-white">
+                            {formatMoneyArsExact(sub)}
+                          </span>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="mt-0.5 size-10 shrink-0 rounded-xl border border-white/10 text-white/75 hover:bg-white/10 hover:text-white"
+                        onClick={() => setDrinkQty(line.productId, q - 1)}
+                        aria-label={`Sacar un consumo ${name}`}
+                      >
+                        <Minus className="size-5" />
+                      </Button>
+                    </div>
+                  </motion.article>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+      ) : null}
+    </div>
   )
 }
