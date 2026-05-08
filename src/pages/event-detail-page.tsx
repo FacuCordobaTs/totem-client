@@ -362,6 +362,7 @@ export function EventDetailPage() {
               <motion.div
                 animate={{
                   y: purchaseOpen ? -28 : 0,
+                  marginBottom: showFooter && commerceSurface === "hero" ? -130 : 0
                 }}
                 transition={EASE_SMOOTH}
                 className="w-full"
@@ -455,22 +456,51 @@ export function EventDetailPage() {
                       )}
                     </AnimatePresence>
                   </div>
+
+                  <AnimatePresence>
+                    {showFooter && commerceSurface === "hero" ? (
+                      <motion.div
+                        key="island-checkout-bar"
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={EASE_SMOOTH}
+                        className="overflow-hidden"
+                      >
+                        <div className="mt-5 flex flex-col gap-3 border-t border-white/[0.08] pt-5">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-1">
+                              <span className="text-sm font-medium text-white/65">Total</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <motion.span
+                                key={totalStr}
+                                initial={{ opacity: 0, y: 6 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                                className="text-xl font-bold tabular-nums tracking-tight text-white sm:text-2xl"
+                              >
+                                {formatMoneyArsExact(totalStr)}
+                              </motion.span>
+                            </div>
+                          </div>
+                          <Button
+                            className="h-12 w-full rounded-2xl bg-white text-base font-semibold text-black shadow-[0_18px_44px_-18px_rgba(255,255,255,0.45)] transition-all hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_24px_56px_-16px_rgba(255,255,255,0.55)] disabled:translate-y-0 disabled:bg-white/30 disabled:text-white/60 disabled:shadow-none"
+                            disabled={!primaryFooterEnabled}
+                            onClick={primaryFooterAction}
+                          >
+                            {footerCtaLabel}
+                          </Button>
+                        </div>
+                      </motion.div>
+                    ) : null}
+                  </AnimatePresence>
                 </div>
               </motion.div>
             )}
 
-            {!purchaseOpen ? (
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="mt-5 text-center text-[11px] text-white/40"
-              >
-                Pago seguro con Mercado Pago
-              </motion.p>
-            ) : null}
-
             <AnimatePresence>
-              {showFooter ? (
+              {showFooter && commerceSurface === "store" ? (
                 <motion.div
                   key="checkout-bar"
                   initial={{ opacity: 0, y: 28 }}
@@ -791,7 +821,7 @@ function TicketStep({
           Sin entradas a la venta.
         </p>
       ) : (
-        <ul className="flex max-h-[320px] flex-col gap-2 overflow-y-auto overscroll-contain pr-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <ul className="flex max-h-[352px] flex-col gap-2 overflow-y-auto overscroll-contain -mx-4 -my-4 px-4 py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {data.ticketTypes.map((t) => {
             const disabled = !t.availableForPurchase || !saleOpen
             const count = ticketQtys[t.id] ?? 0
@@ -837,7 +867,7 @@ function TicketPickRow({
     <motion.div
       layout
       transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-      className={`relative overflow-hidden rounded-2xl shadow-lg mb-1 transition-colors duration-200 ${active
+      className={`relative overflow-hidden rounded-2xl shadow-xl shadow-black/60 mb-1 transition-colors duration-200 ${active
         ? "bg-white/[0.2]"
         : "bg-white/[0.2]"
         } ${disabled ? "opacity-40" : ""}`}
