@@ -4,6 +4,7 @@ import {
   BottleWine,
   Check,
   ChevronLeft,
+  Heart,
   MapPin,
   Minus,
   ShoppingCart,
@@ -1028,6 +1029,7 @@ function ProductShelfRow({
   disabled: boolean
   onAdd: () => void
 }) {
+  const initial = name.trim().charAt(0).toUpperCase() || "?"
   const [addedPulse, setAddedPulse] = useState(false)
   const showPhoto = Boolean(imageUrl)
 
@@ -1045,7 +1047,7 @@ function ProductShelfRow({
         disabled={disabled}
         onClick={triggerAdd}
         whileTap={disabled ? undefined : { scale: 0.988 }}
-        className="group relative aspect-[4/3] w-full max-h-[min(320px,52vw)] overflow-hidden rounded-[1.35rem] border border-white/[0.12] bg-zinc-950/90 text-left shadow-[0_20px_50px_-20px_rgba(0,0,0,0.85)] outline-none ring-1 ring-inset ring-white/[0.06] backdrop-blur-sm focus-visible:ring-2 focus-visible:ring-white/35 disabled:pointer-events-none disabled:opacity-45 sm:max-h-[300px] sm:rounded-[1.75rem] supports-[backdrop-filter]:bg-zinc-950/70"
+        className="group relative aspect-[4/3] w-full max-h-[min(320px,52vw)] overflow-hidden rounded-[1.35rem] border border-white/[0.14] bg-zinc-950 text-left shadow-[0_20px_50px_-24px_rgba(0,0,0,0.95)] outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:pointer-events-none disabled:opacity-45 sm:max-h-[300px] sm:rounded-[1.75rem]"
       >
         <img
           src={imageUrl!}
@@ -1056,20 +1058,24 @@ function ProductShelfRow({
         />
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent"
+          className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black via-black/45 to-black/5"
         />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 p-3 sm:p-4">
-          <div className="rounded-2xl border border-white/[0.14] bg-zinc-900/50 px-4 py-3 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.55)] backdrop-blur-xl supports-[backdrop-filter]:bg-zinc-900/35">
-            <p className="text-[1.2rem] font-extrabold leading-[1.15] tracking-tight text-white sm:text-xl">
-              {name}
-            </p>
-            <p className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[13px] font-medium text-white/85 sm:text-sm">
-              <MapPin className="size-3.5 shrink-0 opacity-75" strokeWidth={2.25} aria-hidden />
-              <span>{categoryLabel}</span>
-              <span className="text-white/35">·</span>
-              <span className="tabular-nums text-[#FF9500] font-semibold">{priceStr}</span>
-            </p>
-          </div>
+        <span
+          aria-hidden
+          className="pointer-events-none absolute right-3 top-3 flex size-10 items-center justify-center rounded-full border border-white/25 bg-white/15 shadow-lg backdrop-blur-md sm:right-4 sm:top-4"
+        >
+          <Heart className="size-[1.15rem] fill-white/90 text-white/90" strokeWidth={1.75} />
+        </span>
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 p-4 pt-16 sm:p-5 sm:pt-20">
+          <p className="text-[1.35rem] font-extrabold leading-[1.15] tracking-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.65)] sm:text-2xl">
+            {name}
+          </p>
+          <p className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[13px] font-medium text-white/88 sm:text-sm">
+            <MapPin className="size-3.5 shrink-0 opacity-80" strokeWidth={2.25} aria-hidden />
+            <span>{categoryLabel}</span>
+            <span className="text-white/40">·</span>
+            <span className="tabular-nums text-white/95">{priceStr}</span>
+          </p>
         </div>
         <AnimatePresence>
           {addedPulse ? (
@@ -1079,7 +1085,7 @@ function ProductShelfRow({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-              className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/45 backdrop-blur-[3px]"
+              className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-[2px]"
             >
               <motion.span
                 initial={{ scale: 0.65, opacity: 0 }}
@@ -1103,33 +1109,41 @@ function ProductShelfRow({
       disabled={disabled}
       onClick={triggerAdd}
       whileTap={disabled ? undefined : { scale: 0.985 }}
-      className="relative w-full rounded-3xl border border-white/10 bg-[#1A1A1A]/85 px-5 py-5 text-left shadow-[0_14px_44px_-16px_rgba(0,0,0,0.75)] outline-none ring-1 ring-inset ring-white/[0.05] backdrop-blur-xl transition-[box-shadow,transform] focus-visible:ring-2 focus-visible:ring-[#FF9500]/40 disabled:pointer-events-none disabled:opacity-45 supports-[backdrop-filter]:bg-[#1A1A1A]/55 sm:px-6 sm:py-6"
+      className={`relative flex w-full gap-3 overflow-hidden rounded-2xl border border-white/[0.12] bg-zinc-950 p-3.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-white/30 disabled:pointer-events-none disabled:opacity-45`}
     >
-      <p className="text-lg font-bold leading-snug tracking-tight text-white sm:text-xl">{name}</p>
-      <p className="mt-2 text-sm leading-relaxed text-white/50">{categoryLabel}</p>
-      <p className="mt-5 text-lg font-bold tabular-nums text-[#FF9500] sm:text-xl">{priceStr}</p>
-      <AnimatePresence>
-        {addedPulse ? (
-          <motion.span
-            key="chk"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-            className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-3xl bg-black/40 backdrop-blur-sm"
-          >
+      <motion.div
+        aria-hidden
+        className="relative flex size-[4.5rem] shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-b from-white/[0.1] to-white/[0.03]"
+        animate={
+          addedPulse
+            ? { scale: [1, 1.06, 1], boxShadow: ["0 0 0 0 rgba(34,197,94,0)", "0 0 0 10px rgba(34,197,94,0.12)", "0 0 0 0 rgba(34,197,94,0)"] }
+            : {}
+        }
+        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      >
+        <span className="flex size-11 items-center justify-center rounded-xl border border-white/10 bg-black/45 text-lg font-semibold text-white/92">
+          {initial}
+        </span>
+        <AnimatePresence>
+          {addedPulse ? (
             <motion.span
-              initial={{ scale: 0.75, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.92, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 440, damping: 30 }}
-              className="flex size-14 items-center justify-center rounded-full bg-emerald-500/95 shadow-lg"
+              key="chk"
+              initial={{ opacity: 0, scale: 0.6 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.85 }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl bg-black/55"
             >
-              <Check className="size-8 text-white" strokeWidth={2.75} aria-hidden />
+              <Check className="size-8 text-emerald-400" strokeWidth={2.5} aria-hidden />
             </motion.span>
-          </motion.span>
-        ) : null}
-      </AnimatePresence>
+          ) : null}
+        </AnimatePresence>
+      </motion.div>
+      <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 pr-1">
+        <p className="text-[15px] font-bold leading-snug text-white">{name}</p>
+        <p className="text-xs text-white/45">{categoryLabel}</p>
+        <p className="text-sm font-semibold tabular-nums text-white/55">{priceStr}</p>
+      </div>
     </motion.button>
   )
 }
