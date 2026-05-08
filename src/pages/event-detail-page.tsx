@@ -1012,6 +1012,7 @@ function ShelfRailButton({
     </button>
   )
 }
+
 function ProductShelfRow({
   name,
   imageUrl,
@@ -1044,9 +1045,8 @@ function ProductShelfRow({
         disabled={disabled}
         onClick={triggerAdd}
         whileTap={disabled ? undefined : { scale: 0.988 }}
-        className="group relative aspect-[4/3] w-full max-h-[min(320px,52vw)] overflow-hidden rounded-[1.35rem] border border-white/[0.10] bg-zinc-950/90 text-left shadow-[0_20px_50px_-20px_rgba(0,0,0,0.85)] outline-none ring-1 ring-inset ring-white/[0.06] focus-visible:ring-2 focus-visible:ring-white/35 disabled:pointer-events-none disabled:opacity-45 sm:max-h-[300px] sm:rounded-[1.75rem]"
+        className="group relative aspect-[4/3] w-full max-h-[min(320px,52vw)] overflow-hidden rounded-[1.35rem] border border-white/[0.12] bg-zinc-950/90 text-left shadow-[0_20px_50px_-20px_rgba(0,0,0,0.85)] outline-none ring-1 ring-inset ring-white/[0.06] backdrop-blur-sm focus-visible:ring-2 focus-visible:ring-white/35 disabled:pointer-events-none disabled:opacity-45 sm:max-h-[300px] sm:rounded-[1.75rem] supports-[backdrop-filter]:bg-zinc-950/70"
       >
-        {/* Photo */}
         <img
           src={imageUrl!}
           alt={name}
@@ -1054,33 +1054,23 @@ function ProductShelfRow({
           loading="lazy"
           decoding="async"
         />
-
-        {/* Gradient — stronger, taller, fully opaque at bottom */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent"
+          className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent"
         />
-
-        {/* Frosted glass bottom bar — edge-to-edge, no inner pill */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-[52%] backdrop-blur-[2px] supports-[backdrop-filter]:bg-transparent"
-          style={{ WebkitMaskImage: "linear-gradient(to top, black 60%, transparent 100%)" }}
-        />
-
-        {/* Text — sits directly on gradient, no inner card */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 px-4 py-4 sm:px-5 sm:py-5">
-          <p className="text-[1.2rem] font-extrabold leading-[1.15] tracking-tight text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.9)] sm:text-xl">
-            {name}
-          </p>
-          <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[13px] font-medium text-white/75 sm:text-sm">
-            <MapPin className="size-3.5 shrink-0 opacity-70" strokeWidth={2.25} aria-hidden />
-            <span>{categoryLabel}</span>
-            <span className="text-white/30">·</span>
-            <span className="tabular-nums text-[#FF9500] font-semibold">{priceStr}</span>
-          </p>
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 p-3 sm:p-4">
+          <div className="rounded-2xl border border-white/[0.14] bg-zinc-900/50 px-4 py-3 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.55)] backdrop-blur-xl supports-[backdrop-filter]:bg-zinc-900/35">
+            <p className="text-[1.2rem] font-extrabold leading-[1.15] tracking-tight text-white sm:text-xl">
+              {name}
+            </p>
+            <p className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[13px] font-medium text-white/85 sm:text-sm">
+              <MapPin className="size-3.5 shrink-0 opacity-75" strokeWidth={2.25} aria-hidden />
+              <span>{categoryLabel}</span>
+              <span className="text-white/35">·</span>
+              <span className="tabular-nums text-[#FF9500] font-semibold">{priceStr}</span>
+            </p>
+          </div>
         </div>
-
         <AnimatePresence>
           {addedPulse ? (
             <motion.span
