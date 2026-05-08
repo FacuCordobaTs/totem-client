@@ -950,7 +950,7 @@ function ConsumosShelfRail({
           active={shelf === "glass"}
           onClick={() => onShelf("glass")}
         >
-          <BottleWine className="size-[1.35rem]" strokeWidth={2} aria-hidden />
+          <Wine className="size-[1.35rem]" strokeWidth={2} aria-hidden />
         </ShelfRailButton>
         <ShelfRailButton
           id="shelf-bottle"
@@ -958,7 +958,7 @@ function ConsumosShelfRail({
           active={shelf === "bottle"}
           onClick={() => onShelf("bottle")}
         >
-          <Wine className="size-[1.35rem]" strokeWidth={2} aria-hidden />
+          <BottleWine className="size-[1.35rem]" strokeWidth={2} aria-hidden />
         </ShelfRailButton>
         <ShelfRailButton
           id="shelf-cart"
