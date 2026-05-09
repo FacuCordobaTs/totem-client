@@ -732,9 +732,7 @@ function productSaleType(p: PublicDrinkProductItem): PublicProductSaleType {
 
 
 function ConsumosMarketplace({
-  eventName,
   data,
-  consFrom,
   consWindow,
   drinks,
   setDrinkQty,
@@ -777,13 +775,6 @@ function ConsumosMarketplace({
     [products]
   )
 
-  const hint =
-    shelf === "cart"
-      ? "Gestioná entradas y consumos. Solo desde acá podés sacar ítems."
-      : shelf === "glass"
-        ? "Tocá un producto para sumarlo al carrito. Las copas se agregan de a una."
-        : "Tocá un producto para sumarlo al carrito. Las botellas se agregan de a una."
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 24 }}
@@ -809,25 +800,8 @@ function ConsumosMarketplace({
           >
             <ChevronLeft className="size-5" />
           </Button>
-          <div className="min-w-0 flex-1 pt-0.5">
-            <h2 className="text-lg font-bold leading-snug tracking-tight text-white">
-              Consumos
-            </h2>
-            <p className="line-clamp-1 text-xs text-white/50">{eventName}</p>
-          </div>
         </div>
       </header>
-
-      {consFrom != null && !saleOpen ? (
-        <p className="mb-4 text-sm leading-relaxed text-white/60">
-          Disponibles desde el {formatEventDate(consFrom)} · en{" "}
-          <span className="tabular-nums text-white/90">
-            {formatCountdown(consWindow.msLeft)}
-          </span>
-        </p>
-      ) : products.length > 0 ? (
-        <p className="mb-4 text-sm text-white/55">{hint}</p>
-      ) : null}
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-8 pr-14 sm:pr-[4.5rem]">
         {products.length === 0 ? (
