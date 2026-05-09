@@ -1135,7 +1135,7 @@ function StoreCartPanel({
                     <div className="pointer-events-none absolute -right-3 top-1/2 z-10 size-6 -translate-y-1/2 rounded-full bg-black" aria-hidden />
                     <div className="flex items-center justify-between gap-4 rounded-xl bg-white px-6 py-5">
                       <div className="flex min-w-0 items-center gap-3">
-                        <Ticket className="size-4 shrink-0 text-black/20" strokeWidth={1.75} aria-hidden />
+                        <Ticket className="size-4 shrink-0 text-black" strokeWidth={1.75} aria-hidden />
                         <div className="min-w-0">
                           <p className="text-sm font-bold text-black">{name}</p>
                           <p className="mt-0.5 text-xs text-black/40">
@@ -1196,7 +1196,7 @@ function StoreCartPanel({
                     <div className="pointer-events-none absolute -right-3 top-1/2 z-10 size-6 -translate-y-1/2 rounded-full bg-black" aria-hidden />
                     <div className="flex items-center justify-between gap-4 rounded-xl bg-white px-6 py-5">
                       <div className="flex min-w-0 items-center gap-3">
-                        <DrinkIcon className="size-4 shrink-0 text-black/20" strokeWidth={1.75} aria-hidden />
+                        <DrinkIcon className="size-4 shrink-0 text-black" strokeWidth={1.75} aria-hidden />
                         <div className="min-w-0">
                           <p className="text-sm font-bold text-black">{name}</p>
                           <p className="mt-0.5 text-xs text-black/40">
