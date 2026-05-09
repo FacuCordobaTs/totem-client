@@ -4,10 +4,9 @@ import {
   BottleWine,
   Check,
   ChevronLeft,
-  Heart,
-  MapPin,
   Minus,
   ShoppingCart,
+  Ticket,
   Wine,
 } from "lucide-react"
 import { AnimatePresence, motion, type Transition } from "motion/react"
@@ -731,9 +730,6 @@ function productSaleType(p: PublicDrinkProductItem): PublicProductSaleType {
   return p.saleType ?? "GLASS"
 }
 
-function saleTypeLabel(t: PublicProductSaleType): string {
-  return t === "BOTTLE" ? "Botella" : "Copa"
-}
 
 function ConsumosMarketplace({
   eventName,
@@ -880,7 +876,6 @@ function ConsumosMarketplace({
                       <ProductShelfRow
                         name={p.name}
                         imageUrl={p.imageUrl?.trim() || null}
-                        categoryLabel={saleTypeLabel(productSaleType(p))}
                         priceStr={formatMoneyArsExact(p.price)}
                         disabled={!saleOpen}
                         onAdd={() => {
@@ -913,7 +908,6 @@ function ConsumosMarketplace({
                       <ProductShelfRow
                         name={p.name}
                         imageUrl={p.imageUrl?.trim() || null}
-                        categoryLabel={saleTypeLabel(productSaleType(p))}
                         priceStr={formatMoneyArsExact(p.price)}
                         disabled={!saleOpen}
                         onAdd={() => {
@@ -1017,19 +1011,16 @@ function ShelfRailButton({
 function ProductShelfRow({
   name,
   imageUrl,
-  categoryLabel,
   priceStr,
   disabled,
   onAdd,
 }: {
   name: string
   imageUrl?: string | null
-  categoryLabel: string
   priceStr: string
   disabled: boolean
   onAdd: () => void
 }) {
-  const initial = name.trim().charAt(0).toUpperCase() || "?"
   const [addedPulse, setAddedPulse] = useState(false)
   const showPhoto = Boolean(imageUrl)
 
@@ -1047,35 +1038,19 @@ function ProductShelfRow({
         disabled={disabled}
         onClick={triggerAdd}
         whileTap={disabled ? undefined : { scale: 0.988 }}
-        className="group relative aspect-[4/3] w-full max-h-[min(320px,52vw)] overflow-hidden rounded-[1.35rem] border border-white/[0.14] bg-zinc-950 text-left shadow-[0_20px_50px_-24px_rgba(0,0,0,0.95)] outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:pointer-events-none disabled:opacity-45 sm:max-h-[300px] sm:rounded-[1.75rem]"
+        className="group relative aspect-[4/3] w-full max-h-[min(280px,52vw)] overflow-hidden rounded-2xl bg-zinc-950 text-left outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:pointer-events-none disabled:opacity-45 sm:max-h-[260px]"
       >
         <img
           src={imageUrl!}
           alt={name}
-          className="absolute inset-0 h-full w-full object-cover transition-transform duration-[0.55s] ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-105 group-active:scale-[1.02]"
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.03]"
           loading="lazy"
           decoding="async"
         />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black via-black/45 to-black/5"
-        />
-        <span
-          aria-hidden
-          className="pointer-events-none absolute right-3 top-3 flex size-10 items-center justify-center rounded-full border border-white/25 bg-white/15 shadow-lg backdrop-blur-md sm:right-4 sm:top-4"
-        >
-          <Heart className="size-[1.15rem] fill-white/90 text-white/90" strokeWidth={1.75} />
-        </span>
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 p-4 pt-16 sm:p-5 sm:pt-20">
-          <p className="text-[1.35rem] font-extrabold leading-[1.15] tracking-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.65)] sm:text-2xl">
-            {name}
-          </p>
-          <p className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[13px] font-medium text-white/88 sm:text-sm">
-            <MapPin className="size-3.5 shrink-0 opacity-80" strokeWidth={2.25} aria-hidden />
-            <span>{categoryLabel}</span>
-            <span className="text-white/40">·</span>
-            <span className="tabular-nums text-white/95">{priceStr}</span>
-          </p>
+        <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 p-4">
+          <p className="text-lg font-bold leading-tight text-white">{name}</p>
+          <p className="mt-0.5 text-[13px] tabular-nums text-white/65">{priceStr}</p>
         </div>
         <AnimatePresence>
           {addedPulse ? (
@@ -1085,16 +1060,16 @@ function ProductShelfRow({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-              className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-[2px]"
+              className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/50"
             >
               <motion.span
                 initial={{ scale: 0.65, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}
                 transition={{ type: "spring", stiffness: 420, damping: 28 }}
-                className="flex size-16 items-center justify-center rounded-full bg-emerald-500/95 shadow-[0_12px_40px_-8px_rgba(16,185,129,0.55)]"
+                className="flex size-14 items-center justify-center rounded-full bg-emerald-500/95"
               >
-                <Check className="size-9 text-white" strokeWidth={2.75} aria-hidden />
+                <Check className="size-8 text-white" strokeWidth={2.75} aria-hidden />
               </motion.span>
             </motion.span>
           ) : null}
@@ -1109,41 +1084,24 @@ function ProductShelfRow({
       disabled={disabled}
       onClick={triggerAdd}
       whileTap={disabled ? undefined : { scale: 0.985 }}
-      className={`relative flex w-full gap-3 overflow-hidden rounded-2xl border border-white/[0.12] bg-zinc-950 p-3.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-white/30 disabled:pointer-events-none disabled:opacity-45`}
+      className="relative flex w-full items-center justify-between gap-4 rounded-2xl border border-white/[0.07] bg-white/[0.04] px-4 py-3.5 text-left outline-none transition-colors hover:bg-white/[0.06] focus-visible:ring-2 focus-visible:ring-white/30 disabled:pointer-events-none disabled:opacity-45"
     >
-      <motion.div
-        aria-hidden
-        className="relative flex size-[4.5rem] shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-b from-white/[0.1] to-white/[0.03]"
-        animate={
-          addedPulse
-            ? { scale: [1, 1.06, 1], boxShadow: ["0 0 0 0 rgba(34,197,94,0)", "0 0 0 10px rgba(34,197,94,0.12)", "0 0 0 0 rgba(34,197,94,0)"] }
-            : {}
-        }
-        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-      >
-        <span className="flex size-11 items-center justify-center rounded-xl border border-white/10 bg-black/45 text-lg font-semibold text-white/92">
-          {initial}
-        </span>
-        <AnimatePresence>
-          {addedPulse ? (
-            <motion.span
-              key="chk"
-              initial={{ opacity: 0, scale: 0.6 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.85 }}
-              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-              className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl bg-black/55"
-            >
-              <Check className="size-8 text-emerald-400" strokeWidth={2.5} aria-hidden />
-            </motion.span>
-          ) : null}
-        </AnimatePresence>
-      </motion.div>
-      <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 pr-1">
-        <p className="text-[15px] font-bold leading-snug text-white">{name}</p>
-        <p className="text-xs text-white/45">{categoryLabel}</p>
-        <p className="text-sm font-semibold tabular-nums text-white/55">{priceStr}</p>
-      </div>
+      <p className="min-w-0 flex-1 text-[15px] font-semibold leading-snug text-white">{name}</p>
+      <p className="shrink-0 text-sm font-medium tabular-nums text-white/50">{priceStr}</p>
+      <AnimatePresence>
+        {addedPulse ? (
+          <motion.span
+            key="chk"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-2xl bg-black/60"
+          >
+            <Check className="size-5 text-emerald-400" strokeWidth={2.5} aria-hidden />
+          </motion.span>
+        ) : null}
+      </AnimatePresence>
     </motion.button>
   )
 }
@@ -1183,61 +1141,49 @@ function StoreCartPanel({
   return (
     <div className="space-y-8">
       {hasTickets ? (
-        <section className="space-y-4">
+        <section className="space-y-3">
           <h3 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/40">
             Entradas
           </h3>
-          <ul className="flex flex-col gap-4">
+          <ul className="flex flex-col gap-3">
             {ticketLines.map((line) => {
               const t = data.ticketTypes.find((x) => x.id === line.ticketTypeId)
               const name = t?.name ?? "Entrada"
-              const initial = name.trim().charAt(0).toUpperCase() || "?"
               const sub = new Decimal(line.unitPrice).mul(line.quantity).toFixed(2)
               return (
                 <li key={line.ticketTypeId}>
-                  <motion.article
+                  <motion.div
                     layout
                     transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-                    className="rounded-2xl border border-white/[0.1] bg-gradient-to-b from-white/[0.08] to-white/[0.02] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+                    className="relative mx-1"
                   >
-                    <div className="flex gap-3 sm:gap-4">
-                      <div
-                        aria-hidden
-                        className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-black/40 text-lg font-bold text-white/90"
-                      >
-                        {initial}
-                      </div>
-                      <div className="min-w-0 flex-1 space-y-2">
-                        <div>
-                          <p className="text-base font-bold leading-snug text-white">{name}</p>
-                          <p className="mt-0.5 text-sm text-white/45">
-                            Entrada ·{" "}
-                            <span className="tabular-nums text-white/65">{line.quantity}</span>{" "}
-                            {line.quantity === 1 ? "unidad" : "unidades"}
+                    <div className="pointer-events-none absolute -left-3 top-1/2 z-10 size-6 -translate-y-1/2 rounded-full bg-black" aria-hidden />
+                    <div className="pointer-events-none absolute -right-3 top-1/2 z-10 size-6 -translate-y-1/2 rounded-full bg-black" aria-hidden />
+                    <div className="flex items-center justify-between gap-4 rounded-xl bg-white px-6 py-5">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <Ticket className="size-4 shrink-0 text-black/20" strokeWidth={1.75} aria-hidden />
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-black">{name}</p>
+                          <p className="mt-0.5 text-xs text-black/40">
+                            {line.quantity} {line.quantity === 1 ? "entrada" : "entradas"}
                           </p>
                         </div>
-                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm">
-                          <span className="text-white/50">
-                            {formatMoneyArsExact(line.unitPrice)} c/u
-                          </span>
-                          <span className="text-white/35">·</span>
-                          <span className="text-base font-bold tabular-nums text-white">
-                            {formatMoneyArsExact(sub)}
-                          </span>
-                        </div>
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        className="mt-0.5 size-10 shrink-0 rounded-xl border border-white/10 text-white/75 hover:bg-white/10 hover:text-white"
-                        onClick={() => trimTicket(line.ticketTypeId)}
-                        aria-label={`Quitar una entrada ${name}`}
-                      >
-                        <Minus className="size-5" />
-                      </Button>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <p className="text-base font-bold tabular-nums text-black">
+                          {formatMoneyArsExact(sub)}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => trimTicket(line.ticketTypeId)}
+                          className="flex size-7 items-center justify-center rounded-full text-black/20 transition-colors hover:bg-black/5 hover:text-black/45"
+                          aria-label={`Quitar una entrada ${name}`}
+                        >
+                          <Minus className="size-3.5" />
+                        </button>
+                      </div>
                     </div>
-                  </motion.article>
+                  </motion.div>
                 </li>
               )
             })}
@@ -1253,63 +1199,52 @@ function StoreCartPanel({
       ) : null}
 
       {hasConsumos ? (
-        <section className="space-y-4">
+        <section className="space-y-3">
           <h3 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/40">
             Consumos
           </h3>
-          <ul className="flex flex-col gap-4">
+          <ul className="flex flex-col gap-3">
             {drinkLines.map((line) => {
               const p = data.drinkProducts.find((x) => x.id === line.productId)
               const name = p?.name ?? "Producto"
-              const initial = name.trim().charAt(0).toUpperCase() || "?"
               const sub = new Decimal(line.unitPrice).mul(line.quantity).toFixed(2)
-              const st = p ? productSaleType(p) : "GLASS"
               const q = drinks[line.productId] ?? 0
+              const saleType = p ? productSaleType(p) : "GLASS"
+              const DrinkIcon = saleType === "BOTTLE" ? BottleWine : Wine
               return (
                 <li key={line.productId}>
-                  <motion.article
+                  <motion.div
                     layout
                     transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-                    className="rounded-2xl border border-white/[0.1] bg-gradient-to-b from-white/[0.08] to-white/[0.02] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+                    className="relative mx-1"
                   >
-                    <div className="flex gap-3 sm:gap-4">
-                      <div
-                        aria-hidden
-                        className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-black/40 text-lg font-bold text-white/90"
-                      >
-                        {initial}
-                      </div>
-                      <div className="min-w-0 flex-1 space-y-2">
-                        <div>
-                          <p className="text-base font-bold leading-snug text-white">{name}</p>
-                          <p className="mt-0.5 text-sm text-white/45">
-                            {saleTypeLabel(st)} ·{" "}
-                            <span className="tabular-nums text-white/65">{line.quantity}</span>{" "}
-                            {line.quantity === 1 ? "unidad" : "unidades"}
+                    <div className="pointer-events-none absolute -left-3 top-1/2 z-10 size-6 -translate-y-1/2 rounded-full bg-black" aria-hidden />
+                    <div className="pointer-events-none absolute -right-3 top-1/2 z-10 size-6 -translate-y-1/2 rounded-full bg-black" aria-hidden />
+                    <div className="flex items-center justify-between gap-4 rounded-xl bg-white px-6 py-5">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <DrinkIcon className="size-4 shrink-0 text-black/20" strokeWidth={1.75} aria-hidden />
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-black">{name}</p>
+                          <p className="mt-0.5 text-xs text-black/40">
+                            {line.quantity} {line.quantity === 1 ? "unidad" : "unidades"}
                           </p>
                         </div>
-                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm">
-                          <span className="text-white/50">
-                            {formatMoneyArsExact(line.unitPrice)} c/u
-                          </span>
-                          <span className="text-white/35">·</span>
-                          <span className="text-base font-bold tabular-nums text-white">
-                            {formatMoneyArsExact(sub)}
-                          </span>
-                        </div>
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        className="mt-0.5 size-10 shrink-0 rounded-xl border border-white/10 text-white/75 hover:bg-white/10 hover:text-white"
-                        onClick={() => setDrinkQty(line.productId, q - 1)}
-                        aria-label={`Sacar un consumo ${name}`}
-                      >
-                        <Minus className="size-5" />
-                      </Button>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <p className="text-base font-bold tabular-nums text-black">
+                          {formatMoneyArsExact(sub)}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setDrinkQty(line.productId, q - 1)}
+                          className="flex size-7 items-center justify-center rounded-full text-black/20 transition-colors hover:bg-black/5 hover:text-black/45"
+                          aria-label={`Sacar un consumo ${name}`}
+                        >
+                          <Minus className="size-3.5" />
+                        </button>
+                      </div>
                     </div>
-                  </motion.article>
+                  </motion.div>
                 </li>
               )
             })}
