@@ -46,6 +46,7 @@ export function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [result, setResult] = useState<GuestCheckoutResponse | null>(null)
+  const [confirmedTotal, setConfirmedTotal] = useState<string>("0.00")
 
   const snapshot: CartSnapshot | null =
     cart && cart.eventId === eventId ? cart : null
@@ -106,6 +107,7 @@ export function CheckoutPage() {
         return
       }
 
+      setConfirmedTotal(totalStr)
       setResult(data)
       clearCart()
       setStep("pay")
@@ -132,7 +134,7 @@ export function CheckoutPage() {
               <ArrowLeft className="size-5" strokeWidth={2.25} />
             </button>
             <p className="text-sm font-semibold tabular-nums tracking-tight text-white/85">
-              {formatMoneyArsExact(totalStr)}
+              {formatMoneyArsExact(step === "pay" ? confirmedTotal : totalStr)}
             </p>
           </div>
           <ProgressStepper step={step} />
@@ -186,11 +188,8 @@ export function CheckoutPage() {
             >
               {method === "TRANSFER" ? (
                 <PayTransferView
-                  amount={formatMoneyArsExact(totalStr)}
-                  alias={
-                    ((result as any)?.transfer?.alias as string | undefined) ??
-                    "alias.pendiente"
-                  }
+                  amount={formatMoneyArsExact(confirmedTotal)}
+                  alias={result?.transfer?.alias ?? "alias.pendiente"}
                 />
               ) : method === "CARD" ? (
                 <PayCardView

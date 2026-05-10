@@ -61,6 +61,7 @@ export type GuestCheckoutResponse = {
   mercadoPago?: boolean
   /** Tarjeta: ir al comprobante y pagar con Brick. */
   payOnReceipt?: boolean
+  transfer?: { alias: string; accountNumber: string }
 }
 
 export type ProcessBrickResponse = {
