@@ -1,14 +1,13 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { useNavigate, useParams } from "react-router"
 import {
   BottleWine,
-  Check,
   Minus,
   Ticket,
   ChevronLeft,
   Wine,
 } from "lucide-react"
-import { AnimatePresence, motion, type Transition } from "motion/react"
+import { AnimatePresence, motion, useAnimationControls, type Transition } from "motion/react"
 import Decimal from "decimal.js"
 import { publicApiFetch } from "@/lib/api"
 import type {
@@ -842,6 +841,7 @@ function ConsumosMarketplace({
                         imageUrl={p.imageUrl?.trim() || null}
                         priceStr={formatMoneyArsExact(p.price)}
                         disabled={!saleOpen}
+                        count={drinks[p.id] ?? 0}
                         type="glass"
                         onAdd={() => {
                           const q = drinks[p.id] ?? 0
@@ -875,6 +875,7 @@ function ConsumosMarketplace({
                         imageUrl={p.imageUrl?.trim() || null}
                         priceStr={formatMoneyArsExact(p.price)}
                         disabled={!saleOpen}
+                        count={drinks[p.id] ?? 0}
                         type="bottle"
                         onAdd={() => {
                           const q = drinks[p.id] ?? 0
@@ -997,23 +998,24 @@ function ProductShelfRow({
   imageUrl,
   priceStr,
   disabled,
+  count,
   onAdd,
 }: {
   name: string
   imageUrl?: string | null
   priceStr: string
   disabled: boolean
+  count: number
   onAdd: () => void
   type: "glass" | "bottle"
 }) {
-  const [addedPulse, setAddedPulse] = useState(false)
+  const [tapTick, setTapTick] = useState(0)
   const showPhoto = Boolean(imageUrl)
 
   const triggerAdd = () => {
     if (disabled) return
     onAdd()
-    setAddedPulse(true)
-    window.setTimeout(() => setAddedPulse(false), 520)
+    setTapTick((t) => t + 1)
   }
 
   if (showPhoto) {
@@ -1033,32 +1035,36 @@ function ProductShelfRow({
           decoding="async"
         />
         <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/95" />
-        <div className="pointer-events-none absolute inset-x-0 top-0 pt-6 pl-4">
+        <div className="pointer-events-none absolute inset-x-0 top-0 pt-6 pl-4 pr-16">
           <p className="text-xl text-white">{name}</p>
         </div>
         <div className="pointer-events-none absolute inset-x-0 bottom-0 pb-6 pl-4">
           <p className="text-xl font-bold tabular-nums text-white/85">{priceStr}</p>
         </div>
+
+        {tapTick > 0 ? (
+          <motion.div
+            key={`flash-${tapTick}`}
+            aria-hidden
+            initial={{ opacity: 0.9 }}
+            animate={{ opacity: 0 }}
+            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            className="pointer-events-none absolute inset-0 rounded-2xl ring-[1.5px] ring-inset ring-white/55"
+          />
+        ) : null}
+
         <AnimatePresence>
-          {addedPulse ? (
-            <motion.span
-              key="chk"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-              className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/50"
+          {count > 0 ? (
+            <motion.div
+              key="qty-badge"
+              initial={{ opacity: 0, scale: 0.55, y: -6 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.55, y: -4 }}
+              transition={{ type: "spring", stiffness: 500, damping: 28 }}
+              className="absolute right-4 top-6 z-10"
             >
-              <motion.span
-                initial={{ scale: 0.65, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                transition={{ type: "spring", stiffness: 420, damping: 28 }}
-                className="flex size-14 items-center justify-center rounded-full bg-emerald-500/95"
-              >
-                <Check className="size-8 text-white" strokeWidth={2.75} aria-hidden />
-              </motion.span>
-            </motion.span>
+              <QuantityBadge value={count} />
+            </motion.div>
           ) : null}
         </AnimatePresence>
       </motion.button>
@@ -1074,22 +1080,76 @@ function ProductShelfRow({
       className="relative flex w-full items-center justify-between gap-4 rounded-2xl border border-white/[0.07] bg-white/[0.04] px-4 py-3.5 text-left outline-none transition-colors hover:bg-white/[0.06] focus-visible:ring-2 focus-visible:ring-white/30 disabled:pointer-events-none disabled:opacity-45"
     >
       <p className="min-w-0 flex-1 text-[15px] font-semibold leading-snug text-white">{name}</p>
-      <p className="shrink-0 text-sm font-medium tabular-nums text-white/50">{priceStr}</p>
-      <AnimatePresence>
-        {addedPulse ? (
-          <motion.span
-            key="chk"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
-            className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl bg-black/60"
-          >
-            <Check className="size-5 text-emerald-400" strokeWidth={2.5} aria-hidden />
-          </motion.span>
-        ) : null}
-      </AnimatePresence>
+      <div className="flex shrink-0 items-center gap-3">
+        <p className="text-sm font-medium tabular-nums text-white/50">{priceStr}</p>
+        <AnimatePresence initial={false}>
+          {count > 0 ? (
+            <motion.div
+              key="qty"
+              initial={{ opacity: 0, scale: 0.5, width: 0 }}
+              animate={{ opacity: 1, scale: 1, width: "auto" }}
+              exit={{ opacity: 0, scale: 0.5, width: 0 }}
+              transition={{ type: "spring", stiffness: 520, damping: 28 }}
+              className="overflow-hidden"
+            >
+              <QuantityBadge value={count} size="sm" />
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+      </div>
+      {tapTick > 0 ? (
+        <motion.div
+          key={`flash-${tapTick}`}
+          aria-hidden
+          initial={{ opacity: 0.75 }}
+          animate={{ opacity: 0 }}
+          transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+          className="pointer-events-none absolute inset-0 rounded-2xl ring-[1.5px] ring-inset ring-white/45"
+        />
+      ) : null}
     </motion.button>
+  )
+}
+
+function QuantityBadge({ value, size = "md" }: { value: number; size?: "sm" | "md" }) {
+  const controls = useAnimationControls()
+  const prevValue = useRef(value)
+  const isSmall = size === "sm"
+
+  useEffect(() => {
+    if (prevValue.current !== value) {
+      controls.start({
+        scale: [1, 1.16, 1],
+        transition: { duration: 0.34, times: [0, 0.42, 1], ease: [0.22, 1, 0.36, 1] },
+      })
+      prevValue.current = value
+    }
+  }, [value, controls])
+
+  return (
+    <motion.div
+      animate={controls}
+      className={`flex items-center justify-center rounded-full bg-white shadow-[0_8px_22px_-8px_rgba(0,0,0,0.75)] ${
+        isSmall ? "h-6 min-w-[1.5rem] px-1.5" : "h-7 min-w-[1.75rem] px-2"
+      }`}
+    >
+      <div className="relative flex h-full items-center overflow-hidden">
+        <AnimatePresence mode="popLayout" initial={false}>
+          <motion.span
+            key={value}
+            initial={{ y: 12, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -12, opacity: 0 }}
+            transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+            className={`block tabular-nums font-bold leading-none text-black ${
+              isSmall ? "text-xs" : "text-sm"
+            }`}
+          >
+            {value}
+          </motion.span>
+        </AnimatePresence>
+      </div>
+    </motion.div>
   )
 }
 
