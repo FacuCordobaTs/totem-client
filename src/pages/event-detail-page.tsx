@@ -3,7 +3,6 @@ import { useNavigate, useParams } from "react-router"
 import {
   BottleWine,
   Check,
-  ChevronLeft,
   Minus,
   ShoppingCart,
   Ticket,
@@ -319,18 +318,23 @@ export function EventDetailPage() {
 
       <motion.div
         aria-hidden
-        className="pointer-events-none fixed inset-0 z-[1] bg-black"
+        className="pointer-events-none fixed inset-0 z-[1] bg-neutral-950"
         initial={false}
         animate={{ opacity: showStore ? 1 : 0 }}
         transition={STORE_TRANSITION}
       />
 
-
+      {showStore ? (
+        <div
+          aria-hidden
+          className="pointer-events-none fixed inset-x-0 top-0 z-20 h-28 bg-gradient-to-b from-black/70 to-transparent"
+        />
+      ) : null}
 
       <div
         className={
           showStore
-            ? `relative z-10 mx-auto flex min-h-dvh max-h-dvh w-full max-w-lg flex-col overflow-y-auto overscroll-contain px-4 pt-[max(0.5rem,env(safe-area-inset-top))] sm:px-5 ${purchaseOpen ? "pb-40" : "pb-6"}`
+            ? `relative z-10 mx-auto flex min-h-dvh max-h-dvh w-full max-w-lg flex-col pt-0`
             : `relative z-10 mx-auto flex min-h-dvh max-h-dvh w-full max-w-lg flex-col justify-end overflow-y-auto overscroll-contain px-5 pt-10 sm:px-8 ${purchaseOpen ? "pb-40" : "pb-32"}`
         }
       >
@@ -467,19 +471,19 @@ export function EventDetailPage() {
             )}
 
             <AnimatePresence>
-              {showFooter && commerceSurface === "store" ? (
+              {!!data && purchaseOpen && commerceSurface === "store" ? (
                 <motion.div
                   key="checkout-bar"
                   initial={{ opacity: 0, y: 28 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 20 }}
                   transition={EASE_OUT}
-                  className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/[0.08] bg-black/75 px-5 pt-4 backdrop-blur-xl pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-8"
+                  className="fixed bottom-0 left-0 right-0 z-40 bg-black/40 px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-lg supports-[backdrop-filter]:bg-black/40 sm:px-8"
                 >
                   <div className="mx-auto flex w-full max-w-lg flex-col gap-3">
                     <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-1">
-                        <span className="text-sm text-white/65">Total</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-white/65">Total</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <motion.span
@@ -494,7 +498,7 @@ export function EventDetailPage() {
                       </div>
                     </div>
                     <Button
-                      className="h-12 w-full rounded-2xl bg-white text-base font-semibold text-black shadow-[0_18px_44px_-18px_rgba(255,255,255,0.45)] transition-all hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_24px_56px_-16px_rgba(255,255,255,0.55)] disabled:translate-y-0 disabled:bg-white/30 disabled:text-white/60 disabled:shadow-none"
+                      className="h-14 w-full rounded-2xl bg-white text-bold font-semibold text-black transition-all  disabled:shadow-none"
                       disabled={!primaryFooterEnabled}
                       onClick={primaryFooterAction}
                     >
@@ -629,7 +633,7 @@ function TicketPickRow({
     <motion.div
       layout
       transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-      className={`relative overflow-hidden rounded-2xl shadow-xl shadow-black/60 mb-1 transition-colors duration-200 ${active
+      className={`relative overflow-hidden rounded-xl shadow-xl shadow-black/40 mb-1 transition-colors duration-200 ${active
         ? "bg-white/[0.2]"
         : "bg-white/[0.2]"
         } ${disabled ? "opacity-40" : ""}`}
@@ -786,24 +790,10 @@ function ConsumosMarketplace({
         shelf={shelf}
         onShelf={setShelf}
         cartUnitCount={cartUnitCount}
+        onBack={onBack}
       />
 
-      <header className="sticky top-0 z-10 -mx-4 mb-4 border-b border-white/[0.07] bg-black/80 px-2 py-3 pr-16 backdrop-blur-md sm:-mx-5 sm:pr-[4.5rem]">
-        <div className="flex items-start gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            className="mt-0.5 size-9 shrink-0 rounded-xl text-white/70 hover:bg-white/10 hover:text-white"
-            onClick={onBack}
-            aria-label="Volver"
-          >
-            <ChevronLeft className="size-5" />
-          </Button>
-        </div>
-      </header>
-
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-8 pr-14 sm:pr-[4.5rem]">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pt-[3.5rem] pb-40 pr-14 sm:pr-[4.5rem] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {products.length === 0 ? (
           <p className="text-sm text-white/55">
             No hay consumos digitales para este evento.
@@ -852,6 +842,7 @@ function ConsumosMarketplace({
                         imageUrl={p.imageUrl?.trim() || null}
                         priceStr={formatMoneyArsExact(p.price)}
                         disabled={!saleOpen}
+                        type="glass"
                         onAdd={() => {
                           const q = drinks[p.id] ?? 0
                           setDrinkQty(p.id, Math.min(99, q + 1))
@@ -884,6 +875,7 @@ function ConsumosMarketplace({
                         imageUrl={p.imageUrl?.trim() || null}
                         priceStr={formatMoneyArsExact(p.price)}
                         disabled={!saleOpen}
+                        type="bottle"
                         onAdd={() => {
                           const q = drinks[p.id] ?? 0
                           setDrinkQty(p.id, Math.min(99, q + 1))
@@ -905,17 +897,27 @@ function ConsumosShelfRail({
   shelf,
   onShelf,
   cartUnitCount,
+  onBack,
 }: {
   shelf: StoreShelf
   onShelf: (s: StoreShelf) => void
   cartUnitCount: number
+  onBack: () => void
 }) {
   return (
     <nav
-      className="pointer-events-auto fixed right-0 top-1/2 z-40 flex -translate-y-1/2 flex-col gap-px rounded-l-[1.15rem] border border-white/[0.12] border-r-0 bg-zinc-950/[0.96] py-1 pl-1 shadow-[-14px_0_44px_-10px_rgba(0,0,0,0.88)] backdrop-blur-xl pr-[max(0.35rem,env(safe-area-inset-right))]"
+      className="pointer-events-auto fixed right-0 top-1/2 z-40 flex -translate-y-1/2 flex-col gap-px rounded-l-[1.15rem] border border-white/[0.12] border-r-0 bg-zinc-950/[0.96] py-1 pl-1 shadow-[-14px_0_44px_-10px_rgba(0,0,0,0.88)] backdrop-blur-xl "
       aria-label="Secciones"
     >
       <motion.div layout className="flex flex-col gap-px" transition={STORE_SHELF_TRANSITION}>
+        <ShelfRailButton
+            id="shelf-back"
+            label="Volver"
+            active={false}
+            onClick={() => onBack()}
+          >
+          <Ticket className="size-[1.35rem]" strokeWidth={2} aria-hidden />
+        </ShelfRailButton>
         <ShelfRailButton
           id="shelf-glass"
           label="Ver copas"
@@ -988,12 +990,14 @@ function ProductShelfRow({
   priceStr,
   disabled,
   onAdd,
+  type,
 }: {
   name: string
   imageUrl?: string | null
   priceStr: string
   disabled: boolean
   onAdd: () => void
+  type: "glass" | "bottle"
 }) {
   const [addedPulse, setAddedPulse] = useState(false)
   const showPhoto = Boolean(imageUrl)
@@ -1012,7 +1016,7 @@ function ProductShelfRow({
         disabled={disabled}
         onClick={triggerAdd}
         whileTap={disabled ? undefined : { scale: 0.988 }}
-        className="group relative aspect-[4/3] w-full max-h-[min(280px,52vw)] overflow-hidden rounded-2xl bg-zinc-950 text-left outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:pointer-events-none disabled:opacity-45 sm:max-h-[260px]"
+        className="group relative aspect-[4/5] w-64 overflow-hidden rounded-2xl bg-zinc-950 ml-6 text-left outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:pointer-events-none disabled:opacity-45"
       >
         <img
           src={imageUrl!}
@@ -1021,10 +1025,12 @@ function ProductShelfRow({
           loading="lazy"
           decoding="async"
         />
-        <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 p-4">
-          <p className="text-lg font-bold leading-tight text-white">{name}</p>
-          <p className="mt-0.5 text-[13px] tabular-nums text-white/65">{priceStr}</p>
+        <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/95" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 pt-6 pl-4">
+          <p className="text-xl font-extrabold text-white">{type == "glass" && name}</p>
+        </div>
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 pb-6 pl-4">
+          <p className="text-xl font-extrabold tabular-nums text-white/85">{priceStr}</p>
         </div>
         <AnimatePresence>
           {addedPulse ? (
@@ -1070,7 +1076,7 @@ function ProductShelfRow({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18 }}
-            className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-2xl bg-black/60"
+            className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl bg-black/60"
           >
             <Check className="size-5 text-emerald-400" strokeWidth={2.5} aria-hidden />
           </motion.span>
@@ -1113,7 +1119,7 @@ function StoreCartPanel({
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 pr-4 pl-6">
       {hasTickets ? (
         <section className="space-y-3">
           <h3 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/40">
@@ -1131,16 +1137,13 @@ function StoreCartPanel({
                     transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
                     className="relative mx-1"
                   >
-                    <div className="pointer-events-none absolute -left-3 top-1/2 z-10 size-6 -translate-y-1/2 rounded-full bg-black" aria-hidden />
-                    <div className="pointer-events-none absolute -right-3 top-1/2 z-10 size-6 -translate-y-1/2 rounded-full bg-black" aria-hidden />
-                    <div className="flex items-center justify-between gap-4 rounded-xl bg-white px-6 py-5">
+                    <div className="pointer-events-none absolute -left-3 top-1/2 z-10 size-6 -translate-y-1/2 rounded-full bg-neutral-950" aria-hidden />
+                    <div className="pointer-events-none absolute -right-3 top-1/2 z-10 size-6 -translate-y-1/2 rounded-full bg-neutral-950" aria-hidden />
+                    <div className="flex items-center justify-between gap-4 bg-white px-6 py-5">
                       <div className="flex min-w-0 items-center gap-3">
-                        <Ticket className="size-4 shrink-0 text-black" strokeWidth={1.75} aria-hidden />
+                        
                         <div className="min-w-0">
-                          <p className="text-sm font-bold text-black">{name}</p>
-                          <p className="mt-0.5 text-xs text-black/40">
-                            {line.quantity} {line.quantity === 1 ? "entrada" : "entradas"}
-                          </p>
+                          <p className="text-sm font-bold text-black">{line.quantity} {name}</p>
                         </div>
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
@@ -1165,12 +1168,6 @@ function StoreCartPanel({
         </section>
       ) : null}
 
-      {hasTickets && hasConsumos ? (
-        <div
-          className="h-px w-full bg-gradient-to-r from-transparent via-white/18 to-transparent"
-          aria-hidden
-        />
-      ) : null}
 
       {hasConsumos ? (
         <section className="space-y-3">
@@ -1192,16 +1189,13 @@ function StoreCartPanel({
                     transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
                     className="relative mx-1"
                   >
-                    <div className="pointer-events-none absolute -left-3 top-1/2 z-10 size-6 -translate-y-1/2 rounded-full bg-black" aria-hidden />
-                    <div className="pointer-events-none absolute -right-3 top-1/2 z-10 size-6 -translate-y-1/2 rounded-full bg-black" aria-hidden />
-                    <div className="flex items-center justify-between gap-4 rounded-xl bg-white px-6 py-5">
+                    <div className="pointer-events-none absolute -left-3 top-1/2 z-10 size-6 -translate-y-1/2 rounded-full bg-neutral-950" aria-hidden />
+                    <div className="pointer-events-none absolute -right-3 top-1/2 z-10 size-6 -translate-y-1/2 rounded-full bg-neutral-950" aria-hidden />
+                    <div className="flex items-center justify-between gap-4 bg-white px-6 py-5">
                       <div className="flex min-w-0 items-center gap-3">
-                        <DrinkIcon className="size-4 shrink-0 text-black" strokeWidth={1.75} aria-hidden />
+                        <DrinkIcon className="size-8 shrink-0 text-black" strokeWidth={1.75} aria-hidden />
                         <div className="min-w-0">
-                          <p className="text-sm font-bold text-black">{name}</p>
-                          <p className="mt-0.5 text-xs text-black/40">
-                            {line.quantity} {line.quantity === 1 ? "unidad" : "unidades"}
-                          </p>
+                          <p className="text-sm font-bold text-black">{line.quantity} {name}</p>
                         </div>
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
