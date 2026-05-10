@@ -4,8 +4,8 @@ import {
   BottleWine,
   Check,
   Minus,
-  ShoppingCart,
   Ticket,
+  ChevronLeft,
   Wine,
 } from "lucide-react"
 import { AnimatePresence, motion, type Transition } from "motion/react"
@@ -905,52 +905,60 @@ function ConsumosShelfRail({
   onBack: () => void
 }) {
   return (
-    <nav
-      className="pointer-events-auto fixed right-0 top-1/2 z-40 flex -translate-y-1/2 flex-col gap-px rounded-l-[1.15rem] border border-white/[0.12] border-r-0 bg-zinc-950/[0.96] py-1 pl-1 shadow-[-14px_0_44px_-10px_rgba(0,0,0,0.88)] backdrop-blur-xl "
-      aria-label="Secciones"
-    >
-      <motion.div layout className="flex flex-col gap-px" transition={STORE_SHELF_TRANSITION}>
+    <>
+      <nav
+        className="pointer-events-auto fixed right-0 top-64 z-40 rounded-l-[1.15rem] border border-white/[0.12] border-r-0 bg-zinc-950/[0.96] py-1 pl-1 shadow-[-14px_0_44px_-10px_rgba(0,0,0,0.88)] backdrop-blur-xl"
+        aria-label="Volver"
+      >
         <ShelfRailButton
-            id="shelf-back"
-            label="Volver"
-            active={false}
-            onClick={() => onBack()}
+          id="shelf-back"
+          label="Volver"
+          active={false}
+          onClick={() => onBack()}
+        >
+          <ChevronLeft className="size-[1.35rem]" strokeWidth={2} aria-hidden />
+        </ShelfRailButton>
+      </nav>
+
+      <nav
+        className="pointer-events-auto fixed right-0 top-1/2 z-40 flex -translate-y-1/2 flex-col gap-px rounded-l-[1.15rem] border border-white/[0.12] border-r-0 bg-zinc-950/[0.96] py-1 pl-1 shadow-[-14px_0_44px_-10px_rgba(0,0,0,0.88)] backdrop-blur-xl"
+        aria-label="Secciones"
+      >
+        <motion.div layout className="flex flex-col gap-px" transition={STORE_SHELF_TRANSITION}>
+          <ShelfRailButton
+            id="shelf-glass"
+            label="Ver copas"
+            active={shelf === "glass"}
+            onClick={() => onShelf("glass")}
           >
-          <Ticket className="size-[1.35rem]" strokeWidth={2} aria-hidden />
-        </ShelfRailButton>
-        <ShelfRailButton
-          id="shelf-glass"
-          label="Ver copas"
-          active={shelf === "glass"}
-          onClick={() => onShelf("glass")}
-        >
-          <Wine className="size-[1.35rem]" strokeWidth={2} aria-hidden />
-        </ShelfRailButton>
-        <ShelfRailButton
-          id="shelf-bottle"
-          label="Ver botellas"
-          active={shelf === "bottle"}
-          onClick={() => onShelf("bottle")}
-        >
-          <BottleWine className="size-[1.35rem]" strokeWidth={2} aria-hidden />
-        </ShelfRailButton>
-        <ShelfRailButton
-          id="shelf-cart"
-          label="Ver carrito"
-          active={shelf === "cart"}
-          onClick={() => onShelf("cart")}
-        >
-          <span className="relative inline-flex">
-            <ShoppingCart className="size-[1.35rem]" strokeWidth={2} aria-hidden />
-            {cartUnitCount > 0 ? (
-              <span className="absolute -right-2 -top-2 flex min-h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold tabular-nums text-black shadow-sm">
-                {cartUnitCount > 99 ? "99+" : cartUnitCount}
-              </span>
-            ) : null}
-          </span>
-        </ShelfRailButton>
-      </motion.div>
-    </nav>
+            <Wine className="size-[1.35rem]" strokeWidth={2} aria-hidden />
+          </ShelfRailButton>
+          <ShelfRailButton
+            id="shelf-bottle"
+            label="Ver botellas"
+            active={shelf === "bottle"}
+            onClick={() => onShelf("bottle")}
+          >
+            <BottleWine className="size-[1.35rem]" strokeWidth={2} aria-hidden />
+          </ShelfRailButton>
+          <ShelfRailButton
+            id="shelf-cart"
+            label="Ver carrito"
+            active={shelf === "cart"}
+            onClick={() => onShelf("cart")}
+          >
+            <span className="relative inline-flex">
+              <Ticket className="size-[1.35rem]" strokeWidth={2} aria-hidden />
+              {cartUnitCount > 0 ? (
+                <span className="absolute -right-2 -top-2 flex min-h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold tabular-nums text-black shadow-sm">
+                  {cartUnitCount > 99 ? "99+" : cartUnitCount}
+                </span>
+              ) : null}
+            </span>
+          </ShelfRailButton>
+        </motion.div>
+      </nav>
+    </>
   )
 }
 
@@ -1103,20 +1111,7 @@ function StoreCartPanel({
 }) {
   const hasTickets = ticketLines.length > 0
   const hasConsumos = drinkLines.length > 0
-  const isEmpty = !hasTickets && !hasConsumos
 
-  if (isEmpty) {
-    return (
-      <div className="rounded-2xl border border-dashed border-white/[0.12] bg-white/[0.02] px-5 py-14 text-center">
-        <ShoppingCart className="mx-auto mb-4 size-10 text-white/25" aria-hidden />
-        <p className="text-base font-semibold text-white/80">Carrito vacío</p>
-        <p className="mt-2 text-sm leading-relaxed text-white/45">
-          Elegí copas o botellas y sumalos con un toque. Acá vas a ver entradas y
-          consumos, y vas a poder sacarlos si cambiás de idea.
-        </p>
-      </div>
-    )
-  }
 
   return (
     <div className="space-y-8 pr-4 pl-6">
