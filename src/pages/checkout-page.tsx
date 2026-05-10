@@ -116,7 +116,7 @@ export function CheckoutPage() {
     }
   }
 
-  if (!snapshot) return null
+  if (!snapshot && !result) return null
 
   return (
     <div className="relative min-h-dvh bg-black">
