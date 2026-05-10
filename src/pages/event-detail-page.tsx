@@ -908,7 +908,7 @@ function ConsumosShelfRail({
   return (
     <>
       <nav
-        className="pointer-events-auto fixed right-0 top-[30%] z-40 rounded-l-[1.15rem] border border-white/[0.12] border-r-0 bg-zinc-950/[0.96] py-1 pl-1 shadow-[-14px_0_44px_-10px_rgba(0,0,0,0.88)] backdrop-blur-xl"
+        className="pointer-events-auto fixed right-0 top-[20%] z-40 rounded-l-[1.15rem] border border-white/[0.12] border-r-0 bg-zinc-950/[0.96] py-1 pl-1 shadow-[-14px_0_44px_-10px_rgba(0,0,0,0.88)] backdrop-blur-xl"
         aria-label="Volver"
       >
         <ShelfRailButton
