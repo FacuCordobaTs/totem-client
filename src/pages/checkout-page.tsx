@@ -231,6 +231,12 @@ export function CheckoutPage() {
               {paymentHint}
             </p>
           </details>
+          <Button
+            className="h-12 w-full rounded-2xl bg-white text-base font-semibold text-black hover:bg-white/95"
+            onClick={() => submitPurchase()}
+          >
+            Continuar
+          </Button>
           </div>
       )}
     </div>
