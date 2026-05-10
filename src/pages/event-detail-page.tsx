@@ -998,7 +998,6 @@ function ProductShelfRow({
   priceStr,
   disabled,
   onAdd,
-  type,
 }: {
   name: string
   imageUrl?: string | null
@@ -1035,7 +1034,7 @@ function ProductShelfRow({
         />
         <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/95" />
         <div className="pointer-events-none absolute inset-x-0 top-0 pt-6 pl-4">
-          <p className="text-xl text-white">{type == "glass" && name}</p>
+          <p className="text-xl text-white">{name}</p>
         </div>
         <div className="pointer-events-none absolute inset-x-0 bottom-0 pb-6 pl-4">
           <p className="text-xl font-bold tabular-nums text-white/85">{priceStr}</p>
