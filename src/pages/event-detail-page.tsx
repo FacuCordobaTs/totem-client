@@ -32,6 +32,22 @@ import {
 type PurchaseWorkflow = "tickets" | "products"
 type CommerceSurface = "hero" | "store"
 
+function readSavedProgress(eventId: string | undefined) {
+  if (!eventId) return null
+  try {
+    const raw = localStorage.getItem(`crow_event_progress_${eventId}`)
+    if (!raw) return null
+    return JSON.parse(raw) as {
+      purchaseOpen?: boolean
+      commerceSurface?: CommerceSurface
+      ticketQtys?: Record<string, number>
+      drinks?: Record<string, number>
+    }
+  } catch {
+    return null
+  }
+}
+
 const EASE_OUT: Transition = { duration: 0.32, ease: [0.22, 1, 0.36, 1] }
 const STORE_TRANSITION: Transition = { duration: 0.48, ease: [0.22, 1, 0.36, 1] }
 const EASE_SMOOTH: Transition = {
@@ -58,11 +74,11 @@ export function EventDetailPage() {
 
   const [data, setData] = useState<PublicEventDetailResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [purchaseOpen, setPurchaseOpen] = useState(false)
-  const [commerceSurface, setCommerceSurface] = useState<CommerceSurface>("hero")
+  const [purchaseOpen, setPurchaseOpen] = useState<boolean>(() => readSavedProgress(eventId)?.purchaseOpen ?? false)
+  const [commerceSurface, setCommerceSurface] = useState<CommerceSurface>(() => readSavedProgress(eventId)?.commerceSurface ?? "hero")
   const [workflow, setWorkflow] = useState<PurchaseWorkflow | null>(null)
-  const [ticketQtys, setTicketQtys] = useState<Record<string, number>>({})
-  const [drinks, setDrinks] = useState<Record<string, number>>({})
+  const [ticketQtys, setTicketQtys] = useState<Record<string, number>>(() => readSavedProgress(eventId)?.ticketQtys ?? {})
+  const [drinks, setDrinks] = useState<Record<string, number>>(() => readSavedProgress(eventId)?.drinks ?? {})
 
   const ticketsFrom = data?.event.ticketsAvailableFrom ?? null
   const consFrom = data?.event.consumptionsAvailableFrom ?? null
@@ -73,9 +89,12 @@ export function EventDetailPage() {
     if (!eventId) return
     publicApiFetch<PublicEventDetailResponse>(`/public/events/${eventId}`)
       .then((r) => {
+        const saved = readSavedProgress(eventId)
         setData(r)
-        setTicketQtys({})
-        setDrinks({})
+        setTicketQtys(saved?.ticketQtys ?? {})
+        setDrinks(saved?.drinks ?? {})
+        setPurchaseOpen(saved?.purchaseOpen ?? false)
+        setCommerceSurface(saved?.commerceSurface ?? "hero")
       })
       .catch(() => setError("No pudimos cargar el evento."))
   }, [eventId])
@@ -266,6 +285,16 @@ export function EventDetailPage() {
       setDrinks({})
     }
   }, [purchaseOpen])
+
+  useEffect(() => {
+    if (!eventId) return
+    try {
+      localStorage.setItem(
+        `crow_event_progress_${eventId}`,
+        JSON.stringify({ purchaseOpen, commerceSurface, ticketQtys, drinks })
+      )
+    } catch { /* noop */ }
+  }, [eventId, purchaseOpen, commerceSurface, ticketQtys, drinks])
 
   if (!eventId) return null
 

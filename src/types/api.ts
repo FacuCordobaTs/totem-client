@@ -103,5 +103,6 @@ export type ReceiptApiResponse = {
     qrHash: string
     status: ConsumptionStatus
     product: { id: string; name: string; price: string }
+    isAddon?: boolean
   }>
 }

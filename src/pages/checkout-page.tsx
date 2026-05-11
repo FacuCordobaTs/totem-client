@@ -36,6 +36,7 @@ export function CheckoutPage() {
   const { eventId } = useParams<{ eventId: string }>()
   const navigate = useNavigate()
   const cart = useCartStore((s) => s.cart)
+  const hydrated = useCartStore((s) => s._hydrated)
   const clearCart = useCartStore((s) => s.clearCart)
 
   const [step, setStep] = useState<Step>("contact")
@@ -103,6 +104,7 @@ export function CheckoutPage() {
       const redirectUrl = (data as any).redirectUrl as string | undefined
       if (method === "MERCADOPAGO" && redirectUrl) {
         clearCart()
+        try { localStorage.removeItem(`crow_event_progress_${eventId}`) } catch { /* noop */ }
         window.location.href = redirectUrl
         return
       }
@@ -110,6 +112,7 @@ export function CheckoutPage() {
       setConfirmedTotal(totalStr)
       setResult(data)
       clearCart()
+      try { localStorage.removeItem(`crow_event_progress_${eventId}`) } catch { /* noop */ }
       setStep("pay")
     } catch (e) {
       setErr(e instanceof Error ? e.message : "No pudimos confirmar el pago.")
@@ -118,7 +121,11 @@ export function CheckoutPage() {
     }
   }
 
-  if (!snapshot && !result) return null
+  if (!hydrated) return null
+  if (!snapshot && !result) {
+    navigate(`/e/${eventId}`, { replace: true })
+    return null
+  }
 
   return (
     <div className="relative min-h-dvh bg-black">
