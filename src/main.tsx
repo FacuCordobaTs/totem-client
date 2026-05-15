@@ -33,7 +33,7 @@ const router = createBrowserRouter([
     ),
   },
   {
-    path: "/e/:eventId",
+    path: "/e/:slug",
     element: (
       <NightRoot>
         <EventDetailPage />

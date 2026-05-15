@@ -32,10 +32,10 @@ import {
 type PurchaseWorkflow = "tickets" | "products"
 type CommerceSurface = "hero" | "store"
 
-function readSavedProgress(eventId: string | undefined) {
-  if (!eventId) return null
+function readSavedProgress(slugOrId: string | undefined) {
+  if (!slugOrId) return null
   try {
-    const raw = localStorage.getItem(`crow_event_progress_${eventId}`)
+    const raw = localStorage.getItem(`crow_event_progress_${slugOrId}`)
     if (!raw) return null
     return JSON.parse(raw) as {
       purchaseOpen?: boolean
@@ -68,17 +68,17 @@ function useWindowOpen(iso: Date | string | null | undefined) {
 }
 
 export function EventDetailPage() {
-  const { eventId } = useParams<{ eventId: string }>()
+  const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
   const setCart = useCartStore((s) => s.setCart)
 
   const [data, setData] = useState<PublicEventDetailResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [purchaseOpen, setPurchaseOpen] = useState<boolean>(() => readSavedProgress(eventId)?.purchaseOpen ?? false)
-  const [commerceSurface, setCommerceSurface] = useState<CommerceSurface>(() => readSavedProgress(eventId)?.commerceSurface ?? "hero")
+  const [purchaseOpen, setPurchaseOpen] = useState<boolean>(() => readSavedProgress(slug)?.purchaseOpen ?? false)
+  const [commerceSurface, setCommerceSurface] = useState<CommerceSurface>(() => readSavedProgress(slug)?.commerceSurface ?? "hero")
   const [workflow, setWorkflow] = useState<PurchaseWorkflow | null>(null)
-  const [ticketQtys, setTicketQtys] = useState<Record<string, number>>(() => readSavedProgress(eventId)?.ticketQtys ?? {})
-  const [drinks, setDrinks] = useState<Record<string, number>>(() => readSavedProgress(eventId)?.drinks ?? {})
+  const [ticketQtys, setTicketQtys] = useState<Record<string, number>>(() => readSavedProgress(slug)?.ticketQtys ?? {})
+  const [drinks, setDrinks] = useState<Record<string, number>>(() => readSavedProgress(slug)?.drinks ?? {})
 
   const ticketsFrom = data?.event.ticketsAvailableFrom ?? null
   const consFrom = data?.event.consumptionsAvailableFrom ?? null
@@ -86,10 +86,10 @@ export function EventDetailPage() {
   const consWindow = useWindowOpen(consFrom)
 
   const load = useCallback(() => {
-    if (!eventId) return
-    publicApiFetch<PublicEventDetailResponse>(`/public/events/${eventId}`)
+    if (!slug) return
+    publicApiFetch<PublicEventDetailResponse>(`/public/events/${slug}`)
       .then((r) => {
-        const saved = readSavedProgress(eventId)
+        const saved = readSavedProgress(slug)
         setData(r)
         setTicketQtys(saved?.ticketQtys ?? {})
         setDrinks(saved?.drinks ?? {})
@@ -97,7 +97,7 @@ export function EventDetailPage() {
         setCommerceSurface(saved?.commerceSurface ?? "hero")
       })
       .catch(() => setError("No pudimos cargar el evento."))
-  }, [eventId])
+  }, [slug])
 
   useEffect(() => {
     load()
@@ -155,15 +155,15 @@ export function EventDetailPage() {
   }, [data, drinks])
 
   const cartPreview = useMemo(() => {
-    if (!data || !eventId) return null
+    if (!data) return null
     return {
-      eventId,
+      eventId: data.event.id,
       eventName: data.event.name,
       productoraName: data.productora.name,
       ticketLines,
       drinkLines,
     }
-  }, [data, eventId, ticketLines, drinkLines])
+  }, [data, ticketLines, drinkLines])
 
   const totalStr = cartPreview ? computeCartTotalString(cartPreview) : "0.00"
 
@@ -219,7 +219,7 @@ export function EventDetailPage() {
   const continueClick = () => {
     if (!cartPreview || !canContinue) return
     setCart(cartPreview)
-    navigate(`/checkout/${eventId}`)
+    navigate(`/checkout/${data!.event.id}`)
   }
 
   const storeBack = () => {
@@ -287,16 +287,16 @@ export function EventDetailPage() {
   }, [purchaseOpen])
 
   useEffect(() => {
-    if (!eventId) return
+    if (!slug) return
     try {
       localStorage.setItem(
-        `crow_event_progress_${eventId}`,
+        `crow_event_progress_${slug}`,
         JSON.stringify({ purchaseOpen, commerceSurface, ticketQtys, drinks })
       )
     } catch { /* noop */ }
-  }, [eventId, purchaseOpen, commerceSurface, ticketQtys, drinks])
+  }, [slug, purchaseOpen, commerceSurface, ticketQtys, drinks])
 
-  if (!eventId) return null
+  if (!slug) return null
 
   const hero = data?.event.imageUrl ?? null
   const flyerVisible = !purchaseOpen || commerceSurface === "hero"
