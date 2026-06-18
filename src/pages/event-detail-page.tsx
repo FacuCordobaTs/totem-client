@@ -86,9 +86,13 @@ export function EventDetailPage() {
   const consWindow = useWindowOpen(consFrom)
 
   const load = useCallback(() => {
+    console.log("load")
+    console.log(slug)
     if (!slug) return
     publicApiFetch<PublicEventDetailResponse>(`/public/events/${slug}`)
       .then((r) => {
+        console.log("r")
+        console.log(r)
         const saved = readSavedProgress(slug)
         setData(r)
         setTicketQtys(saved?.ticketQtys ?? {})
@@ -271,12 +275,12 @@ export function EventDetailPage() {
 
   const ctaDisabled = !data || !hasAnyCatalog || !anythingPurchasable
 
-  const startPurchase = () => {
+  const startPurchase = useCallback(() => {
     if (ctaDisabled) return
     setPurchaseOpen(true)
     if (!hasTicketCatalog && hasProductCatalog) setCommerceSurface("store")
     else setCommerceSurface("hero")
-  }
+  }, [ctaDisabled, hasTicketCatalog, hasProductCatalog])
 
   useEffect(() => {
     if (!purchaseOpen) {
@@ -295,6 +299,24 @@ export function EventDetailPage() {
       )
     } catch { /* noop */ }
   }, [slug, purchaseOpen, commerceSurface, ticketQtys, drinks])
+
+  useEffect(() => {
+    if (purchaseOpen || ctaDisabled) return
+    let startY = 0
+    const onTouchStart = (e: TouchEvent) => { startY = e.touches[0].clientY }
+    const onTouchEnd = (e: TouchEvent) => {
+      if (startY - e.changedTouches[0].clientY > 40) startPurchase()
+    }
+    const onWheel = (e: WheelEvent) => { if (e.deltaY > 0) startPurchase() }
+    window.addEventListener("wheel", onWheel, { passive: true })
+    window.addEventListener("touchstart", onTouchStart, { passive: true })
+    window.addEventListener("touchend", onTouchEnd, { passive: true })
+    return () => {
+      window.removeEventListener("wheel", onWheel)
+      window.removeEventListener("touchstart", onTouchStart)
+      window.removeEventListener("touchend", onTouchEnd)
+    }
+  }, [purchaseOpen, ctaDisabled, startPurchase])
 
   if (!slug) return null
 
