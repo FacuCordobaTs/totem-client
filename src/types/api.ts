@@ -34,6 +34,14 @@ export type PublicDrinkProductItem = {
   price: string
   saleType?: PublicProductSaleType
   imageUrl?: string | null
+  categoryId?: string | null
+  categoryName?: string | null
+}
+
+export type PublicProductCategory = {
+  id: string
+  name: string
+  sortOrder: number
 }
 
 export type PublicEventDetailResponse = {
@@ -49,6 +57,7 @@ export type PublicEventDetailResponse = {
   }
   ticketTypes: PublicTicketTypeItem[]
   drinkProducts: PublicDrinkProductItem[]
+  productCategories?: PublicProductCategory[]
 }
 
 export type GuestCheckoutResponse = {

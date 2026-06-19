@@ -18,6 +18,7 @@ import {  publicApiFetch } from "@/lib/api"
 import type {
   PublicDrinkProductItem,
   PublicEventDetailResponse,
+  PublicProductCategory,
   PublicProductSaleType,
   ReceiptApiResponse,
 } from "@/types/api"
@@ -44,6 +45,54 @@ type ShelfKind = "glass" | "bottle" | "cart"
 
 function productSaleType(p: PublicDrinkProductItem): PublicProductSaleType {
   return p.saleType ?? "GLASS"
+}
+
+const UNCATEGORIZED_KEY = "__uncat__"
+
+type ProductCategoryGroup = {
+  id: string
+  name: string | null
+  products: PublicDrinkProductItem[]
+}
+
+function groupProductsByCategory(
+  products: PublicDrinkProductItem[],
+  categories?: PublicProductCategory[]
+): ProductCategoryGroup[] {
+  const byCat = new Map<string, PublicDrinkProductItem[]>()
+  for (const p of products) {
+    const key = p.categoryId ?? UNCATEGORIZED_KEY
+    const list = byCat.get(key) ?? []
+    list.push(p)
+    byCat.set(key, list)
+  }
+  const groups: ProductCategoryGroup[] = []
+  for (const cat of categories ?? []) {
+    const list = byCat.get(cat.id)
+    if (list && list.length > 0) {
+      groups.push({ id: cat.id, name: cat.name, products: list })
+      byCat.delete(cat.id)
+    }
+  }
+  for (const [key, list] of byCat) {
+    if (key === UNCATEGORIZED_KEY) continue
+    if (list.length > 0) {
+      groups.push({ id: key, name: list[0].categoryName ?? null, products: list })
+    }
+  }
+  const uncat = byCat.get(UNCATEGORIZED_KEY)
+  if (uncat && uncat.length > 0) {
+    groups.push({ id: UNCATEGORIZED_KEY, name: null, products: uncat })
+  }
+  return groups
+}
+
+function CategoryHeading({ children }: { children: ReactNode }) {
+  return (
+    <p className="mb-2 mt-1 px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
+      {children}
+    </p>
+  )
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -444,6 +493,7 @@ export function ReceiptPage() {
   const hadPendingPaymentRef = useRef(false)
 
   const [addonProducts, setAddonProducts] = useState<PublicDrinkProductItem[] | null>(null)
+  const [addonCategories, setAddonCategories] = useState<PublicProductCategory[]>([])
   const [addonDrinks, setAddonDrinks] = useState<Record<string, number>>({})
   const [addonSubmitting, setAddonSubmitting] = useState(false)
   const [addonPolling, setAddonPolling] = useState(false)
@@ -539,8 +589,14 @@ export function ReceiptPage() {
   useEffect(() => {
     if (!data?.sale.paid || !data.event?.id) return
     publicApiFetch<PublicEventDetailResponse>(`/public/events/${data.event.id}`)
-      .then((r) => setAddonProducts(r.drinkProducts))
-      .catch(() => setAddonProducts([]))
+      .then((r) => {
+        setAddonProducts(r.drinkProducts)
+        setAddonCategories(r.productCategories ?? [])
+      })
+      .catch(() => {
+        setAddonProducts([])
+        setAddonCategories([])
+      })
   }, [data?.sale.paid, data?.event?.id])
 
   useEffect(() => {
@@ -838,6 +894,7 @@ export function ReceiptPage() {
                     >
                       <ConsumosTabContent
                         addonProducts={addonProducts ?? []}
+                        addonCategories={addonCategories}
                         addonDrinks={addonDrinks}
                         shelf={shelf}
                         onAdd={bumpAddon}
@@ -1040,12 +1097,14 @@ export function ReceiptPage() {
 // ──────────────────────────────────────────────────────────────────────────────
 function ConsumosTabContent({
   addonProducts,
+  addonCategories,
   addonDrinks,
   shelf,
   onAdd,
   onRemove,
 }: {
   addonProducts: PublicDrinkProductItem[]
+  addonCategories: PublicProductCategory[]
   addonDrinks: Record<string, number>
   shelf: ShelfKind
   onAdd: (productId: string) => void
@@ -1081,26 +1140,34 @@ function ConsumosTabContent({
             exit={{ opacity: 0, x: 28, filter: "blur(8px)" }}
             transition={SHELF_TRANSITION}
           >
-            <ul className="flex flex-col gap-4">
-              {glassProducts.length === 0 ? (
-                <li className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-10 text-center text-sm text-white/45">
-                  No hay copas para este evento.
-                </li>
-              ) : null}
-              {glassProducts.map((p) => (
-                <li key={p.id}>
-                  <ProductShelfRow
-                    name={p.name}
-                    imageUrl={p.imageUrl?.trim() || null}
-                    priceStr={formatMoneyArsExact(p.price)}
-                    disabled={false}
-                    count={addonDrinks[p.id] ?? 0}
-                    type="glass"
-                    onAdd={() => onAdd(p.id)}
-                  />
-                </li>
-              ))}
-            </ul>
+            {glassProducts.length === 0 ? (
+              <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-10 text-center text-sm text-white/45">
+                No hay copas para este evento.
+              </div>
+            ) : (
+              <div className="flex flex-col gap-5">
+                {groupProductsByCategory(glassProducts, addonCategories).map((group) => (
+                  <div key={group.id}>
+                    {group.name ? <CategoryHeading>{group.name}</CategoryHeading> : null}
+                    <ul className="flex flex-col gap-4">
+                      {group.products.map((p) => (
+                        <li key={p.id}>
+                          <ProductShelfRow
+                            name={p.name}
+                            imageUrl={p.imageUrl?.trim() || null}
+                            priceStr={formatMoneyArsExact(p.price)}
+                            disabled={false}
+                            count={addonDrinks[p.id] ?? 0}
+                            type="glass"
+                            onAdd={() => onAdd(p.id)}
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            )}
           </motion.div>
         ) : shelf === "bottle" ? (
           <motion.div
@@ -1112,26 +1179,34 @@ function ConsumosTabContent({
             exit={{ opacity: 0, x: -28, filter: "blur(8px)" }}
             transition={SHELF_TRANSITION}
           >
-            <ul className="flex flex-col gap-4">
-              {bottleProducts.length === 0 ? (
-                <li className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-10 text-center text-sm text-white/45">
-                  No hay botellas para este evento.
-                </li>
-              ) : null}
-              {bottleProducts.map((p) => (
-                <li key={p.id}>
-                  <ProductShelfRow
-                    name={p.name}
-                    imageUrl={p.imageUrl?.trim() || null}
-                    priceStr={formatMoneyArsExact(p.price)}
-                    disabled={false}
-                    count={addonDrinks[p.id] ?? 0}
-                    type="bottle"
-                    onAdd={() => onAdd(p.id)}
-                  />
-                </li>
-              ))}
-            </ul>
+            {bottleProducts.length === 0 ? (
+              <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-10 text-center text-sm text-white/45">
+                No hay botellas para este evento.
+              </div>
+            ) : (
+              <div className="flex flex-col gap-5">
+                {groupProductsByCategory(bottleProducts, addonCategories).map((group) => (
+                  <div key={group.id}>
+                    {group.name ? <CategoryHeading>{group.name}</CategoryHeading> : null}
+                    <ul className="flex flex-col gap-4">
+                      {group.products.map((p) => (
+                        <li key={p.id}>
+                          <ProductShelfRow
+                            name={p.name}
+                            imageUrl={p.imageUrl?.trim() || null}
+                            priceStr={formatMoneyArsExact(p.price)}
+                            disabled={false}
+                            count={addonDrinks[p.id] ?? 0}
+                            type="bottle"
+                            onAdd={() => onAdd(p.id)}
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            )}
           </motion.div>
         ) : (
           <motion.div
