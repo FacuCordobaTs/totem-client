@@ -52,6 +52,8 @@ export type PublicEventDetailResponse = {
     date: string
     location: string | null
     imageUrl?: string | null
+    /** GLASS = diseño glassmorphism (default), MINIMAL = diseño plano/minimalista. */
+    designType?: "GLASS" | "MINIMAL"
     ticketsAvailableFrom: Date | string | null
     consumptionsAvailableFrom: Date | string | null
   }

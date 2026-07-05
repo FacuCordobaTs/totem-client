@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router"
 import {
   BottleWine,
   Minus,
+  Plus,
   Ticket,
   ChevronLeft,
   Wine,
@@ -320,6 +321,32 @@ export function EventDetailPage() {
   }, [purchaseOpen, ctaDisabled, startPurchase])
 
   if (!slug) return null
+
+  if (data && (data.event.designType ?? "GLASS") === "MINIMAL") {
+    return (
+      <MinimalEventDetail
+        data={data}
+        ticketsFrom={ticketsFrom}
+        consFrom={consFrom}
+        ticketsWindow={ticketsWindow}
+        consWindow={consWindow}
+        ticketQtys={ticketQtys}
+        bumpTicket={bumpTicket}
+        trimTicket={trimTicket}
+        drinks={drinks}
+        setDrinkQty={setDrinkQty}
+        ticketLines={ticketLines}
+        drinkLines={drinkLines}
+        totalStr={totalStr}
+        canContinue={canContinue}
+        continueClick={continueClick}
+        hasTicketCatalog={hasTicketCatalog}
+        hasProductCatalog={hasProductCatalog}
+        anyTicketPurchasable={anyTicketPurchasable}
+        productsPurchasable={productsPurchasable}
+      />
+    )
+  }
 
   const hero = data?.event.imageUrl ?? null
   const flyerVisible = !purchaseOpen || commerceSurface === "hero"
@@ -1390,6 +1417,335 @@ function StoreCartPanel({
           </ul>
         </section>
       ) : null}
+    </div>
+  )
+}
+
+// -----------------------------------------------------------------------------
+// DISEÑO MINIMALISTA (plano, sin glassmorphism)
+// -----------------------------------------------------------------------------
+
+function MinimalEventDetail({
+  data,
+  ticketsFrom,
+  consFrom,
+  ticketsWindow,
+  consWindow,
+  ticketQtys,
+  bumpTicket,
+  trimTicket,
+  drinks,
+  setDrinkQty,
+  ticketLines,
+  drinkLines,
+  totalStr,
+  canContinue,
+  continueClick,
+  hasTicketCatalog,
+  hasProductCatalog,
+  anyTicketPurchasable,
+  productsPurchasable,
+}: {
+  data: PublicEventDetailResponse
+  ticketsFrom: Date | string | null
+  consFrom: Date | string | null
+  ticketsWindow: { open: boolean; msLeft: number }
+  consWindow: { open: boolean; msLeft: number }
+  ticketQtys: Record<string, number>
+  bumpTicket: (id: string) => void
+  trimTicket: (id: string) => void
+  drinks: Record<string, number>
+  setDrinkQty: (productId: string, next: number) => void
+  ticketLines: CartTicketLine[]
+  drinkLines: CartDrinkLine[]
+  totalStr: string
+  canContinue: boolean
+  continueClick: () => void
+  hasTicketCatalog: boolean
+  hasProductCatalog: boolean
+  anyTicketPurchasable: boolean
+  productsPurchasable: boolean
+}) {
+  const hero = data.event.imageUrl ?? null
+  const cartCount =
+    ticketLines.reduce((a, l) => a + l.quantity, 0) +
+    drinkLines.reduce((a, l) => a + l.quantity, 0)
+
+  const ticketsSaleOpen = ticketsWindow.open
+  const consSaleOpen = consWindow.open
+  const productGroups = groupProductsByCategory(
+    data.drinkProducts,
+    data.productCategories
+  )
+  const hasAnyCatalog = hasTicketCatalog || hasProductCatalog
+
+  return (
+    <div className="min-h-dvh bg-[#0a0a0a] text-white">
+      <div className="mx-auto w-full max-w-xl px-5 pt-8 pb-40 sm:px-6">
+        {/* Flyer */}
+        <div className="overflow-hidden rounded-2xl border border-white/10 bg-neutral-900">
+          {hero ? (
+            <img
+              src={hero}
+              alt={data.event.name}
+              className="aspect-[4/5] w-full object-cover"
+              loading="eager"
+              decoding="async"
+            />
+          ) : (
+            <div className="flex aspect-[4/5] w-full items-center justify-center px-6 text-center">
+              <span className="text-2xl font-semibold tracking-tight text-white/70">
+                {data.event.name}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Encabezado */}
+        <header className="mt-7 space-y-2">
+          <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-white/45">
+            {formatEventDay(data.event.date)}
+          </p>
+          <h1 className="text-[2rem] font-bold leading-[1.1] tracking-tight text-white sm:text-[2.25rem]">
+            {data.event.name}
+          </h1>
+          {data.event.location ? (
+            <p className="text-[15px] text-white/55">{data.event.location}</p>
+          ) : null}
+        </header>
+
+        {!hasAnyCatalog ? (
+          <p className="mt-10 text-center text-sm text-white/45">
+            Este evento no tiene venta online por el momento.
+          </p>
+        ) : null}
+
+        {/* Entradas */}
+        {hasTicketCatalog ? (
+          <section className="mt-10">
+            <MinimalSectionTitle
+              title="Entradas"
+              hint={
+                ticketsFrom != null && !ticketsSaleOpen
+                  ? `Venta desde el ${formatEventDate(ticketsFrom)} · en ${formatCountdown(
+                      ticketsWindow.msLeft
+                    )}`
+                  : ticketsSaleOpen && !anyTicketPurchasable
+                    ? "Por ahora no hay entradas disponibles."
+                    : null
+              }
+            />
+            <ul className="mt-4 space-y-2.5">
+              {data.ticketTypes.map((t) => {
+                const count = ticketQtys[t.id] ?? 0
+                const disabled = !t.availableForPurchase || !ticketsSaleOpen
+                return (
+                  <li key={t.id}>
+                    <MinimalPickRow
+                      name={t.name}
+                      priceStr={formatMoneyArsExact(t.price)}
+                      count={count}
+                      disabled={disabled}
+                      onAdd={() => bumpTicket(t.id)}
+                      onRemove={() => trimTicket(t.id)}
+                    />
+                  </li>
+                )
+              })}
+            </ul>
+          </section>
+        ) : null}
+
+        {/* Consumos */}
+        {hasProductCatalog ? (
+          <section className="mt-10">
+            <MinimalSectionTitle
+              title="Consumos"
+              hint={
+                consFrom != null && !consSaleOpen
+                  ? `Disponible desde el ${formatEventDate(consFrom)} · en ${formatCountdown(
+                      consWindow.msLeft
+                    )}`
+                  : null
+              }
+            />
+            <div className="mt-4 space-y-6">
+              {productGroups.map((group) => (
+                <div key={group.id}>
+                  {group.name ? (
+                    <p className="mb-2.5 px-0.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/40">
+                      {group.name}
+                    </p>
+                  ) : null}
+                  <ul className="space-y-2.5">
+                    {group.products.map((p) => {
+                      const count = drinks[p.id] ?? 0
+                      const Icon =
+                        productSaleType(p) === "BOTTLE" ? BottleWine : Wine
+                      return (
+                        <li key={p.id}>
+                          <MinimalPickRow
+                            name={p.name}
+                            priceStr={formatMoneyArsExact(p.price)}
+                            imageUrl={p.imageUrl?.trim() || null}
+                            Icon={Icon}
+                            count={count}
+                            disabled={!productsPurchasable}
+                            onAdd={() =>
+                              setDrinkQty(p.id, Math.min(99, count + 1))
+                            }
+                            onRemove={() => setDrinkQty(p.id, count - 1)}
+                          />
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+      </div>
+
+      {/* Barra de checkout */}
+      <AnimatePresence>
+        {cartCount > 0 ? (
+          <motion.div
+            key="minimal-checkout"
+            initial={{ y: 24, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 24, opacity: 0 }}
+            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+            className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#0a0a0a]/95 px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6"
+          >
+            <div className="mx-auto flex w-full max-w-xl items-center gap-4">
+              <div className="min-w-0">
+                <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/40">
+                  {cartCount} {cartCount === 1 ? "ítem" : "ítems"}
+                </p>
+                <p className="text-xl font-bold tabular-nums tracking-tight text-white">
+                  {formatMoneyArsExact(totalStr)}
+                </p>
+              </div>
+              <Button
+                onClick={continueClick}
+                disabled={!canContinue}
+                className="ml-auto h-[3.25rem] flex-1 rounded-xl bg-white px-6 text-[15px] font-semibold text-black transition-colors hover:bg-white/90 disabled:bg-white/25 disabled:text-white/50"
+              >
+                Continuar al pago
+              </Button>
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+function MinimalSectionTitle({
+  title,
+  hint,
+}: {
+  title: string
+  hint?: string | null
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 border-b border-white/10 pb-3">
+      <h2 className="text-lg font-semibold tracking-tight text-white">{title}</h2>
+      {hint ? (
+        <span className="text-right text-[12px] leading-tight text-white/45">
+          {hint}
+        </span>
+      ) : null}
+    </div>
+  )
+}
+
+function MinimalPickRow({
+  name,
+  priceStr,
+  imageUrl,
+  Icon,
+  count,
+  disabled,
+  onAdd,
+  onRemove,
+}: {
+  name: string
+  priceStr: string
+  imageUrl?: string | null
+  Icon?: typeof Wine
+  count: number
+  disabled: boolean
+  onAdd: () => void
+  onRemove: () => void
+}) {
+  const active = count > 0
+  return (
+    <div
+      className={`flex items-center gap-3.5 rounded-xl border px-3.5 py-3 transition-colors ${
+        active
+          ? "border-white/25 bg-white/[0.04]"
+          : "border-white/10 bg-transparent"
+      } ${disabled ? "opacity-40" : ""}`}
+    >
+      {imageUrl ? (
+        <img
+          src={imageUrl}
+          alt={name}
+          className="size-12 shrink-0 rounded-lg object-cover"
+          loading="lazy"
+          decoding="async"
+        />
+      ) : Icon ? (
+        <span className="flex size-12 shrink-0 items-center justify-center rounded-lg border border-white/10">
+          <Icon className="size-5 text-white/70" strokeWidth={1.75} aria-hidden />
+        </span>
+      ) : null}
+
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[15px] font-semibold leading-tight text-white">
+          {name}
+        </p>
+        <p className="mt-0.5 text-[13px] font-medium tabular-nums text-white/50">
+          {priceStr}
+        </p>
+      </div>
+
+      {active ? (
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            onClick={onRemove}
+            className="flex size-9 items-center justify-center rounded-lg border border-white/15 text-white/70 transition-colors hover:bg-white/[0.06] hover:text-white"
+            aria-label={`Quitar ${name}`}
+          >
+            <Minus className="size-4" aria-hidden />
+          </button>
+          <span className="w-6 text-center text-[15px] font-bold tabular-nums text-white">
+            {count}
+          </span>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={onAdd}
+            className="flex size-9 items-center justify-center rounded-lg border border-white/15 text-white/70 transition-colors hover:bg-white/[0.06] hover:text-white disabled:opacity-40"
+            aria-label={`Sumar ${name}`}
+          >
+            <Plus className="size-4" aria-hidden />
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={onAdd}
+          className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white text-black transition-transform hover:scale-105 active:scale-95 disabled:bg-white/25 disabled:text-white/50"
+          aria-label={`Agregar ${name}`}
+        >
+          <Plus className="size-4" strokeWidth={2.5} aria-hidden />
+        </button>
+      )}
     </div>
   )
 }
