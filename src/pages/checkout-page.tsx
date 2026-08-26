@@ -39,6 +39,41 @@ const STEPS: Array<{ key: Step; label: string }> = [
   { key: "pay", label: "Pago" },
 ]
 
+// Al volver desde el checkout, la página del evento solo restaura la parte de
+// consumos si encuentra este flag (una visita normal al link arranca limpia).
+function setEventRestoreFlag(slug: string | null) {
+  if (!slug) return
+  try {
+    sessionStorage.setItem(`crow_restore_progress_${slug}`, "1")
+  } catch { /* noop */ }
+}
+
+// Borra el progreso de compra guardado por la página del evento (localStorage
+// keyed por slug — el eventId de la URL no coincide con el slug, así que se
+// limpian ambos) y el flag de restauración: al reingresar al link del evento
+// después de comprar, se ve la pantalla normal, no la de consumos.
+function clearEventProgress(eventId: string | undefined, slug: string | null) {
+  try {
+    if (eventId) localStorage.removeItem(`crow_event_progress_${eventId}`)
+    if (slug) {
+      localStorage.removeItem(`crow_event_progress_${slug}`)
+      sessionStorage.removeItem(`crow_restore_progress_${slug}`)
+    }
+  } catch { /* noop */ }
+}
+
+// Teléfonos argentinos: el prefijo +54 se agrega automáticamente. Los dígitos
+// se normalizan (se descarta un "54" o "0" inicial ya incluido) y se recortan a
+// 10, que es el largo de un número local.
+function normalizeArPhone(raw: string): string {
+  const digits = raw.replace(/\D/g, "")
+  let local = digits
+  if (local.startsWith("54")) local = local.slice(2)
+  else if (local.startsWith("0")) local = local.slice(1)
+  local = local.slice(0, 10)
+  return local ? `+54${local}` : ""
+}
+
 export function CheckoutPage() {
   const { eventId } = useParams<{ eventId: string }>()
   const navigate = useNavigate()
@@ -88,10 +123,14 @@ export function CheckoutPage() {
 
   // Tarea 2.1 — el DNI es requerido y numérico: es la identidad del comprador en la puerta.
   const dniValid = /^\d{6,9}$/.test(dni.trim())
+  // Teléfono: número local argentino (8 a 10 dígitos, sin contar el +54).
+  const phoneDigits = phone.replace(/\D/g, "").replace(/^54/, "")
   const contactValid =
-    name.trim().length >= 2 && dniValid && email.includes("@") && phone.trim().length >= 6
+    name.trim().length >= 2 && dniValid && email.includes("@") && phoneDigits.length >= 8
 
   const goToEventPage = () => {
+    // Volver desde el checkout restaura la parte de consumos del evento.
+    setEventRestoreFlag(eventSlug)
     navigate(eventSlug ? `/${eventSlug}` : "/")
   }
 
@@ -170,7 +209,7 @@ export function CheckoutPage() {
       // COMPLETED y debitó el saldo). Sin paso de pago: directo al comprobante.
       if (method === "SALDO") {
         clearCart()
-        try { localStorage.removeItem(`crow_event_progress_${eventId}`) } catch { /* noop */ }
+        clearEventProgress(eventId, eventSlug)
         navigate(`/receipt/${data.receiptToken}`)
         return
       }
@@ -179,7 +218,7 @@ export function CheckoutPage() {
       const redirectUrl = data.redirectUrl
       if (method === "MERCADOPAGO" && redirectUrl) {
         clearCart()
-        try { localStorage.removeItem(`crow_event_progress_${eventId}`) } catch { /* noop */ }
+        clearEventProgress(eventId, eventSlug)
         window.location.href = redirectUrl
         return
       }
@@ -197,7 +236,7 @@ export function CheckoutPage() {
       setConfirmedTotal(totalStr)
       setResult(data)
       clearCart()
-      try { localStorage.removeItem(`crow_event_progress_${eventId}`) } catch { /* noop */ }
+      clearEventProgress(eventId, eventSlug)
       setStep("pay")
     } catch (e) {
       setErr(e instanceof Error ? e.message : "No pudimos confirmar el pago.")
@@ -208,13 +247,15 @@ export function CheckoutPage() {
 
   if (!hydrated) return null
   if (!snapshot && !result) {
+    setEventRestoreFlag(eventSlug)
     navigate(eventSlug ? `/${eventSlug}` : "/", { replace: true })
     return null
   }
 
   return (
-    <div className="relative min-h-dvh bg-black">
-      <header className="sticky top-0 z-20 border-b border-white/[0.04] bg-black/70 px-5 pb-4 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-xl sm:px-8">
+    // Mismo fondo que la página del evento (diseño minimalista).
+    <div className="relative min-h-dvh bg-[#0a0a0a]">
+      <header className="sticky top-0 z-20 border-b border-white/[0.04] bg-[#0a0a0a]/70 px-5 pb-4 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-xl sm:px-8">
         <div className="mx-auto flex w-full max-w-lg flex-col gap-6">
           <div className="flex items-center justify-between">
             <button
@@ -441,7 +482,8 @@ function ContactStep({
           id="co-phone"
           label="Teléfono"
           value={phone}
-          onChange={setPhone}
+          onChange={(v) => setPhone(normalizeArPhone(v))}
+          prefix="+54"
           type="tel"
           inputMode="tel"
           autoComplete="tel"
@@ -469,6 +511,7 @@ function FloatingField({
   type = "text",
   autoComplete,
   inputMode,
+  prefix,
 }: {
   id: string
   label: string
@@ -477,7 +520,10 @@ function FloatingField({
   type?: string
   autoComplete?: string
   inputMode?: "text" | "email" | "tel" | "numeric"
+  prefix?: string
 }) {
+  const displayedValue = prefix && value.startsWith(prefix) ? value.slice(prefix.length) : value
+
   return (
     <div>
       <label
@@ -486,15 +532,20 @@ function FloatingField({
       >
         {label}
       </label>
-      <input
-        id={id}
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        inputMode={inputMode}
-        autoComplete={autoComplete}
-        className="mt-3 w-full border-0 border-b border-white/[0.12] bg-transparent px-0 py-3 text-xl font-medium text-white outline-none transition-colors placeholder:text-white/25 focus:border-white"
-      />
+      <div className="mt-3 flex items-center border-b border-white/[0.12] transition-colors focus-within:border-white">
+        {prefix ? (
+          <span className="shrink-0 py-3 text-xl font-medium text-white/40">{prefix}</span>
+        ) : null}
+        <input
+          id={id}
+          type={type}
+          value={displayedValue}
+          onChange={(e) => onChange(e.target.value)}
+          inputMode={inputMode}
+          autoComplete={autoComplete}
+          className="min-w-0 flex-1 border-0 bg-transparent px-0 py-3 text-xl font-medium text-white outline-none placeholder:text-white/25"
+        />
+      </div>
     </div>
   )
 }

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useNavigate, useParams } from "react-router"
 import {
   BottleWine,
+  MapPin,
   Minus,
   Plus,
   Ticket,
@@ -45,9 +46,33 @@ function readSavedProgress(slugOrId: string | undefined) {
       commerceSurface?: CommerceSurface
       ticketQtys?: Record<string, number>
       drinks?: Record<string, number>
+      minimalStep?: MinimalStep
     }
   } catch {
     return null
+  }
+}
+
+/**
+ * Flag que deja checkout-page al volver atrás: la página del evento solo
+ * restaura la parte de consumos cuando viene de ahí (vuelta con "Volver" o
+ * swipe atrás desde el checkout). Una visita normal al link del evento arranca
+ * limpia, con la pantalla normal, sin importar qué quedó guardado en
+ * localStorage. El Set tolera el doble-montaje de StrictMode en dev: el flag se
+ * consume una sola vez por carga del documento.
+ */
+const consumedRestoreFlags = new Set<string>()
+
+function consumeRestoreFlag(slug: string | undefined): boolean {
+  if (!slug) return false
+  if (consumedRestoreFlags.has(slug)) return true
+  try {
+    const raw = sessionStorage.getItem(`crow_restore_progress_${slug}`)
+    sessionStorage.removeItem(`crow_restore_progress_${slug}`)
+    if (raw !== null) consumedRestoreFlags.add(slug)
+    return raw !== null
+  } catch {
+    return false
   }
 }
 
@@ -77,11 +102,14 @@ export function EventDetailPage() {
 
   const [data, setData] = useState<PublicEventDetailResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [purchaseOpen, setPurchaseOpen] = useState<boolean>(() => readSavedProgress(slug)?.purchaseOpen ?? false)
-  const [commerceSurface, setCommerceSurface] = useState<CommerceSurface>(() => readSavedProgress(slug)?.commerceSurface ?? "hero")
+  const [restoreSession] = useState(() => consumeRestoreFlag(slug))
+  const savedProgress = restoreSession ? readSavedProgress(slug) : null
+  const [purchaseOpen, setPurchaseOpen] = useState<boolean>(() => savedProgress?.purchaseOpen ?? false)
+  const [commerceSurface, setCommerceSurface] = useState<CommerceSurface>(() => savedProgress?.commerceSurface ?? "hero")
   const [workflow, setWorkflow] = useState<PurchaseWorkflow | null>(null)
-  const [ticketQtys, setTicketQtys] = useState<Record<string, number>>(() => readSavedProgress(slug)?.ticketQtys ?? {})
-  const [drinks, setDrinks] = useState<Record<string, number>>(() => readSavedProgress(slug)?.drinks ?? {})
+  const [ticketQtys, setTicketQtys] = useState<Record<string, number>>(() => savedProgress?.ticketQtys ?? {})
+  const [drinks, setDrinks] = useState<Record<string, number>>(() => savedProgress?.drinks ?? {})
+  const [minimalStep, setMinimalStep] = useState<MinimalStep>(() => savedProgress?.minimalStep ?? "cover")
 
   const ticketsFrom = data?.event.ticketsAvailableFrom ?? null
   const consFrom = data?.event.consumptionsAvailableFrom ?? null
@@ -96,15 +124,16 @@ export function EventDetailPage() {
       .then((r) => {
         console.log("r")
         console.log(r)
-        const saved = readSavedProgress(slug)
+        const saved = restoreSession ? readSavedProgress(slug) : null
         setData(r)
         setTicketQtys(saved?.ticketQtys ?? {})
         setDrinks(saved?.drinks ?? {})
         setPurchaseOpen(saved?.purchaseOpen ?? false)
         setCommerceSurface(saved?.commerceSurface ?? "hero")
+        setMinimalStep(saved?.minimalStep ?? "cover")
       })
       .catch(() => setError("No pudimos cargar el evento."))
-  }, [slug])
+  }, [slug, restoreSession])
 
   useEffect(() => {
     load()
@@ -191,7 +220,6 @@ export function EventDetailPage() {
 
   const showTicketStep = !!data && workflow === "tickets"
   const showProductStep = !!data && workflow === "products"
-
   const canContinue =
     (ticketCount > 0 && ticketsBuyable) || (hasDrinks && drinksBuyable)
 
@@ -298,10 +326,10 @@ export function EventDetailPage() {
     try {
       localStorage.setItem(
         `crow_event_progress_${slug}`,
-        JSON.stringify({ purchaseOpen, commerceSurface, ticketQtys, drinks })
+        JSON.stringify({ purchaseOpen, commerceSurface, ticketQtys, drinks, minimalStep })
       )
     } catch { /* noop */ }
-  }, [slug, purchaseOpen, commerceSurface, ticketQtys, drinks])
+  }, [slug, purchaseOpen, commerceSurface, ticketQtys, drinks, minimalStep])
 
   useEffect(() => {
     if (purchaseOpen || ctaDisabled) return
@@ -345,6 +373,8 @@ export function EventDetailPage() {
         hasProductCatalog={hasProductCatalog}
         anyTicketPurchasable={anyTicketPurchasable}
         productsPurchasable={productsPurchasable}
+        initialStep={minimalStep}
+        onStepChange={setMinimalStep}
       />
     )
   }
@@ -362,15 +392,8 @@ export function EventDetailPage() {
             alt={data?.event.name ?? ""}
             className="h-full w-full object-cover"
             initial={{ scale: 1.06, opacity: 0 }}
-            animate={{
-              scale: flyerVisible ? 1 : 1.08,
-              opacity: flyerVisible ? 1 : 0,
-            }}
-            transition={
-              flyerVisible
-                ? { duration: 1.2, ease: [0.16, 1, 0.3, 1] }
-                : STORE_TRANSITION
-            }
+            animate={{ scale: flyerVisible ? 1 : 1.08, opacity: flyerVisible ? 1 : 0 }}
+            transition={flyerVisible ? { duration: 1.2, ease: [0.16, 1, 0.3, 1] } : STORE_TRANSITION}
             loading="eager"
             decoding="async"
           />
@@ -404,10 +427,7 @@ export function EventDetailPage() {
       />
 
       {showStore ? (
-        <div
-          aria-hidden
-          className="pointer-events-none fixed inset-x-0 top-0 z-20 h-28 bg-gradient-to-b from-black/70 to-transparent"
-        />
+        <div aria-hidden className="pointer-events-none fixed inset-x-0 top-0 z-20 h-28 bg-gradient-to-b from-black/70 to-transparent" />
       ) : null}
 
       <div
@@ -616,8 +636,6 @@ function StepShell({ children }: { children: React.ReactNode }) {
   )
 }
 
-
-
 function TicketStep({
   data,
   ticketsFrom,
@@ -710,7 +728,7 @@ function TicketPickRow({
     <motion.div
       layout
       transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-      className={`relative overflow-hidden rounded-xl shadow-xl shadow-black/40 mb-1 transition-colors duration-200 ${active
+      className={`relative overflow-hidden rounded-xl shadow-xl shadow-black/40 mb-1 transition-colors duration-200 ${active ? "w-full" : "w-[calc(100%-4.75rem)]"} ${active
         ? "bg-white/[0.2]"
         : "bg-white/[0.2]"
         } ${disabled ? "opacity-40" : ""}`}
@@ -890,7 +908,7 @@ function ConsumosMarketplace({
 }) {
   const products = data.drinkProducts
   const saleOpen = consWindow.open
-  const [shelf, setShelf] = useState<StoreShelf>("glass")
+  const [shelf, setShelf] = useState<StoreShelf | null>(null)
 
   const drinkLines: CartDrinkLine[] = useMemo(() => {
     const out: CartDrinkLine[] = []
@@ -925,14 +943,9 @@ function ConsumosMarketplace({
         onBack={onBack}
       />
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pt-[3.5rem] pb-40 pr-14 sm:pr-[4.5rem] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {products.length === 0 ? (
-          <p className="text-sm text-white/55">
-            No hay consumos digitales para este evento.
-          </p>
-        ) : (
-          <AnimatePresence mode="wait" initial={false}>
-            {shelf === "cart" ? (
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pt-[5.5rem] pb-40 pr-14 sm:pr-[4.5rem] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <AnimatePresence mode="wait" initial={false}>
+            {shelf === null ? null : shelf === "cart" ? (
               <motion.div
                 key="panel-cart"
                 role="tabpanel"
@@ -970,7 +983,7 @@ function ConsumosMarketplace({
                     {groupProductsByCategory(glassProducts, data.productCategories).map((group) => (
                       <div key={group.id}>
                         {group.name ? <CategoryHeading>{group.name}</CategoryHeading> : null}
-                        <ul className="flex flex-col gap-3">
+                        <ul className="grid grid-cols-2 gap-3">
                           {group.products.map((p) => (
                             <li key={p.id}>
                               <ProductShelfRow
@@ -979,10 +992,13 @@ function ConsumosMarketplace({
                                 priceStr={formatMoneyArsExact(p.price)}
                                 disabled={!saleOpen}
                                 count={drinks[p.id] ?? 0}
-                                type="glass"
                                 onAdd={() => {
                                   const q = drinks[p.id] ?? 0
                                   setDrinkQty(p.id, Math.min(99, q + 1))
+                                }}
+                                onRemove={() => {
+                                  const q = drinks[p.id] ?? 0
+                                  setDrinkQty(p.id, q - 1)
                                 }}
                               />
                             </li>
@@ -1012,7 +1028,7 @@ function ConsumosMarketplace({
                     {groupProductsByCategory(bottleProducts, data.productCategories).map((group) => (
                       <div key={group.id}>
                         {group.name ? <CategoryHeading>{group.name}</CategoryHeading> : null}
-                        <ul className="flex flex-col gap-3">
+                        <ul className="grid grid-cols-2 gap-3">
                           {group.products.map((p) => (
                             <li key={p.id}>
                               <ProductShelfRow
@@ -1021,10 +1037,13 @@ function ConsumosMarketplace({
                                 priceStr={formatMoneyArsExact(p.price)}
                                 disabled={!saleOpen}
                                 count={drinks[p.id] ?? 0}
-                                type="bottle"
                                 onAdd={() => {
                                   const q = drinks[p.id] ?? 0
                                   setDrinkQty(p.id, Math.min(99, q + 1))
+                                }}
+                                onRemove={() => {
+                                  const q = drinks[p.id] ?? 0
+                                  setDrinkQty(p.id, q - 1)
                                 }}
                               />
                             </li>
@@ -1037,7 +1056,6 @@ function ConsumosMarketplace({
               </motion.div>
             )}
           </AnimatePresence>
-        )}
       </div>
     </motion.div>
   )
@@ -1049,7 +1067,7 @@ function ConsumosShelfRail({
   cartUnitCount,
   onBack,
 }: {
-  shelf: StoreShelf
+  shelf: StoreShelf | null
   onShelf: (s: StoreShelf) => void
   cartUnitCount: number
   onBack: () => void
@@ -1057,7 +1075,7 @@ function ConsumosShelfRail({
   return (
     <>
       <nav
-        className="pointer-events-auto fixed right-0 top-[20%] z-40 rounded-l-[1.15rem] border border-white/[0.12] border-r-0 bg-zinc-950/[0.96] py-1 pl-1 shadow-[-14px_0_44px_-10px_rgba(0,0,0,0.88)] backdrop-blur-xl"
+        className="pointer-events-auto fixed left-0 top-[max(1rem,env(safe-area-inset-top))] z-40 rounded-r-[1.15rem] border border-l-0 border-white/[0.12] bg-zinc-950/[0.96] py-1 pr-1 shadow-[14px_0_44px_-10px_rgba(0,0,0,0.88)] backdrop-blur-xl"
         aria-label="Volver"
       >
         <ShelfRailButton
@@ -1065,37 +1083,62 @@ function ConsumosShelfRail({
           label="Volver"
           active={false}
           onClick={() => onBack()}
+          dockEdge="left"
         >
           <ChevronLeft className="size-[1.35rem]" strokeWidth={2} aria-hidden />
         </ShelfRailButton>
       </nav>
 
-      <nav
-        className="pointer-events-auto fixed right-0 top-1/2 z-40 flex -translate-y-1/2 flex-col gap-px rounded-l-[1.15rem] border border-white/[0.12] border-r-0 bg-zinc-950/[0.96] py-1 pl-1 shadow-[-14px_0_44px_-10px_rgba(0,0,0,0.88)] backdrop-blur-xl"
+      <AnimatePresence initial={false}>
+        {shelf === null ? (
+          <motion.h2
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.24 }}
+            className="pointer-events-none fixed inset-x-0 top-[calc(50%-9rem)] z-40 px-6 text-center text-xl font-semibold leading-tight text-white"
+          >
+            <span className="block">Elegí qué consumos</span>
+            <span className="block">querés comprar</span>
+          </motion.h2>
+        ) : null}
+      </AnimatePresence>
+
+      <motion.nav
+        layout
+        initial={false}
+        animate={{ right: shelf === null ? "calc(50% - 6.5rem)" : 0 }}
+        transition={STORE_SHELF_TRANSITION}
+        className={`pointer-events-auto fixed top-1/2 z-40 flex -translate-y-1/2 flex-col gap-px border border-white/[0.12] bg-zinc-950/[0.96] py-1 pl-1 shadow-[-14px_0_44px_-10px_rgba(0,0,0,0.88)] backdrop-blur-xl ${
+          shelf === null ? "w-52 rounded-[1.15rem] pr-1" : "rounded-l-[1.15rem] border-r-0"
+        }`}
         aria-label="Secciones"
       >
         <motion.div layout className="flex flex-col gap-px" transition={STORE_SHELF_TRANSITION}>
           <ShelfRailButton
             id="shelf-glass"
-            label="Ver copas"
+            label="Tragos"
             active={shelf === "glass"}
             onClick={() => onShelf("glass")}
+            docked={shelf !== null}
           >
             <Wine className="size-[1.35rem]" strokeWidth={2} aria-hidden />
           </ShelfRailButton>
           <ShelfRailButton
             id="shelf-bottle"
-            label="Ver botellas"
+            label="Botellas"
             active={shelf === "bottle"}
             onClick={() => onShelf("bottle")}
+            docked={shelf !== null}
           >
             <BottleWine className="size-[1.35rem]" strokeWidth={2} aria-hidden />
           </ShelfRailButton>
           <ShelfRailButton
             id="shelf-cart"
-            label="Ver carrito"
+            label="Tus Tickets"
             active={shelf === "cart"}
             onClick={() => onShelf("cart")}
+            docked={shelf !== null}
           >
             <span className="relative inline-flex">
               <Ticket className="size-[1.35rem]" strokeWidth={2} aria-hidden />
@@ -1107,7 +1150,7 @@ function ConsumosShelfRail({
             </span>
           </ShelfRailButton>
         </motion.div>
-      </nav>
+      </motion.nav>
     </>
   )
 }
@@ -1117,12 +1160,16 @@ function ShelfRailButton({
   label,
   active,
   onClick,
+  docked = true,
+  dockEdge = "right",
   children,
 }: {
   id: string
   label: string
   active: boolean
   onClick: () => void
+  docked?: boolean
+  dockEdge?: "left" | "right"
   children: ReactNode
 }) {
   return (
@@ -1132,12 +1179,13 @@ function ShelfRailButton({
       aria-label={label}
       aria-pressed={active}
       onClick={onClick}
-      className={`relative flex size-[3.25rem] items-center justify-center rounded-l-xl outline-none transition-colors focus-visible:ring-2 focus-visible:ring-white/35 ${active
+      className={`relative flex h-[3.25rem] items-center outline-none transition-all focus-visible:ring-2 focus-visible:ring-white/35 ${docked ? `w-[3.25rem] justify-center ${dockEdge === "left" ? "rounded-r-xl" : "rounded-l-xl"}` : "w-full justify-start gap-3 rounded-xl px-4"} ${active
         ? "bg-white text-black shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]"
         : "text-white/72 hover:bg-white/[0.08] hover:text-white"
         }`}
     >
       {children}
+      {!docked ? <span className="text-sm font-semibold">{label}</span> : null}
     </button>
   )
 }
@@ -1149,6 +1197,7 @@ function ProductShelfRow({
   disabled,
   count,
   onAdd,
+  onRemove,
 }: {
   name: string
   imageUrl?: string | null
@@ -1156,7 +1205,7 @@ function ProductShelfRow({
   disabled: boolean
   count: number
   onAdd: () => void
-  type: "glass" | "bottle"
+  onRemove: () => void
 }) {
   const [tapTick, setTapTick] = useState(0)
   const showPhoto = Boolean(imageUrl)
@@ -1167,15 +1216,12 @@ function ProductShelfRow({
     setTapTick((t) => t + 1)
   }
 
-  if (showPhoto) {
-    return (
-      <motion.button
-        type="button"
-        disabled={disabled}
-        onClick={triggerAdd}
-        whileTap={disabled ? undefined : { scale: 0.988 }}
-        className="group relative aspect-[4/5] w-64 overflow-hidden rounded-2xl bg-zinc-950 ml-6 text-left outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:pointer-events-none disabled:opacity-45"
+  return (
+      <motion.div
+        layout
+        className={`group relative aspect-[4/5] w-full overflow-hidden rounded-2xl border border-white/[0.07] bg-zinc-950 text-left ${disabled ? "opacity-45" : ""}`}
       >
+        {showPhoto ? (
         <img
           src={imageUrl!}
           alt={name}
@@ -1183,12 +1229,25 @@ function ProductShelfRow({
           loading="lazy"
           decoding="async"
         />
-        <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/95" />
-        <div className="pointer-events-none absolute inset-x-0 top-0 pt-6 pl-4 pr-16">
-          <p className="text-xl text-white">{name}</p>
+        ) : (
+          <div className="absolute inset-0 bg-[#141414]" />
+        )}
+        {showPhoto ? (
+          <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/95" />
+        ) : null}
+        <motion.button
+          type="button"
+          disabled={disabled}
+          onClick={triggerAdd}
+          whileTap={disabled ? undefined : { scale: 0.985 }}
+          aria-label={`Agregar ${name}`}
+          className="absolute inset-0 z-10 rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/35 disabled:pointer-events-none"
+        />
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-[11] px-3 pt-3 pr-12">
+          <p className="text-[15px] font-semibold leading-tight text-white sm:text-base">{name}</p>
         </div>
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 pb-6 pl-4">
-          <p className="text-xl font-bold tabular-nums text-white/85">{priceStr}</p>
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[11] px-3 pb-3 pr-12">
+          <p className="text-base font-bold tabular-nums text-white/85 sm:text-lg">{priceStr}</p>
         </div>
 
         {tapTick > 0 ? (
@@ -1198,65 +1257,44 @@ function ProductShelfRow({
             initial={{ opacity: 0.9 }}
             animate={{ opacity: 0 }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-            className="pointer-events-none absolute inset-0 rounded-2xl ring-[1.5px] ring-inset ring-white/55"
+            className="pointer-events-none absolute inset-0 z-30 rounded-2xl ring-[1.5px] ring-inset ring-white/55"
           />
         ) : null}
 
-        <AnimatePresence>
+        <AnimatePresence initial={false}>
           {count > 0 ? (
             <motion.div
-              key="qty-badge"
+              key="qty-controls"
               initial={{ opacity: 0, scale: 0.55, y: -6 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.55, y: -4 }}
               transition={{ type: "spring", stiffness: 500, damping: 28 }}
-              className="absolute right-4 top-6 z-10"
+              className="absolute right-2.5 top-2.5 z-20 flex items-center gap-1.5"
             >
-              <QuantityBadge value={count} />
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
-      </motion.button>
-    )
-  }
-
-  return (
-    <motion.button
-      type="button"
-      disabled={disabled}
-      onClick={triggerAdd}
-      whileTap={disabled ? undefined : { scale: 0.985 }}
-      className="relative flex w-full items-center justify-between gap-4 rounded-2xl border border-white/[0.07] bg-white/[0.04] px-4 py-3.5 text-left outline-none transition-colors hover:bg-white/[0.06] focus-visible:ring-2 focus-visible:ring-white/30 disabled:pointer-events-none disabled:opacity-45"
-    >
-      <p className="min-w-0 flex-1 text-[15px] font-semibold leading-snug text-white">{name}</p>
-      <div className="flex shrink-0 items-center gap-3">
-        <p className="text-sm font-medium tabular-nums text-white/50">{priceStr}</p>
-        <AnimatePresence initial={false}>
-          {count > 0 ? (
-            <motion.div
-              key="qty"
-              initial={{ opacity: 0, scale: 0.5, width: 0 }}
-              animate={{ opacity: 1, scale: 1, width: "auto" }}
-              exit={{ opacity: 0, scale: 0.5, width: 0 }}
-              transition={{ type: "spring", stiffness: 520, damping: 28 }}
-              className="overflow-hidden"
-            >
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={onRemove}
+                aria-label={`Quitar ${name}`}
+                className="flex size-7 items-center justify-center rounded-full bg-black/75 text-white shadow-lg backdrop-blur-sm transition-colors hover:bg-black disabled:pointer-events-none"
+              >
+                <Minus className="size-3.5" strokeWidth={2.5} aria-hidden />
+              </button>
               <QuantityBadge value={count} size="sm" />
             </motion.div>
-          ) : null}
+          ) : (
+            <motion.span
+              key="add-indicator"
+              initial={{ opacity: 0, scale: 0.7 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.7 }}
+              className="pointer-events-none absolute bottom-2.5 right-2.5 z-20 flex size-7 items-center justify-center rounded-full bg-white text-black"
+            >
+              <Plus className="size-3.5" strokeWidth={2.5} aria-hidden />
+            </motion.span>
+          )}
         </AnimatePresence>
-      </div>
-      {tapTick > 0 ? (
-        <motion.div
-          key={`flash-${tapTick}`}
-          aria-hidden
-          initial={{ opacity: 0.75 }}
-          animate={{ opacity: 0 }}
-          transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-          className="pointer-events-none absolute inset-0 rounded-2xl ring-[1.5px] ring-inset ring-white/45"
-        />
-      ) : null}
-    </motion.button>
+      </motion.div>
   )
 }
 
@@ -1430,7 +1468,20 @@ function StoreCartPanel({
 // DISEÑO MINIMALISTA (dark, sin glassmorphism) — multi-paso, estilo Apple
 // -----------------------------------------------------------------------------
 
-type MinimalStep = "cover" | "tickets" | "store"
+/*
+ * MAPA MINIMALISTA RESERVADO
+ *
+ * Se mantiene apartado del layout activo para integrarlo más adelante con el
+ * nuevo flujo. El bloque anterior era:
+ *
+ *   {data.event.location ? (
+ *     <div className="mt-6 px-1">
+ *       <EventMap location={data.event.location} />
+ *     </div>
+ *   ) : null}
+ */
+
+type MinimalStep = "cover" | "store"
 
 const MINIMAL_SPRING: Transition = { type: "spring", stiffness: 380, damping: 36 }
 
@@ -1460,6 +1511,8 @@ function MinimalEventDetail({
   hasProductCatalog,
   anyTicketPurchasable,
   productsPurchasable,
+  initialStep,
+  onStepChange,
 }: {
   data: PublicEventDetailResponse
   ticketsFrom: Date | string | null
@@ -1480,13 +1533,18 @@ function MinimalEventDetail({
   hasProductCatalog: boolean
   anyTicketPurchasable: boolean
   productsPurchasable: boolean
+  initialStep: MinimalStep
+  onStepChange: (step: MinimalStep) => void
 }) {
-  const [step, setStep] = useState<MinimalStep>("cover")
+  const [step, setStep] = useState<MinimalStep>(initialStep)
+  const [returnToOpenTickets, setReturnToOpenTickets] = useState(false)
+  const [savedDrawerTravelY, setSavedDrawerTravelY] = useState(0)
   const dirRef = useRef(1)
 
   const go = (next: MinimalStep, dir: number) => {
     dirRef.current = dir
     setStep(next)
+    onStepChange(next)
   }
 
   const ticketCount = ticketLines.reduce((a, l) => a + l.quantity, 0)
@@ -1510,19 +1568,23 @@ function MinimalEventDetail({
     ? "No disponible"
     : !anythingPurchasable
       ? "Próximamente"
-      : "Comprar"
+      : anyTicketPurchasable
+        ? "Comprar Entradas"
+        : "Comprar Consumos"
 
   const startBuy = () => {
     if (coverCtaDisabled) return
-    go(hasTicketCatalog ? "tickets" : "store", 1)
+    go("store", 1)
   }
   const ticketsNext = () => {
-    if (hasProductCatalog) go("store", 1)
+    if (hasProductCatalog) {
+      setReturnToOpenTickets(true)
+      go("store", 1)
+    }
     else continueClick()
   }
   const back = () => {
-    if (step === "store") go(hasTicketCatalog ? "tickets" : "cover", -1)
-    else if (step === "tickets") go("cover", -1)
+    if (step === "store") go("cover", -1)
   }
 
   return (
@@ -1540,23 +1602,6 @@ function MinimalEventDetail({
           >
             <MinimalCover
               data={data}
-              ctaLabel={coverCtaLabel}
-              ctaDisabled={coverCtaDisabled}
-              onStart={startBuy}
-            />
-          </motion.div>
-        ) : step === "tickets" ? (
-          <motion.div
-            key="tickets"
-            custom={dirRef.current}
-            variants={minimalStepVariants}
-            initial="enter"
-            animate="center"
-            exit="exit"
-            transition={MINIMAL_SPRING}
-          >
-            <MinimalTicketsStep
-              data={data}
               ticketsFrom={ticketsFrom}
               ticketsWindow={ticketsWindow}
               ticketQtys={ticketQtys}
@@ -1565,12 +1610,16 @@ function MinimalEventDetail({
               anyTicketPurchasable={anyTicketPurchasable}
               totalStr={totalStr}
               cartCount={ticketCount}
-              onBack={back}
               primaryLabel={hasProductCatalog ? "Continuar" : "Continuar al pago"}
-              primaryEnabled={
-                hasProductCatalog ? canGoStoreFromTickets : canContinue
-              }
+              primaryEnabled={hasProductCatalog ? canGoStoreFromTickets : canContinue}
               onPrimary={ticketsNext}
+              opensTickets={anyTicketPurchasable}
+              ctaLabel={coverCtaLabel}
+              ctaDisabled={coverCtaDisabled}
+              onStart={startBuy}
+              initialDrawerOpen={returnToOpenTickets}
+              initialPurchaseTravelY={savedDrawerTravelY}
+              onDrawerTravelY={setSavedDrawerTravelY}
             />
           </motion.div>
         ) : (
@@ -1608,84 +1657,6 @@ function MinimalEventDetail({
 
 function MinimalCover({
   data,
-  ctaLabel,
-  ctaDisabled,
-  onStart,
-}: {
-  data: PublicEventDetailResponse
-  ctaLabel: string
-  ctaDisabled: boolean
-  onStart: () => void
-}) {
-  const hero = data.event.imageUrl ?? null
-  return (
-    <div className="flex min-h-dvh flex-col">
-      <div className="flex-1 overflow-y-auto px-5 pt-8 pb-36 sm:px-6">
-        <div className="mx-auto w-full max-w-md">
-          <motion.div
-            initial={{ opacity: 0, y: 24, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ ...MINIMAL_SPRING, delay: 0.04 }}
-            className="flex items-center justify-center overflow-hidden rounded-[26px] bg-neutral-950"
-          >
-            {hero ? (
-              <img
-                src={hero}
-                alt={data.event.name}
-                className="max-h-[72vh] w-full object-contain"
-                loading="eager"
-                decoding="async"
-              />
-            ) : (
-              <div className="flex aspect-[4/5] w-full items-center justify-center px-8 text-center">
-                <span className="text-2xl font-semibold tracking-tight text-white/45">
-                  {data.event.name}
-                </span>
-              </div>
-            )}
-          </motion.div>
-
-          <motion.header
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ ...MINIMAL_SPRING, delay: 0.12 }}
-            className="mt-7 space-y-2.5 px-1"
-          >
-            <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-white/45">
-              {formatEventDay(data.event.date)}
-            </p>
-            <h1 className="text-[2.35rem] font-bold leading-[1.05] tracking-[-0.02em] text-white sm:text-[2.6rem]">
-              {data.event.name}
-            </h1>
-            {data.event.location ? (
-              <p className="text-[16px] text-white/55">{data.event.location}</p>
-            ) : null}
-          </motion.header>
-
-          {data.event.location ? (
-            <div className="mt-6 px-1">
-              <EventMap location={data.event.location} />
-            </div>
-          ) : null}
-        </div>
-      </div>
-
-      <MinimalBottomBar>
-        <button
-          type="button"
-          onClick={onStart}
-          disabled={ctaDisabled}
-          className="h-[3.5rem] w-full rounded-full bg-white text-[17px] font-semibold text-black transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-white/15 disabled:text-white/45"
-        >
-          {ctaLabel}
-        </button>
-      </MinimalBottomBar>
-    </div>
-  )
-}
-
-function MinimalTicketsStep({
-  data,
   ticketsFrom,
   ticketsWindow,
   ticketQtys,
@@ -1694,10 +1665,16 @@ function MinimalTicketsStep({
   anyTicketPurchasable,
   totalStr,
   cartCount,
-  onBack,
   primaryLabel,
   primaryEnabled,
   onPrimary,
+  opensTickets,
+  ctaLabel,
+  ctaDisabled,
+  onStart,
+  initialDrawerOpen,
+  initialPurchaseTravelY,
+  onDrawerTravelY,
 }: {
   data: PublicEventDetailResponse
   ticketsFrom: Date | string | null
@@ -1708,71 +1685,287 @@ function MinimalTicketsStep({
   anyTicketPurchasable: boolean
   totalStr: string
   cartCount: number
-  onBack: () => void
   primaryLabel: string
   primaryEnabled: boolean
   onPrimary: () => void
+  opensTickets: boolean
+  ctaLabel: string
+  ctaDisabled: boolean
+  onStart: () => void
+  initialDrawerOpen: boolean
+  initialPurchaseTravelY: number
+  onDrawerTravelY: (value: number) => void
 }) {
+  const hero = data.event.imageUrl ?? null
+  const [drawerOpen, setDrawerOpen] = useState(initialDrawerOpen)
+  const [ticketsReady, setTicketsReady] = useState(initialDrawerOpen)
+  const [mapExpanded, setMapExpanded] = useState(false)
+  const [purchaseTravelY, setPurchaseTravelY] = useState(initialPurchaseTravelY)
+  const purchaseHeaderRef = useRef<HTMLElement | null>(null)
+  const drawerCycleRef = useRef(0)
+  const titleLength = data.event.name.trim().length
+  const titleSize = titleLength > 54
+    ? "clamp(1.3rem, 5.6vw, 1.8rem)"
+    : titleLength > 32
+      ? "clamp(1.6rem, 6.8vw, 2.15rem)"
+      : "clamp(2rem, 8.8vw, 2.6rem)"
+
+  const start = () => {
+    if (ctaDisabled) return
+    if (!opensTickets) {
+      onStart()
+      return
+    }
+
+    const headerTop = purchaseHeaderRef.current?.getBoundingClientRect().top
+    const openDrawerHeaderTop = window.innerHeight * 0.4 + 45
+    const travelY = headerTop == null ? 0 : openDrawerHeaderTop - headerTop
+    drawerCycleRef.current += 1
+    setPurchaseTravelY(travelY)
+    onDrawerTravelY(travelY)
+    setDrawerOpen(true)
+  }
+
+  const closeDrawer = () => {
+    if (!drawerOpen) return
+    drawerCycleRef.current += 1
+    setMapExpanded(false)
+    setTicketsReady(false)
+    window.requestAnimationFrame(() => setDrawerOpen(false))
+  }
+
+  useEffect(() => {
+    if (!drawerOpen) return
+    const cycle = drawerCycleRef.current
+    const readyTimer = window.setTimeout(() => {
+      if (drawerCycleRef.current === cycle) setTicketsReady(true)
+    }, 520)
+    return () => window.clearTimeout(readyTimer)
+  }, [drawerOpen])
+
   const saleOpen = ticketsWindow.open
+
   return (
-    <div className="flex min-h-dvh flex-col">
-      <MinimalStepHeader title="Entradas" eventName={data.event.name} onBack={onBack} />
-      <div className="flex-1 overflow-y-auto px-5 pb-36 pt-5 sm:px-6">
-        <div className="mx-auto w-full max-w-md">
-          <div className="mb-6 flex items-baseline justify-between gap-3">
-            <h2 className="text-[26px] font-bold tracking-[-0.02em] text-white">
-              Elegí tus entradas
-            </h2>
+    <div className="relative h-dvh overflow-hidden bg-[#0a0a0a]">
+      <motion.div
+        initial={{ opacity: 0, y: 20, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: drawerOpen ? 1.5 : 1 }}
+        transition={MINIMAL_SPRING}
+        style={{ transformOrigin: "top center" }}
+        className="absolute inset-x-5 top-[max(2rem,env(safe-area-inset-top))] mx-auto flex max-w-md items-center justify-center overflow-hidden rounded-[26px] bg-neutral-950 sm:inset-x-6"
+      >
+        {hero ? (
+          <img
+            src={hero}
+            alt={data.event.name}
+            className="max-h-[72dvh] w-full object-contain"
+            loading="eager"
+            decoding="async"
+          />
+        ) : (
+          <div className="flex aspect-[4/5] w-full items-center justify-center px-8 text-center">
+            <span className="text-2xl font-semibold tracking-tight text-white/45">
+              {data.event.name}
+            </span>
           </div>
+        )}
+      </motion.div>
 
-          {ticketsFrom != null && !saleOpen ? (
-            <p className="mb-5 rounded-2xl bg-white/[0.05] px-4 py-3 text-[13px] text-white/55">
-              Venta desde el {formatEventDate(ticketsFrom)} · en{" "}
-              <span className="font-semibold tabular-nums text-white">
-                {formatCountdown(ticketsWindow.msLeft)}
-              </span>
-            </p>
-          ) : saleOpen && !anyTicketPurchasable ? (
-            <p className="mb-5 rounded-2xl bg-white/[0.05] px-4 py-3 text-[13px] text-white/55">
-              Por ahora no hay entradas disponibles para este evento.
-            </p>
-          ) : null}
+      <motion.button
+        type="button"
+        aria-label="Cerrar selección de entradas"
+        onClick={closeDrawer}
+        disabled={!drawerOpen}
+        initial={false}
+        animate={{ opacity: drawerOpen ? 0.48 : 0 }}
+        transition={{ duration: 0.45 }}
+        className={`absolute inset-0 z-10 bg-black ${drawerOpen ? "pointer-events-auto" : "pointer-events-none"}`}
+      />
 
-          <ul className="space-y-3.5">
-            {data.ticketTypes.map((t, i) => {
-              const count = ticketQtys[t.id] ?? 0
-              const disabled = !t.availableForPurchase || !saleOpen
-              return (
-                <motion.li
-                  key={t.id}
-                  initial={{ opacity: 0, y: 16 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ ...MINIMAL_SPRING, delay: 0.04 + i * 0.06 }}
-                >
-                  <MinimalTicketRow
-                    name={t.name}
-                    priceStr={formatMoneyArsExact(t.price)}
-                    count={count}
-                    disabled={disabled}
-                    onAdd={() => bumpTicket(t.id)}
-                    onRemove={() => trimTicket(t.id)}
-                  />
-                </motion.li>
-              )
-            })}
-          </ul>
+      <AnimatePresence initial={false}>
+        {drawerOpen && data.event.location ? (
+          <motion.div
+            key="location-island"
+            initial={{ opacity: 0, y: -32, scale: 0.92 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -24, scale: 0.94 }}
+            transition={MINIMAL_SPRING}
+            className="pointer-events-none fixed inset-x-0 top-[max(1rem,env(safe-area-inset-top))] z-30 flex justify-center px-5"
+          >
+            <motion.div
+              layout
+              transition={MINIMAL_SPRING}
+              className={`pointer-events-auto overflow-hidden border border-white/[0.1] bg-[#0a0a0a] shadow-2xl shadow-black/70 ${
+                mapExpanded
+                  ? "w-full max-w-md rounded-[24px] p-3"
+                  : "w-[min(16rem,calc(100vw-3rem))] rounded-full px-5 py-3"
+              }`}
+            >
+              <button
+                type="button"
+                onClick={() => setMapExpanded((expanded) => !expanded)}
+                aria-expanded={mapExpanded}
+                className="block w-full text-white"
+              >
+                <span className="flex min-w-0 items-center justify-center gap-2">
+                  <MapPin className="size-4 shrink-0 text-white/70" aria-hidden />
+                  <span className="truncate text-[14px] font-semibold">
+                    {data.event.location}
+                  </span>
+                </span>
+                <span className="mt-0.5 block text-center text-[11px] font-medium text-white/45">
+                  {mapExpanded ? "Ocultar ubicación" : "Ver ubicación"}
+                </span>
+              </button>
+
+              <AnimatePresence initial={false}>
+                {mapExpanded ? (
+                  <motion.div
+                    key="location-map"
+                    initial={{ height: 0, opacity: 0, y: -8 }}
+                    animate={{ height: "auto", opacity: 1, y: 0 }}
+                    exit={{ height: 0, opacity: 0, y: -8 }}
+                    transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
+                    className="overflow-hidden"
+                  >
+                    <div className="pt-3">
+                      <EventMap location={data.event.location} />
+                    </div>
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+
+      <motion.section
+        aria-label={drawerOpen ? "Selección de entradas" : "Información del evento"}
+        initial={false}
+        animate={{
+          height: drawerOpen ? "60dvh" : "auto",
+          borderTopLeftRadius: drawerOpen ? 28 : 0,
+          borderTopRightRadius: drawerOpen ? 28 : 0,
+          boxShadow: drawerOpen ? "0 -28px 70px -30px rgba(0,0,0,0.9)" : "0 0 0 rgba(0,0,0,0)",
+        }}
+        transition={{ duration: 0.52, ease: [0.22, 1, 0.36, 1] }}
+        className="fixed inset-x-0 bottom-0 z-20 mx-auto flex w-full max-w-lg flex-col overflow-hidden bg-[#0a0a0a] px-5 pt-5 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6"
+      >
+        {drawerOpen ? (
+          <div aria-hidden className="mx-auto mb-4 h-1 w-10 shrink-0 rounded-full bg-white/20" />
+        ) : null}
+
+        <AnimatePresence mode="wait" initial={false}>
+          {!ticketsReady ? (
+            <motion.header
+              ref={purchaseHeaderRef}
+              key="event-title"
+              initial={{ opacity: 1, y: drawerOpen ? purchaseTravelY : 0 }}
+              animate={{ opacity: 1, y: drawerOpen ? purchaseTravelY : 0 }}
+              exit={{ opacity: 0, transition: { duration: 0 } }}
+              transition={drawerOpen ? { duration: 0.52, ease: [0.22, 1, 0.36, 1] } : { duration: 0.2 }}
+              className="mt-auto shrink-0"
+            >
+              <h1
+                className="max-h-[3.2em] overflow-hidden text-pretty font-bold leading-[1.04] tracking-[-0.02em] text-white [overflow-wrap:anywhere]"
+                style={{ fontSize: titleSize }}
+              >
+                {data.event.name}
+              </h1>
+              <p className="mt-2 text-[12px] font-semibold uppercase tracking-[0.2em] text-white/45">
+                {formatEventDay(data.event.date)}
+              </p>
+            </motion.header>
+          ) : (
+            <motion.header
+              key="tickets-title"
+              initial={false}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0 }}
+              className="shrink-0"
+            >
+              <h2 className="text-[clamp(1.65rem,7vw,2.25rem)] font-bold tracking-[-0.02em] text-white">
+                Elegí tus entradas
+              </h2>
+            </motion.header>
+          )}
+        </AnimatePresence>
+
+        <div className={ticketsReady ? "min-h-0 flex-1 overflow-hidden" : "hidden"}>
+          <AnimatePresence>
+            {ticketsReady ? (
+              <motion.div
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.32, delay: 0.05 }}
+                className="flex h-full min-h-0 flex-col pt-5"
+              >
+                {ticketsFrom != null && !saleOpen ? (
+                  <p className="mb-4 shrink-0 rounded-2xl bg-white/[0.05] px-4 py-3 text-[13px] text-white/55">
+                    Venta desde el {formatEventDate(ticketsFrom)} · en{" "}
+                    <span className="font-semibold tabular-nums text-white">
+                      {formatCountdown(ticketsWindow.msLeft)}
+                    </span>
+                  </p>
+                ) : saleOpen && !anyTicketPurchasable ? (
+                  <p className="mb-4 shrink-0 rounded-2xl bg-white/[0.05] px-4 py-3 text-[13px] text-white/55">
+                    Por ahora no hay entradas disponibles para este evento.
+                  </p>
+                ) : null}
+
+                <ul className="min-h-0 flex-1 space-y-3.5 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {data.ticketTypes.map((t, i) => {
+                    const count = ticketQtys[t.id] ?? 0
+                    const disabled = !t.availableForPurchase || !saleOpen
+                    return (
+                      <motion.li
+                        key={t.id}
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ ...MINIMAL_SPRING, delay: i * 0.05 }}
+                      >
+                        <MinimalTicketRow
+                          name={t.name}
+                          priceStr={formatMoneyArsExact(t.price)}
+                          count={count}
+                          disabled={disabled}
+                          onAdd={() => bumpTicket(t.id)}
+                          onRemove={() => trimTicket(t.id)}
+                        />
+                      </motion.li>
+                    )
+                  })}
+                </ul>
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
         </div>
-      </div>
 
-      <MinimalBottomBar>
-        <MinimalCheckoutRow
-          totalStr={totalStr}
-          cartCount={cartCount}
-          label={primaryLabel}
-          enabled={primaryEnabled}
-          onClick={onPrimary}
-        />
-      </MinimalBottomBar>
+        <AnimatePresence mode="wait" initial={false}>
+          {!ticketsReady ? (
+            <motion.button
+              key="buy"
+              type="button"
+              onClick={start}
+              disabled={ctaDisabled || drawerOpen}
+              exit={{ opacity: 0, transition: { duration: 0 } }}
+              className="mt-5 h-[3.5rem] w-full shrink-0 rounded-full bg-white text-[17px] font-semibold text-black transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-white/15 disabled:text-white/45"
+            >
+              {ctaLabel}
+            </motion.button>
+          ) : (
+            <motion.div key="checkout" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4 shrink-0 border-t border-white/[0.07] pt-4">
+              <MinimalCheckoutRow
+                totalStr={totalStr}
+                cartCount={cartCount}
+                label={primaryLabel}
+                enabled={primaryEnabled}
+                onClick={onPrimary}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.section>
     </div>
   )
 }
@@ -1818,9 +2011,7 @@ function MinimalStoreStep({
     () => products.filter((p) => productSaleType(p) === "BOTTLE"),
     [products]
   )
-  const [shelf, setShelf] = useState<StoreShelf>(
-    glassProducts.length > 0 ? "glass" : bottleProducts.length > 0 ? "bottle" : "cart"
-  )
+  const [shelf, setShelf] = useState<StoreShelf | null>(null)
 
   return (
     <div className="relative flex min-h-dvh flex-col">
@@ -1835,7 +2026,7 @@ function MinimalStoreStep({
         onBack={onBack}
       />
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-8 pb-40 pr-14 sm:px-6 sm:pr-[4.75rem] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-24 pb-40 pr-14 sm:px-6 sm:pr-[4.75rem] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <div className="mx-auto w-full max-w-md">
           {consFrom != null && !saleOpen ? (
             <p className="mb-5 rounded-2xl bg-white/[0.05] px-4 py-3 text-[13px] text-white/55">
@@ -1847,7 +2038,7 @@ function MinimalStoreStep({
           ) : null}
 
           <AnimatePresence mode="wait" initial={false}>
-            {shelf === "cart" ? (
+            {shelf === null ? null : shelf === "cart" ? (
               <motion.div
                 key="m-cart"
                 initial={{ opacity: 0, x: 32 }}
@@ -1939,7 +2130,7 @@ function MinimalProductShelf({
       {groups.map((group) => (
         <div key={group.id}>
           {group.name ? <CategoryHeading>{group.name}</CategoryHeading> : null}
-          <ul className="flex flex-col gap-3">
+          <ul className="grid grid-cols-2 gap-3">
             {group.products.map((p) => (
               <li key={p.id}>
                 <MinimalProductCard
@@ -1951,6 +2142,10 @@ function MinimalProductShelf({
                   onAdd={() => {
                     const q = drinks[p.id] ?? 0
                     setDrinkQty(p.id, Math.min(99, q + 1))
+                  }}
+                  onRemove={() => {
+                    const q = drinks[p.id] ?? 0
+                    setDrinkQty(p.id, q - 1)
                   }}
                 />
               </li>
@@ -1969,6 +2164,7 @@ function MinimalProductCard({
   disabled,
   count,
   onAdd,
+  onRemove,
 }: {
   name: string
   imageUrl?: string | null
@@ -1976,110 +2172,18 @@ function MinimalProductCard({
   disabled: boolean
   count: number
   onAdd: () => void
+  onRemove: () => void
 }) {
-  const [tapTick, setTapTick] = useState(0)
-  const showPhoto = Boolean(imageUrl)
-
-  const triggerAdd = () => {
-    if (disabled) return
-    onAdd()
-    setTapTick((t) => t + 1)
-  }
-
-  if (showPhoto) {
-    return (
-      <motion.button
-        type="button"
-        disabled={disabled}
-        onClick={triggerAdd}
-        whileTap={disabled ? undefined : { scale: 0.988 }}
-        className="group relative aspect-[4/5] w-full overflow-hidden rounded-2xl bg-neutral-950 text-left outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:pointer-events-none disabled:opacity-45"
-      >
-        <img
-          src={imageUrl!}
-          alt={name}
-          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.03]"
-          loading="lazy"
-          decoding="async"
-        />
-        <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/95" />
-        <div className="pointer-events-none absolute inset-x-0 top-0 px-5 pt-5">
-          <p className="text-xl font-semibold tracking-tight text-white drop-shadow">{name}</p>
-        </div>
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 px-5 pb-5">
-          <p className="text-xl font-bold tabular-nums text-white">{priceStr}</p>
-        </div>
-
-        {tapTick > 0 ? (
-          <motion.div
-            key={`flash-${tapTick}`}
-            aria-hidden
-            initial={{ opacity: 0.9 }}
-            animate={{ opacity: 0 }}
-            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-            className="pointer-events-none absolute inset-0 rounded-2xl ring-2 ring-inset ring-white/50"
-          />
-        ) : null}
-
-        <AnimatePresence>
-          {count > 0 ? (
-            <motion.div
-              key="qty-badge"
-              initial={{ opacity: 0, scale: 0.55, y: -6 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.55, y: -4 }}
-              transition={{ type: "spring", stiffness: 500, damping: 28 }}
-              className="absolute right-4 top-5 z-10"
-            >
-              <QuantityBadge value={count} />
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
-      </motion.button>
-    )
-  }
-
   return (
-    <motion.button
-      type="button"
+    <ProductShelfRow
+      name={name}
+      imageUrl={imageUrl}
+      priceStr={priceStr}
       disabled={disabled}
-      onClick={triggerAdd}
-      whileTap={disabled ? undefined : { scale: 0.985 }}
-      className="relative flex w-full items-center justify-between gap-4 rounded-2xl bg-white/[0.04] px-4 py-4 text-left outline-none transition-colors hover:bg-white/[0.06] focus-visible:ring-2 focus-visible:ring-white/30 disabled:pointer-events-none disabled:opacity-45"
-    >
-      <p className="min-w-0 flex-1 text-[15px] font-semibold leading-snug text-white">{name}</p>
-      <div className="flex shrink-0 items-center gap-3">
-        <p className="text-sm font-medium tabular-nums text-white/55">{priceStr}</p>
-        <AnimatePresence initial={false}>
-          {count > 0 ? (
-            <motion.div
-              key="qty"
-              initial={{ opacity: 0, scale: 0.5, width: 0 }}
-              animate={{ opacity: 1, scale: 1, width: "auto" }}
-              exit={{ opacity: 0, scale: 0.5, width: 0 }}
-              transition={{ type: "spring", stiffness: 520, damping: 28 }}
-              className="overflow-hidden"
-            >
-              <QuantityBadge value={count} size="sm" />
-            </motion.div>
-          ) : (
-            <span className="flex size-8 items-center justify-center rounded-full bg-white text-black">
-              <Plus className="size-4" strokeWidth={2.5} aria-hidden />
-            </span>
-          )}
-        </AnimatePresence>
-      </div>
-      {tapTick > 0 ? (
-        <motion.div
-          key={`flash-${tapTick}`}
-          aria-hidden
-          initial={{ opacity: 0.75 }}
-          animate={{ opacity: 0 }}
-          transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-          className="pointer-events-none absolute inset-0 rounded-2xl ring-[1.5px] ring-inset ring-white/40"
-        />
-      ) : null}
-    </motion.button>
+      count={count}
+      onAdd={onAdd}
+      onRemove={onRemove}
+    />
   )
 }
 
@@ -2206,7 +2310,7 @@ function MinimalShelfRail({
   cartCount,
   onBack,
 }: {
-  shelf: StoreShelf
+  shelf: StoreShelf | null
   onShelf: (s: StoreShelf) => void
   cartCount: number
   onBack: () => void
@@ -2214,25 +2318,46 @@ function MinimalShelfRail({
   return (
     <>
       <nav
-        className="fixed right-0 top-[18%] z-40 rounded-l-2xl bg-neutral-900 py-1 pl-1 shadow-[-14px_0_44px_-16px_rgba(0,0,0,0.9)]"
+        className="fixed left-0 top-[max(1rem,env(safe-area-inset-top))] z-40 rounded-r-2xl bg-neutral-900 py-1 pr-1 shadow-[14px_0_44px_-16px_rgba(0,0,0,0.9)]"
         aria-label="Volver"
       >
-        <MinimalShelfButton label="Volver" active={false} onClick={onBack}>
+        <MinimalShelfButton label="Volver" active={false} dockEdge="left" onClick={onBack}>
           <ChevronLeft className="size-[1.35rem]" strokeWidth={2} aria-hidden />
         </MinimalShelfButton>
       </nav>
 
-      <nav
-        className="fixed right-0 top-1/2 z-40 flex -translate-y-1/2 flex-col gap-px rounded-l-2xl bg-neutral-900 py-1 pl-1 shadow-[-14px_0_44px_-16px_rgba(0,0,0,0.9)]"
+      <AnimatePresence initial={false}>
+        {shelf === null ? (
+          <motion.h2
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.24 }}
+            className="pointer-events-none fixed inset-x-0 top-[calc(50%-9rem)] z-40 px-6 text-center text-xl font-semibold leading-tight text-white"
+          >
+            <span className="block">Elegí qué consumos</span>
+            <span className="block">querés comprar</span>
+          </motion.h2>
+        ) : null}
+      </AnimatePresence>
+
+      <motion.nav
+        layout
+        initial={false}
+        animate={{ right: shelf === null ? "calc(50% - 6.5rem)" : 0 }}
+        transition={STORE_SHELF_TRANSITION}
+        className={`fixed top-1/2 z-40 flex -translate-y-1/2 flex-col gap-px bg-neutral-900 py-1 pl-1 shadow-[-14px_0_44px_-16px_rgba(0,0,0,0.9)] ${
+          shelf === null ? "w-52 rounded-2xl pr-1" : "rounded-l-2xl"
+        }`}
         aria-label="Secciones"
       >
-        <MinimalShelfButton label="Ver copas" active={shelf === "glass"} onClick={() => onShelf("glass")}>
+        <MinimalShelfButton label="Tragos" active={shelf === "glass"} docked={shelf !== null} onClick={() => onShelf("glass")}>
           <Wine className="size-[1.35rem]" strokeWidth={2} aria-hidden />
         </MinimalShelfButton>
-        <MinimalShelfButton label="Ver botellas" active={shelf === "bottle"} onClick={() => onShelf("bottle")}>
+        <MinimalShelfButton label="Botellas" active={shelf === "bottle"} docked={shelf !== null} onClick={() => onShelf("bottle")}>
           <BottleWine className="size-[1.35rem]" strokeWidth={2} aria-hidden />
         </MinimalShelfButton>
-        <MinimalShelfButton label="Ver carrito" active={shelf === "cart"} onClick={() => onShelf("cart")}>
+        <MinimalShelfButton label="Tus Tickets" active={shelf === "cart"} docked={shelf !== null} onClick={() => onShelf("cart")}>
           <span className="relative inline-flex">
             <Ticket className="size-[1.35rem]" strokeWidth={2} aria-hidden />
             {cartCount > 0 ? (
@@ -2242,7 +2367,7 @@ function MinimalShelfRail({
             ) : null}
           </span>
         </MinimalShelfButton>
-      </nav>
+      </motion.nav>
     </>
   )
 }
@@ -2251,11 +2376,15 @@ function MinimalShelfButton({
   label,
   active,
   onClick,
+  docked = true,
+  dockEdge = "right",
   children,
 }: {
   label: string
   active: boolean
   onClick: () => void
+  docked?: boolean
+  dockEdge?: "left" | "right"
   children: ReactNode
 }) {
   return (
@@ -2264,43 +2393,13 @@ function MinimalShelfButton({
       aria-label={label}
       aria-pressed={active}
       onClick={onClick}
-      className={`relative flex size-[3.25rem] items-center justify-center rounded-l-xl outline-none transition-colors focus-visible:ring-2 focus-visible:ring-white/35 ${
+      className={`relative flex h-[3.25rem] items-center outline-none transition-all focus-visible:ring-2 focus-visible:ring-white/35 ${docked ? `w-[3.25rem] justify-center ${dockEdge === "left" ? "rounded-r-xl" : "rounded-l-xl"}` : "w-full justify-start gap-3 rounded-xl px-4"} ${
         active ? "bg-white text-black" : "text-white/60 hover:bg-white/[0.08] hover:text-white"
       }`}
     >
       {children}
+      {!docked ? <span className="text-sm font-semibold">{label}</span> : null}
     </button>
-  )
-}
-
-function MinimalStepHeader({
-  title,
-  eventName,
-  onBack,
-}: {
-  title: string
-  eventName: string
-  onBack: () => void
-}) {
-  return (
-    <header className="sticky top-0 z-20 bg-[#0a0a0a]">
-      <div className="mx-auto flex w-full max-w-md items-center gap-3 px-5 py-3.5 sm:px-6">
-        <button
-          type="button"
-          onClick={onBack}
-          className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-white transition-transform active:scale-95 hover:bg-white/[0.12]"
-          aria-label="Volver"
-        >
-          <ChevronLeft className="size-5" aria-hidden />
-        </button>
-        <div className="min-w-0">
-          <p className="truncate text-[12px] leading-tight text-white/45">{eventName}</p>
-          <h2 className="text-[17px] font-semibold leading-tight tracking-tight text-white">
-            {title}
-          </h2>
-        </div>
-      </div>
-    </header>
   )
 }
 
@@ -2373,7 +2472,7 @@ function MinimalTicketRow({
     <motion.div
       layout
       transition={MINIMAL_SPRING}
-      className={`relative flex items-stretch overflow-hidden rounded-2xl transition-colors ${
+      className={`relative flex items-stretch overflow-hidden rounded-2xl transition-colors ${active ? "w-full" : "w-[calc(100%-3.5rem)]"} ${
         active ? "bg-white/[0.08]" : "bg-white/[0.04]"
       } ${disabled ? "opacity-45" : ""}`}
     >
