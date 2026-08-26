@@ -107,6 +107,8 @@ const PAYMENT_LABELS: Record<string, string> = {
   CARD: "Tarjeta",
   MERCADOPAGO: "Mercado Pago",
   TRANSFER: "Transferencia",
+  /** Tarea 6.1 — Pago con el saldo cargado del cliente (visión §2.7). */
+  SALDO: "Saldo",
 }
 
 export function formatPaymentMethod(code: string): string {

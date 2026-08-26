@@ -24,6 +24,7 @@ import {
   formatMoneyArsExact,
 } from "@/lib/format"
 import { Button } from "@/components/ui/button"
+import { EventMap } from "@/components/event-map"
 import {
   computeCartTotalString,
   useCartStore,
@@ -481,9 +482,7 @@ export function EventDetailPage() {
                           <h1 className="text-3xl font-black leading-[1.08] tracking-tight text-white drop-shadow-[0_2px_28px_rgba(0,0,0,0.65)] sm:text-[2.125rem]">
                             {data.event.name}
                           </h1>
-                          {data.event.location ? (
-                            <p className="text-sm text-white/72">{data.event.location}</p>
-                          ) : null}
+                          <EventMap location={data.event.location} compact />
                         </div>
 
                         <div className="mt-6">
@@ -1662,6 +1661,12 @@ function MinimalCover({
               <p className="text-[16px] text-white/55">{data.event.location}</p>
             ) : null}
           </motion.header>
+
+          {data.event.location ? (
+            <div className="mt-6 px-1">
+              <EventMap location={data.event.location} />
+            </div>
+          ) : null}
         </div>
       </div>
 

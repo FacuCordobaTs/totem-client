@@ -4,6 +4,7 @@ import QRCode from "qrcode"
 import {
   ArrowRight,
   BottleWine,
+  Coins,
   Copy,
   Loader2,
   Minus,
@@ -16,6 +17,8 @@ import { AnimatePresence, motion, useAnimationControls, type Transition } from "
 import Decimal from "decimal.js"
 import {  publicApiFetch } from "@/lib/api"
 import type {
+  BalanceDepositResponse,
+  ConsumptionsCheckoutResponse,
   PublicDrinkProductItem,
   PublicEventDetailResponse,
   PublicProductCategory,
@@ -502,6 +505,23 @@ export function ReceiptPage() {
   const [activeTab, setActiveTab] = useState<ReceiptTab>("tickets")
   const [shelf, setShelf] = useState<ShelfKind>("glass")
 
+  // ─── Tarea 6.2 — Saldo (visión §2.7): bloque "Tu saldo" con carga (MP/transferencia)
+  // y pago con saldo en el addon. ────────────────────────────────────────────────────
+  const [depositOpen, setDepositOpen] = useState(false)
+  const [depositAmount, setDepositAmount] = useState("")
+  const [depositMethod, setDepositMethod] = useState<"MERCADOPAGO" | "TRANSFER">(
+    "MERCADOPAGO"
+  )
+  const [depositSubmitting, setDepositSubmitting] = useState(false)
+  const [depositTransfer, setDepositTransfer] = useState<{
+    alias: string
+    accountNumber: string
+  } | null>(null)
+  const [depositSubmitted, setDepositSubmitted] = useState(false)
+  const [depositPolling, setDepositPolling] = useState(false)
+  const depositInitialBalanceRef = useRef(0)
+  const [addonMethod, setAddonMethod] = useState<"MERCADOPAGO" | "SALDO">("MERCADOPAGO")
+
   const mpCheckoutReturnParams = useMemo(
     () =>
       !!(
@@ -650,6 +670,32 @@ export function ReceiptPage() {
     consumptionsCountRef.current = count
   }, [data?.consumptions.length, addonPolling])
 
+  // Tarea 6.2 — Depósito por transferencia: la acreditación la hace el webhook en segundo
+  // plano; se sondea el comprobante hasta que el saldo sube (o se corta solo a los 3 min).
+  useEffect(() => {
+    if (!depositPolling) return
+    void load()
+    const id = window.setInterval(() => void load(), 4000)
+    const timeout = window.setTimeout(() => setDepositPolling(false), 3 * 60 * 1000)
+    return () => {
+      window.clearInterval(id)
+      window.clearTimeout(timeout)
+    }
+  }, [depositPolling, load])
+
+  useEffect(() => {
+    if (!depositPolling || !data) return
+    if (parseFloat(data.balance.amount) > depositInitialBalanceRef.current) {
+      setDepositPolling(false)
+      toast.success("¡Saldo cargado!")
+      setDepositOpen(false)
+      setDepositSubmitted(false)
+      setDepositTransfer(null)
+      setDepositAmount("")
+      setAddonMethod("MERCADOPAGO")
+    }
+  }, [depositPolling, data])
+
   if (!receiptToken) return null
 
   const showPaidContent = data?.sale.paid === true
@@ -677,21 +723,42 @@ export function ReceiptPage() {
   const consumosAvailable =
     showPaidContent && addonProducts !== null && addonProducts.length > 0
 
-  // ─── Mercado Pago handlers ──────────────────────────────────────────────────
+  // Hay tragos comprados y no canjeados → se habilita el retiro en barra (tarea 4.1).
+  const hasPendingConsumptions = (data?.consumptions ?? []).some(
+    (c) => c.status === "PENDING"
+  )
+
+  // ─── Pago handlers (addon) ───────────────────────────────────────────────────
   const handleAddonCheckout = async () => {
     if (!addonDrinkLines.length || !receiptToken || addonSubmitting) return
     setAddonSubmitting(true)
     try {
-      const result = await publicApiFetch<{
-        success: boolean
-        url_pago?: string
-        error?: string
-      }>(`/public/receipts/${receiptToken}/consumptions-checkout`, {
-        method: "POST",
-        body: JSON.stringify({ drinkLines: addonDrinkLines, clientTotal: addonTotalStr }),
-        headers: { "Content-Type": "application/json" },
-      })
-      if (!result.success || !result.url_pago) {
+      const result = await publicApiFetch<ConsumptionsCheckoutResponse>(
+        `/public/receipts/${receiptToken}/consumptions-checkout`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            drinkLines: addonDrinkLines,
+            clientTotal: addonTotalStr,
+            // Tarea 6.2 — SALDO: la sale queda COMPLETED al instante (el backend la
+            // debita del saldo del cliente). Sin redirección: se refresca el comprobante.
+            paymentMethod: addonMethod,
+          }),
+          headers: { "Content-Type": "application/json" },
+        }
+      )
+      if (!result.success) {
+        toast.error(result.error ?? "No se pudo iniciar el pago")
+        return
+      }
+      if (addonMethod === "SALDO") {
+        toast.success("¡Comprado con tu saldo!")
+        setAddonDrinks({})
+        setActiveTab("tickets")
+        await load()
+        return
+      }
+      if (!result.url_pago) {
         toast.error(result.error ?? "No se pudo iniciar el pago")
         return
       }
@@ -705,6 +772,46 @@ export function ReceiptPage() {
       toast.error(e instanceof Error ? e.message : "Error al iniciar el pago")
     } finally {
       setAddonSubmitting(false)
+    }
+  }
+
+  // ─── Tarea 6.2 — Carga de saldo (visión §2.7) ────────────────────────────────
+  // El contacto se reusa del snapshot de esta compra (el cliente ya está identificado):
+  // el backend solo necesita el `receiptToken` de este comprobante.
+  const handleDeposit = async () => {
+    const amt = depositAmount.trim()
+    if (!/^\d+(\.\d{1,2})?$/.test(amt) || parseFloat(amt) <= 0 || depositSubmitting) return
+    if (!data?.event?.id || !receiptToken) return
+    setDepositSubmitting(true)
+    try {
+      const res = await publicApiFetch<BalanceDepositResponse>(
+        `/public/events/${data.event.id}/balance/deposit`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            amount: amt,
+            paymentMethod: depositMethod,
+            receiptToken,
+          }),
+          headers: { "Content-Type": "application/json" },
+        }
+      )
+      if (depositMethod === "MERCADOPAGO" && res.redirectUrl) {
+        window.location.href = res.redirectUrl
+        return
+      }
+      if (depositMethod === "TRANSFER" && res.transfer) {
+        depositInitialBalanceRef.current = parseFloat(data.balance.amount)
+        setDepositTransfer(res.transfer)
+        setDepositSubmitted(true)
+        setDepositPolling(true)
+        return
+      }
+      toast.error("No se pudo iniciar la carga de saldo")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo iniciar la carga de saldo")
+    } finally {
+      setDepositSubmitting(false)
     }
   }
 
@@ -727,6 +834,9 @@ export function ReceiptPage() {
 
   const onConsumosTab = activeTab === "consumos" && consumosAvailable
   const showFooter = onConsumosTab && addonUnitCount > 0
+
+  // Tarea 6.2 — Con saldo, el addon ofrece pagar con saldo (sin tarjeta ni transferencia).
+  const addonBalanceAvailable = parseFloat(data?.balance?.amount ?? "0") > 0
 
   return (
     <div className={`min-h-dvh ${showFooter ? "pb-44" : "pb-24"}`}>
@@ -767,6 +877,53 @@ export function ReceiptPage() {
                           </p>
                         </button>
                       ) : null}
+
+                      {/* ─── Cross-tab CTA: retirar tragos (tarea 4.1) ─── */}
+                      {hasPendingConsumptions ? (
+                        <Link
+                          to={`/receipt/${receiptToken}/retirar`}
+                          className="group relative flex w-full flex-col gap-3 overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.03] px-6 py-7 text-left outline-none transition-colors hover:bg-white/[0.05] focus-visible:ring-2 focus-visible:ring-white/30"
+                        >
+                          <div className="flex items-baseline justify-between gap-4">
+                            <h3 className="text-lg font-semibold tracking-tight text-white">
+                              Retirar tragos
+                            </h3>
+                            <ArrowRight
+                              className="size-4 shrink-0 text-white/40 transition-transform group-hover:translate-x-0.5 group-hover:text-white"
+                              aria-hidden
+                            />
+                          </div>
+                          <p className="text-[14px] leading-relaxed text-white/55">
+                            Elegí qué llevarte ahora y mostrá un solo código en la barra.
+                            Lo que no retires queda guardado.
+                          </p>
+                        </Link>
+                      ) : null}
+
+                      {/* ─── Tarea 6.2 — Tu saldo (visión §2.7) ─── */}
+                      <section className="flex items-center justify-between gap-4 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-6 py-5">
+                        <div className="flex min-w-0 items-center gap-4">
+                          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-white/70">
+                            <Coins className="size-5" strokeWidth={2} aria-hidden />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
+                              Tu saldo
+                            </p>
+                            <p className="mt-1 text-xl font-bold tabular-nums tracking-tight text-white">
+                              {formatMoneyArsExact(data.balance?.amount ?? "0.00")}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="shrink-0 rounded-xl"
+                          onClick={() => setDepositOpen(true)}
+                        >
+                          Cargar
+                        </Button>
+                      </section>
                 <AnimatePresence mode="wait" initial={false}>
                   {activeTab === "tickets" ? (
                     <motion.div
@@ -904,6 +1061,17 @@ export function ReceiptPage() {
                   )}
                 </AnimatePresence>
               </>
+            ) : data ? (
+              <div className="flex flex-col gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-6 py-8 text-center">
+                <p className="text-lg font-semibold tracking-tight text-white">
+                  Pago pendiente
+                </p>
+                <p className="mx-auto max-w-[260px] text-sm leading-relaxed text-white/50">
+                  {formatMoneyArsExact(data.sale.totalAmount)} ·{" "}
+                  {formatPaymentMethod(data.sale.paymentMethod)}. Cuando se acredite, tus
+                  códigos aparecen acá.
+                </p>
+              </div>
             ) : null}
       </div>
 
@@ -934,6 +1102,41 @@ export function ReceiptPage() {
             className="fixed bottom-0 left-0 right-0 z-40 bg-black/40 px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 backdrop-blur-lg supports-[backdrop-filter]:bg-black/40 sm:px-8"
           >
             <div className="mx-auto flex w-full max-w-lg flex-col gap-3">
+              {/* Tarea 6.2 — Método del addon: Mercado Pago o saldo disponible. */}
+              {addonBalanceAvailable ? (
+                <div
+                  className="flex rounded-xl bg-white/[0.06] p-1"
+                  role="radiogroup"
+                  aria-label="Método de pago de consumos"
+                >
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={addonMethod === "MERCADOPAGO"}
+                    onClick={() => setAddonMethod("MERCADOPAGO")}
+                    className={`flex-1 rounded-lg py-2.5 text-[13px] font-semibold transition-colors ${
+                      addonMethod === "MERCADOPAGO"
+                        ? "bg-white text-black"
+                        : "text-white/55 hover:text-white"
+                    }`}
+                  >
+                    Mercado Pago
+                  </button>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={addonMethod === "SALDO"}
+                    onClick={() => setAddonMethod("SALDO")}
+                    className={`flex-1 rounded-lg py-2.5 text-[13px] font-semibold transition-colors ${
+                      addonMethod === "SALDO"
+                        ? "bg-white text-black"
+                        : "text-white/55 hover:text-white"
+                    }`}
+                  >
+                    Saldo · {formatMoneyArsExact(data.balance?.amount ?? "0.00")}
+                  </button>
+                </div>
+              ) : null}
               <div className="flex items-center justify-between gap-3">
                 <span className="text-sm font-medium text-white/65">Total</span>
                 <motion.span
@@ -953,6 +1156,8 @@ export function ReceiptPage() {
               >
                 {addonSubmitting ? (
                   <Loader2 className="size-6 animate-spin" aria-hidden />
+                ) : addonMethod === "SALDO" ? (
+                  "Pagar con saldo"
                 ) : (
                   "Pagar"
                 )}
@@ -1085,6 +1290,138 @@ export function ReceiptPage() {
               </div>
             </div>
           </div>
+        </AppleSheet>
+      ) : null}
+
+      {/* ─── Tarea 6.2 — Cargar saldo (visión §2.7) ─── */}
+      {data ? (
+        <AppleSheet
+          open={depositOpen}
+          onOpenChange={(open) => {
+            setDepositOpen(open)
+            if (!open) {
+              setDepositSubmitted(false)
+              setDepositTransfer(null)
+            }
+          }}
+          title="Cargar saldo"
+          description="Tu saldo queda asociado a tu DNI dentro del evento."
+        >
+          {depositTransfer && depositSubmitted ? (
+            <div className="flex flex-col gap-6">
+              <div className="flex flex-col gap-2">
+                <p className="text-xs font-semibold uppercase tracking-wider text-white/45">
+                  Copiar alias
+                </p>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="h-12 justify-start gap-2 rounded-xl"
+                  onClick={() => {
+                    void copyText("Alias", depositTransfer.alias)
+                  }}
+                >
+                  <Copy className="size-4 shrink-0" aria-hidden />
+                  <span className="truncate font-mono text-sm">{depositTransfer.alias}</span>
+                </Button>
+              </div>
+              <div className="flex flex-col gap-2">
+                <p className="text-xs font-semibold uppercase tracking-wider text-white/45">
+                  Copiar CVU
+                </p>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="h-12 justify-start gap-2 rounded-xl"
+                  onClick={() => {
+                    void copyText("CVU", depositTransfer.accountNumber)
+                  }}
+                >
+                  <Copy className="size-4 shrink-0" aria-hidden />
+                  <span className="truncate font-mono text-sm">
+                    {depositTransfer.accountNumber}
+                  </span>
+                </Button>
+              </div>
+              <p className="text-sm leading-relaxed text-white/55">
+                Cuando acreditemos el pago, se suma a tu saldo automáticamente.
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-8">
+              <div>
+                <label
+                  htmlFor="deposit-amount"
+                  className="block text-[10px] font-semibold uppercase tracking-[0.22em] text-white/45"
+                >
+                  Monto
+                </label>
+                <input
+                  id="deposit-amount"
+                  type="text"
+                  inputMode="decimal"
+                  value={depositAmount}
+                  onChange={(e) => setDepositAmount(e.target.value.replace(/,/g, "."))}
+                  placeholder="10000"
+                  autoFocus
+                  className="mt-3 w-full border-0 border-b border-white/[0.12] bg-transparent px-0 py-3 text-2xl font-bold tabular-nums text-white outline-none transition-colors placeholder:text-white/25 focus:border-white"
+                />
+              </div>
+              <div className="flex flex-col gap-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-white/45">
+                  Método
+                </p>
+                <div
+                  className="flex rounded-xl bg-white/[0.06] p-1"
+                  role="radiogroup"
+                  aria-label="Método de carga"
+                >
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={depositMethod === "MERCADOPAGO"}
+                    onClick={() => setDepositMethod("MERCADOPAGO")}
+                    className={`flex-1 rounded-lg py-2.5 text-[13px] font-semibold transition-colors ${
+                      depositMethod === "MERCADOPAGO"
+                        ? "bg-white text-black"
+                        : "text-white/55 hover:text-white"
+                    }`}
+                  >
+                    Mercado Pago
+                  </button>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={depositMethod === "TRANSFER"}
+                    onClick={() => setDepositMethod("TRANSFER")}
+                    className={`flex-1 rounded-lg py-2.5 text-[13px] font-semibold transition-colors ${
+                      depositMethod === "TRANSFER"
+                        ? "bg-white text-black"
+                        : "text-white/55 hover:text-white"
+                    }`}
+                  >
+                    Transferencia
+                  </button>
+                </div>
+              </div>
+              <Button
+                type="button"
+                className="h-14 w-full rounded-2xl bg-white font-semibold text-black transition-all disabled:shadow-none"
+                disabled={
+                  depositSubmitting ||
+                  !/^\d+(\.\d{1,2})?$/.test(depositAmount.trim()) ||
+                  parseFloat(depositAmount) <= 0
+                }
+                onClick={() => void handleDeposit()}
+              >
+                {depositSubmitting ? (
+                  <Loader2 className="size-6 animate-spin" aria-hidden />
+                ) : (
+                  "Continuar"
+                )}
+              </Button>
+            </div>
+          )}
         </AppleSheet>
       ) : null}
     </div>

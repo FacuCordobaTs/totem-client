@@ -6,14 +6,21 @@ import {
   ArrowRight,
   ArrowUpRight,
   Check,
+  Coins,
   Copy,
   CreditCard,
   Loader2,
   Wallet,
 } from "lucide-react"
+import { CardPayment, initMercadoPago } from "@mercadopago/sdk-react"
 import { AnimatePresence, motion, type Transition } from "motion/react"
 import { publicApiFetch } from "@/lib/api"
-import type { GuestCheckoutResponse } from "@/types/api"
+import type {
+  BalanceLookupResponse,
+  GuestCheckoutResponse,
+  ProcessBrickResponse,
+  PublicEventDetailResponse,
+} from "@/types/api"
 import {
   computeCartTotalString,
   useCartStore,
@@ -22,7 +29,7 @@ import {
 import { formatMoneyArsExact } from "@/lib/format"
 
 type Step = "contact" | "method" | "pay"
-type Method = "TRANSFER" | "CARD" | "MERCADOPAGO"
+type Method = "TRANSFER" | "CARD" | "MERCADOPAGO" | "SALDO"
 
 const STEP_EASE: Transition = { duration: 0.44, ease: [0.22, 1, 0.36, 1] as const }
 
@@ -42,12 +49,34 @@ export function CheckoutPage() {
   const [step, setStep] = useState<Step>("contact")
   const [method, setMethod] = useState<Method>("TRANSFER")
   const [name, setName] = useState("")
+  const [dni, setDni] = useState("")
   const [email, setEmail] = useState("")
   const [phone, setPhone] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [result, setResult] = useState<GuestCheckoutResponse | null>(null)
   const [confirmedTotal, setConfirmedTotal] = useState<string>("0.00")
+  // Tarea 2.2 — el "Volver" navega a la página del evento por slug (la ruta
+  // `/e/:eventId` no existe). Se resuelve al montar con `GET /public/events/:id`.
+  const [eventSlug, setEventSlug] = useState<string | null>(null)
+  // Tarea 6.2 — Saldo del cliente en este evento ("0.00" si no tiene): "Saldo disponible"
+  // se ofrece como método solo cuando hay fondos (visión §2.7).
+  const [balanceAmount, setBalanceAmount] = useState<string>("0.00")
+
+  useEffect(() => {
+    if (!eventId) return
+    let cancelled = false
+    publicApiFetch<PublicEventDetailResponse>(`/public/events/${eventId}`)
+      .then((d) => {
+        if (!cancelled) setEventSlug(d.event.slug ?? null)
+      })
+      .catch(() => {
+        if (!cancelled) setEventSlug(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [eventId])
 
   const snapshot: CartSnapshot | null =
     cart && cart.eventId === eventId ? cart : null
@@ -57,19 +86,21 @@ export function CheckoutPage() {
     [snapshot]
   )
 
+  // Tarea 2.1 — el DNI es requerido y numérico: es la identidad del comprador en la puerta.
+  const dniValid = /^\d{6,9}$/.test(dni.trim())
   const contactValid =
-    name.trim().length >= 2 && email.includes("@") && phone.trim().length >= 6
+    name.trim().length >= 2 && dniValid && email.includes("@") && phone.trim().length >= 6
+
+  const goToEventPage = () => {
+    navigate(eventSlug ? `/${eventSlug}` : "/")
+  }
 
   const handleBack = () => {
-    if (step === "contact") {
-      navigate(`/e/${eventId}`)
-      return
-    }
     if (step === "method") {
       setStep("contact")
       return
     }
-    navigate(`/e/${eventId}`)
+    goToEventPage()
   }
 
   const goToMethod = () => {
@@ -77,6 +108,35 @@ export function CheckoutPage() {
     setErr(null)
     setStep("method")
   }
+
+  // Tarea 6.2 — Al llegar al paso de método, consulta el saldo por DNI: sin DNI válido o
+  // sin saldo, "Saldo disponible" no aparece como opción.
+  useEffect(() => {
+    if (step !== "method" || !dniValid || !eventId) return
+    let cancelled = false
+    publicApiFetch<BalanceLookupResponse>(
+      `/public/events/${eventId}/balance?dni=${encodeURIComponent(dni.trim())}`
+    )
+      .then((d) => {
+        if (!cancelled) setBalanceAmount(d.amount ?? "0.00")
+      })
+      .catch(() => {
+        if (!cancelled) setBalanceAmount("0.00")
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [step, dniValid, dni, eventId])
+
+  const balanceAvailable = parseFloat(balanceAmount) > 0
+
+  // Si el DNI cambió y el saldo ya no está disponible, no dejar "Saldo disponible"
+  // seleccionado (el backend lo rechazaría igual, pero mejor corregir la UI).
+  useEffect(() => {
+    if (method === "SALDO" && !balanceAvailable) {
+      setMethod("TRANSFER")
+    }
+  }, [method, balanceAvailable])
 
   const submitPurchase = async () => {
     if (!snapshot || submitting) return
@@ -89,7 +149,12 @@ export function CheckoutPage() {
           eventId: snapshot.eventId,
           paymentMethod: method,
           clientTotal: totalStr,
-          contact: { name: name.trim(), email: email.trim(), phone: phone.trim() },
+          contact: {
+            name: name.trim(),
+            dni: dni.trim(),
+            email: email.trim(),
+            phone: phone.trim(),
+          },
           ticketLines: snapshot.ticketLines.map((l) => ({
             ticketTypeId: l.ticketTypeId,
             quantity: l.quantity,
@@ -101,12 +166,32 @@ export function CheckoutPage() {
         }),
       })
 
-      const redirectUrl = (data as any).redirectUrl as string | undefined
+      // Tarea 6.2 — Pago con saldo: completo al instante (el backend dejó la sale
+      // COMPLETED y debitó el saldo). Sin paso de pago: directo al comprobante.
+      if (method === "SALDO") {
+        clearCart()
+        try { localStorage.removeItem(`crow_event_progress_${eventId}`) } catch { /* noop */ }
+        navigate(`/receipt/${data.receiptToken}`)
+        return
+      }
+
+      // Tarea 2.2 — `redirectUrl` tipado: el backend devuelve el link de Checkout Pro.
+      const redirectUrl = data.redirectUrl
       if (method === "MERCADOPAGO" && redirectUrl) {
         clearCart()
         try { localStorage.removeItem(`crow_event_progress_${eventId}`) } catch { /* noop */ }
         window.location.href = redirectUrl
         return
+      }
+
+      // Inicializar el SDK antes de montar el Brick (el Brick se crea en su propio
+      // effect al renderizar el paso de pago, y `initMercadoPago` debe ir primero).
+      if (method === "CARD" && data.card?.publicKey) {
+        try {
+          initMercadoPago(data.card.publicKey, { locale: "es-AR" })
+        } catch (e) {
+          console.error("[Mercado Pago] initMercadoPago", e)
+        }
       }
 
       setConfirmedTotal(totalStr)
@@ -123,7 +208,7 @@ export function CheckoutPage() {
 
   if (!hydrated) return null
   if (!snapshot && !result) {
-    navigate(`/e/${eventId}`, { replace: true })
+    navigate(eventSlug ? `/${eventSlug}` : "/", { replace: true })
     return null
   }
 
@@ -160,9 +245,11 @@ export function CheckoutPage() {
             >
               <ContactStep
                 name={name}
+                dni={dni}
                 email={email}
                 phone={phone}
                 setName={setName}
+                setDni={setDni}
                 setEmail={setEmail}
                 setPhone={setPhone}
                 canContinue={contactValid}
@@ -183,6 +270,8 @@ export function CheckoutPage() {
                 onConfirm={submitPurchase}
                 submitting={submitting}
                 error={err}
+                balanceAmount={balanceAmount}
+                balanceAvailable={balanceAvailable}
               />
             </motion.div>
           ) : (
@@ -200,13 +289,16 @@ export function CheckoutPage() {
                 />
               ) : method === "CARD" ? (
                 <PayCardView
-                  amount={formatMoneyArsExact(totalStr)}
-                  preferenceId={
-                    ((result as any)?.card?.preferenceId as string | undefined) ?? null
-                  }
-                  publicKey={
-                    ((result as any)?.card?.publicKey as string | undefined) ?? null
-                  }
+                  amount={Number(confirmedTotal)}
+                  publicKey={result?.card?.publicKey ?? null}
+                  receiptToken={result?.receiptToken ?? ""}
+                  onPaid={() => {
+                    const token = result?.receiptToken
+                    if (!token) return
+                    // Aprobado o pendiente: el comprobante hace polling y muestra el
+                    // resultado real (el webhook cumple la sale en segundo plano).
+                    navigate(`/receipt/${token}`)
+                  }}
                 />
               ) : null}
             </motion.div>
@@ -288,18 +380,22 @@ function ProgressStepper({ step }: { step: Step }) {
 
 function ContactStep({
   name,
+  dni,
   email,
   phone,
   setName,
+  setDni,
   setEmail,
   setPhone,
   canContinue,
   onContinue,
 }: {
   name: string
+  dni: string
   email: string
   phone: string
   setName: (v: string) => void
+  setDni: (v: string) => void
   setEmail: (v: string) => void
   setPhone: (v: string) => void
   canContinue: boolean
@@ -323,6 +419,14 @@ function ContactStep({
           value={name}
           onChange={setName}
           autoComplete="name"
+        />
+        <FloatingField
+          id="co-dni"
+          label="DNI"
+          value={dni}
+          onChange={setDni}
+          inputMode="numeric"
+          autoComplete="off"
         />
         <FloatingField
           id="co-email"
@@ -401,19 +505,25 @@ function MethodStep({
   onConfirm,
   submitting,
   error,
+  balanceAmount,
+  balanceAvailable,
 }: {
   method: Method
   setMethod: (m: Method) => void
   onConfirm: () => void
   submitting: boolean
   error: string | null
+  balanceAmount: string
+  balanceAvailable: boolean
 }) {
   const ctaLabel =
     method === "TRANSFER"
       ? "Generar transferencia"
       : method === "CARD"
         ? "Pagar con tarjeta"
-        : "Ir a Mercado Pago"
+        : method === "SALDO"
+          ? "Pagar con saldo"
+          : "Ir a Mercado Pago"
 
   const CtaIcon = method === "MERCADOPAGO" ? ArrowUpRight : ArrowRight
 
@@ -426,6 +536,17 @@ function MethodStep({
       </div>
 
       <div className="flex flex-col gap-3" role="radiogroup" aria-label="Medio de pago">
+        {/* Tarea 6.2 — "Saldo disponible" solo cuando el cliente tiene fondos (visión §2.7):
+            el saldo está atado al DNI del paso anterior. */}
+        {balanceAvailable ? (
+          <MethodCard
+            icon={<Coins className="size-5" strokeWidth={2} />}
+            label="Saldo disponible"
+            description={`Tenés ${formatMoneyArsExact(balanceAmount)} cargados para este evento.`}
+            selected={method === "SALDO"}
+            onSelect={() => setMethod("SALDO")}
+          />
+        ) : null}
         <MethodCard
           icon={<ArrowLeftRight className="size-5" strokeWidth={2} />}
           label="Transferencia"
@@ -603,24 +724,67 @@ function PayTransferView({ amount, alias }: { amount: string; alias: string }) {
   )
 }
 
+/**
+ * Datos que entrega el CardPayment Brick al submit. Todo opcional: es un supertipo
+ * del form data del SDK (así el callback es asignable sin casts `any`).
+ */
+type CardBrickFormData = {
+  token?: string
+  issuer_id?: string | null
+  payment_method_id?: string
+  installments?: number
+  payer?: { email?: string; identification?: { type?: string; number?: string } | null }
+}
+
 function PayCardView({
   amount,
-  preferenceId,
   publicKey,
+  receiptToken,
+  onPaid,
 }: {
-  amount: string
-  preferenceId: string | null
+  amount: number
   publicKey: string | null
+  receiptToken: string
+  onPaid: (status: "approved" | "pending") => void
 }) {
-  useEffect(() => {
-    if (!preferenceId || !publicKey) return
-    // Inyectar MP Bricks (cardPayment) acá.
-    // const mp = new (window as any).MercadoPago(publicKey, { locale: "es-AR" })
-    // mp.bricks().create("cardPayment", "mp-card-brick", {
-    //   initialization: { amount: <number desde totalStr> },
-    //   callbacks: { onSubmit: (cardFormData) => fetch(...) }
-    // })
-  }, [preferenceId, publicKey])
+  const [error, setError] = useState<string | null>(null)
+
+  // Tarea 2.2 — pago con tarjeta de punta a punta: el Brick entrega el token del
+  // método de pago y acá se cobra contra `/api/mp/process-brick` (la sale ya quedó
+  // PENDING en el checkout y el backend la cumple al aprobarse).
+  const handleSubmit = async (form: CardBrickFormData) => {
+    if (!receiptToken || !form.token) return
+    setError(null)
+    try {
+      const res = await publicApiFetch<ProcessBrickResponse>("/api/mp/process-brick", {
+        method: "POST",
+        body: JSON.stringify({
+          receiptToken,
+          token: form.token,
+          installments: form.installments,
+          payer: {
+            email: form.payer?.email ?? "",
+            ...(form.payer?.identification
+              ? { identification: form.payer.identification }
+              : {}),
+          },
+          payment_method_id: form.payment_method_id,
+          issuer_id: form.issuer_id,
+        }),
+      })
+      if (!res.success) {
+        setError(res.error ?? "No pudimos procesar el pago.")
+        return
+      }
+      if (res.status === "rejected" || res.status === "cancelled") {
+        setError("El pago fue rechazado. Probá con otra tarjeta.")
+        return
+      }
+      onPaid(res.status === "approved" ? "approved" : "pending")
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No pudimos procesar el pago.")
+    }
+  }
 
   return (
     <div className="flex flex-col gap-10">
@@ -634,14 +798,26 @@ function PayCardView({
           transition={{ duration: 0.32 }}
           className="mt-4 text-4xl font-black tracking-tight tabular-nums text-white sm:text-5xl"
         >
-          {amount}
+          {formatMoneyArsExact(amount)}
         </motion.p>
       </div>
-      <div id="mp-card-brick" className="overflow-hidden rounded-2xl bg-white" />
-      {!preferenceId || !publicKey ? (
+      {publicKey ? (
+        <CardPayment
+          id="mp-card-brick"
+          initialization={{ amount }}
+          locale="es-AR"
+          onSubmit={handleSubmit}
+          onReady={() => setError(null)}
+        />
+      ) : (
         <p className="text-center text-xs text-white/40">
           Preparando el formulario seguro de Mercado Pago…
         </p>
+      )}
+      {error ? (
+        <div className="rounded-xl border border-red-500/20 bg-red-500/[0.06] px-4 py-3">
+          <p className="text-sm leading-relaxed text-red-300">{error}</p>
+        </div>
       ) : null}
     </div>
   )

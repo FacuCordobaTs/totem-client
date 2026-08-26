@@ -8,6 +8,9 @@ import { EventDetailPage } from "@/pages/event-detail-page"
 import { CheckoutPage } from "@/pages/checkout-page"
 import { ReceiptPage } from "@/pages/receipt-page"
 import { QrPage } from "@/pages/qr-page"
+import { RetirarPage } from "@/pages/retirar-page"
+import { PickupPage } from "@/pages/pickup-page"
+import { InvitationPage } from "@/pages/invitation-page"
 import { EventLinkHintPage } from "@/pages/event-link-hint-page"
 import { AppShell } from "@/components/app-shell"
 
@@ -61,6 +64,32 @@ const router = createBrowserRouter([
     element: (
       <NightRoot>
         <QrPage />
+      </NightRoot>
+    ),
+  },
+  {
+    path: "/receipt/:receiptToken/retirar",
+    element: (
+      <NightRoot>
+        <RetirarPage />
+      </NightRoot>
+    ),
+  },
+  {
+    path: "/retiro/:token",
+    element: (
+      <NightRoot>
+        <PickupPage />
+      </NightRoot>
+    ),
+  },
+  // Tarea 7.2 — Invitación nominada (cortesía): el link que copia el admin es `${client}/i/:token`
+  // y hoy moría en el wildcard. El token es la credencial (sin auth).
+  {
+    path: "/i/:token",
+    element: (
+      <NightRoot>
+        <InvitationPage />
       </NightRoot>
     ),
   },
