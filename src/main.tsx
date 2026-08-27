@@ -12,6 +12,7 @@ import { RetirarPage } from "@/pages/retirar-page"
 import { PickupPage } from "@/pages/pickup-page"
 import { InvitationPage } from "@/pages/invitation-page"
 import { EventLinkHintPage } from "@/pages/event-link-hint-page"
+import { CustomerProfilePage } from "@/pages/customer-profile-page"
 import { AppShell } from "@/components/app-shell"
 
 function NightRoot({ children }: { children: ReactNode }) {
@@ -32,6 +33,14 @@ const router = createBrowserRouter([
     element: (
       <NightRoot>
         <EventLinkHintPage />
+      </NightRoot>
+    ),
+  },
+  {
+    path: "/mi-cuenta/:token",
+    element: (
+      <NightRoot>
+        <CustomerProfilePage />
       </NightRoot>
     ),
   },

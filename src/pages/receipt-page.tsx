@@ -1,24 +1,29 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react"
-import { Link, useParams, useSearchParams } from "react-router"
+import { Link, useNavigate, useParams, useSearchParams } from "react-router"
 import QRCode from "qrcode"
 import {
+  ArrowLeft,
   ArrowRight,
   BottleWine,
   Coins,
   Copy,
   Loader2,
+  Maximize2,
   Minus,
+  Plus,
   Ticket,
   Wine,
+  UserRound,
 } from "lucide-react"
 import { initMercadoPago } from "@mercadopago/sdk-react"
 import { toast } from "sonner"
 import { AnimatePresence, motion, useAnimationControls, type Transition } from "motion/react"
 import Decimal from "decimal.js"
-import {  publicApiFetch } from "@/lib/api"
+import { publicApiFetch } from "@/lib/api"
 import type {
   BalanceDepositResponse,
   ConsumptionsCheckoutResponse,
+  PickupApiResponse,
   PublicDrinkProductItem,
   PublicEventDetailResponse,
   PublicProductCategory,
@@ -27,7 +32,6 @@ import type {
 } from "@/types/api"
 import { Button } from "@/components/ui/button"
 import {
-  consumptionStatusLabel,
   formatEventDate,
   formatMoneyArsExact,
   formatPaymentMethod,
@@ -43,7 +47,7 @@ const EASE_OUT: Transition = { duration: 0.32, ease: [0.22, 1, 0.36, 1] }
 const SHELF_TRANSITION: Transition = { duration: 0.42, ease: [0.22, 1, 0.36, 1] }
 const TAB_TRANSITION: Transition = { duration: 0.34, ease: [0.22, 1, 0.36, 1] }
 
-type ReceiptTab = "tickets" | "consumos"
+type ReceiptView = "home" | "tickets" | "consumos" | "shop" | "balance"
 type ShelfKind = "glass" | "bottle" | "cart"
 
 function productSaleType(p: PublicDrinkProductItem): PublicProductSaleType {
@@ -104,24 +108,27 @@ function CategoryHeading({ children }: { children: ReactNode }) {
 function QrBlock({
   hash,
   active,
-  label,
+  receiptToken,
+  ticketName,
+  ticketPrice,
 }: {
   hash: string
   active: boolean
-  label: string
+  receiptToken: string
+  ticketName: string
+  ticketPrice: string
 }) {
   const [src, setSrc] = useState<string | null>(null)
 
   useEffect(() => {
     if (!active) {
-      setSrc(null)
       return
     }
     let cancelled = false
     QRCode.toDataURL(hash, {
-      width: 220,
+      width: 88,
       margin: 1,
-      color: { dark: "#fafafa", light: "#121212" },
+      color: { dark: "#09090b", light: "#ffffff" },
     })
       .then((url) => {
         if (!cancelled) setSrc(url)
@@ -136,90 +143,29 @@ function QrBlock({
 
   if (!active) {
     return (
-      <div className="flex flex-col items-center gap-5 rounded-2xl px-4 py-10">
-        <div className="flex size-[220px] items-center justify-center rounded-xl border border-dashed border-white/10">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/35">
-            Canjeada
+      <div className="flex size-[4.5rem] items-center justify-center rounded-lg border border-dashed border-zinc-300 bg-zinc-100">
+          <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-zinc-400">
+            Usada
           </span>
-        </div>
-        <p className="max-w-[240px] text-center text-sm text-white/40">{label}</p>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col items-center gap-5 rounded-2xl px-4 py-8">
-      {src ? (
-        <img src={src} alt="" className="size-[220px] rounded-xl" width={220} height={220} />
-      ) : (
-        <div className="flex size-[220px] items-center justify-center text-sm text-white/40">…</div>
-      )}
-      <p className="max-w-[240px] text-center text-sm text-white/55">{label}</p>
+    <div className="relative mx-auto w-fit">
       <Link
-        to={`/qr/${encodeURIComponent(hash)}`}
-        className="text-[13px] text-white/45 underline decoration-white/15 underline-offset-4 hover:text-white"
+        to={`/qr/${encodeURIComponent(hash)}?layout=ticket&name=${encodeURIComponent(ticketName)}&price=${encodeURIComponent(ticketPrice)}&returnTo=${encodeURIComponent(`/receipt/${encodeURIComponent(receiptToken)}?view=tickets`)}`}
+        aria-label="Ver código en pantalla completa"
+        className="absolute -right-1.5 -top-1.5 z-10 flex size-7 items-center justify-center rounded-full border-2 border-white bg-zinc-950 text-white shadow-lg transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
       >
-        Pantalla completa
+        <Maximize2 className="size-3" aria-hidden />
       </Link>
+      {src ? (
+        <img src={src} alt="Código QR de entrada" className="size-[4.5rem] rounded-lg" width={72} height={72} />
+      ) : (
+        <div className="flex size-[4.5rem] items-center justify-center text-sm text-zinc-400">…</div>
+      )}
     </div>
-  )
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Tabs — minimal, animated underline (Arc / Claude style)
-// ──────────────────────────────────────────────────────────────────────────────
-function ReceiptTabs({
-  value,
-  onChange,
-  showConsumos,
-}: {
-  value: ReceiptTab
-  onChange: (v: ReceiptTab) => void
-  showConsumos: boolean
-}) {
-  if (!showConsumos) return null
-  return (
-    <div className="flex items-center gap-8 border-b border-white/[0.07]">
-      <TabButton
-        active={value === "tickets"}
-        onClick={() => onChange("tickets")}
-        label="Tus tickets"
-      />
-      <TabButton
-        active={value === "consumos"}
-        onClick={() => onChange("consumos")}
-        label="Comprar consumos"
-      />
-    </div>
-  )
-}
-
-function TabButton({
-  active,
-  onClick,
-  label,
-}: {
-  active: boolean
-  onClick: () => void
-  label: string
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`relative -mb-px py-4 text-[15px] font-semibold tracking-tight outline-none transition-colors focus-visible:text-white ${
-        active ? "text-white" : "text-white/40 hover:text-white/65"
-      }`}
-    >
-      {label}
-      {active ? (
-        <motion.div
-          layoutId="receipt-tab-indicator"
-          className="absolute -bottom-px left-0 right-0 h-px bg-white"
-          transition={TAB_TRANSITION}
-        />
-      ) : null}
-    </button>
   )
 }
 
@@ -276,6 +222,7 @@ function ProductShelfRow({
   disabled,
   count,
   onAdd,
+  onRemove,
 }: {
   name: string
   imageUrl?: string | null
@@ -283,7 +230,7 @@ function ProductShelfRow({
   disabled: boolean
   count: number
   onAdd: () => void
-  type: "glass" | "bottle"
+  onRemove: () => void
 }) {
   const [tapTick, setTapTick] = useState(0)
   const showPhoto = Boolean(imageUrl)
@@ -294,15 +241,12 @@ function ProductShelfRow({
     setTapTick((t) => t + 1)
   }
 
-  if (showPhoto) {
-    return (
-      <motion.button
-        type="button"
-        disabled={disabled}
-        onClick={triggerAdd}
-        whileTap={disabled ? undefined : { scale: 0.988 }}
-        className="group relative ml-6 aspect-[4/5] w-64 overflow-hidden rounded-2xl bg-zinc-950 text-left outline-none focus-visible:ring-2 focus-visible:ring-white/35 disabled:pointer-events-none disabled:opacity-45"
-      >
+  return (
+    <motion.div
+      layout
+      className={`group relative aspect-[4/5] w-full overflow-hidden rounded-2xl border border-white/[0.07] bg-zinc-950 text-left ${disabled ? "opacity-45" : ""}`}
+    >
+      {showPhoto ? (
         <img
           src={imageUrl!}
           alt={name}
@@ -310,80 +254,72 @@ function ProductShelfRow({
           loading="lazy"
           decoding="async"
         />
+      ) : (
+        <div className="absolute inset-0 bg-[#141414]" />
+      )}
+      {showPhoto ? (
         <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/95" />
-        <div className="pointer-events-none absolute inset-x-0 top-0 pl-4 pr-16 pt-6">
-          <p className="text-xl text-white">{name}</p>
-        </div>
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 pb-6 pl-4">
-          <p className="text-xl font-bold tabular-nums text-white/85">{priceStr}</p>
-        </div>
-
-        {tapTick > 0 ? (
-          <motion.div
-            key={`flash-${tapTick}`}
-            aria-hidden
-            initial={{ opacity: 0.9 }}
-            animate={{ opacity: 0 }}
-            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-            className="pointer-events-none absolute inset-0 rounded-2xl ring-[1.5px] ring-inset ring-white/55"
-          />
-        ) : null}
-
-        <AnimatePresence>
-          {count > 0 ? (
-            <motion.div
-              key="qty-badge"
-              initial={{ opacity: 0, scale: 0.55, y: -6 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.55, y: -4 }}
-              transition={{ type: "spring", stiffness: 500, damping: 28 }}
-              className="absolute right-4 top-6 z-10"
-            >
-              <QuantityBadge value={count} />
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
-      </motion.button>
-    )
-  }
-
-  return (
-    <motion.button
-      type="button"
-      disabled={disabled}
-      onClick={triggerAdd}
-      whileTap={disabled ? undefined : { scale: 0.985 }}
-      className="relative flex w-full items-center justify-between gap-4 rounded-2xl border border-white/[0.07] bg-white/[0.04] px-4 py-3.5 text-left outline-none transition-colors hover:bg-white/[0.06] focus-visible:ring-2 focus-visible:ring-white/30 disabled:pointer-events-none disabled:opacity-45"
-    >
-      <p className="min-w-0 flex-1 text-[15px] font-semibold leading-snug text-white">{name}</p>
-      <div className="flex shrink-0 items-center gap-3">
-        <p className="text-sm font-medium tabular-nums text-white/50">{priceStr}</p>
-        <AnimatePresence initial={false}>
-          {count > 0 ? (
-            <motion.div
-              key="qty"
-              initial={{ opacity: 0, scale: 0.5, width: 0 }}
-              animate={{ opacity: 1, scale: 1, width: "auto" }}
-              exit={{ opacity: 0, scale: 0.5, width: 0 }}
-              transition={{ type: "spring", stiffness: 520, damping: 28 }}
-              className="overflow-hidden"
-            >
-              <QuantityBadge value={count} size="sm" />
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
+      ) : null}
+      <motion.button
+        type="button"
+        disabled={disabled}
+        onClick={triggerAdd}
+        whileTap={disabled ? undefined : { scale: 0.985 }}
+        aria-label={`Agregar ${name}`}
+        className="absolute inset-0 z-10 rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/35 disabled:pointer-events-none"
+      />
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-[11] px-3 pt-3 pr-12">
+        <p className="text-[15px] font-semibold leading-tight text-white sm:text-base">{name}</p>
       </div>
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[11] px-3 pb-3 pr-12">
+        <p className="text-base font-bold tabular-nums text-white/85 sm:text-lg">{priceStr}</p>
+      </div>
+
       {tapTick > 0 ? (
         <motion.div
           key={`flash-${tapTick}`}
           aria-hidden
-          initial={{ opacity: 0.75 }}
+          initial={{ opacity: 0.9 }}
           animate={{ opacity: 0 }}
-          transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-          className="pointer-events-none absolute inset-0 rounded-2xl ring-[1.5px] ring-inset ring-white/45"
+          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          className="pointer-events-none absolute inset-0 z-30 rounded-2xl ring-[1.5px] ring-inset ring-white/55"
         />
       ) : null}
-    </motion.button>
+
+      <AnimatePresence initial={false}>
+        {count > 0 ? (
+          <motion.div
+            key="qty-controls"
+            initial={{ opacity: 0, scale: 0.55, y: -6 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.55, y: -4 }}
+            transition={{ type: "spring", stiffness: 500, damping: 28 }}
+            className="absolute right-2.5 top-2.5 z-20 flex items-center gap-1.5"
+          >
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={onRemove}
+              aria-label={`Quitar ${name}`}
+              className="flex size-7 items-center justify-center rounded-full bg-black/75 text-white shadow-lg backdrop-blur-sm transition-colors hover:bg-black disabled:pointer-events-none"
+            >
+              <Minus className="size-3.5" strokeWidth={2.5} aria-hidden />
+            </button>
+            <QuantityBadge value={count} size="sm" />
+          </motion.div>
+        ) : (
+          <motion.span
+            key="add-indicator"
+            initial={{ opacity: 0, scale: 0.7 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.7 }}
+            className="pointer-events-none absolute bottom-2.5 right-2.5 z-20 flex size-7 items-center justify-center rounded-full bg-white text-black"
+          >
+            <Plus className="size-3.5" strokeWidth={2.5} aria-hidden />
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </motion.div>
   )
 }
 
@@ -484,11 +420,59 @@ async function copyText(label: string, value: string) {
   }
 }
 
+function SectionHeader({ title, onBack }: { title: string; onBack: () => void }) {
+  return (
+    <header className="space-y-5">
+      <button
+        type="button"
+        onClick={onBack}
+        className="flex items-center gap-2 text-sm font-medium text-white/55 transition-colors hover:text-white"
+      >
+        <ArrowLeft className="size-4" aria-hidden />
+        Volver
+      </button>
+      <h1 className="text-3xl font-bold tracking-tight text-white">{title}</h1>
+    </header>
+  )
+}
+
+function NavigationCard({
+  icon,
+  title,
+  detail,
+  onClick,
+}: {
+  icon: ReactNode
+  title: string
+  detail?: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex w-full items-center gap-4 rounded-2xl border border-white/[0.08] bg-white/[0.035] px-5 py-5 text-left outline-none transition-colors hover:bg-white/[0.07] focus-visible:ring-2 focus-visible:ring-white/30"
+    >
+      <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-white/[0.07] text-white/80">
+        {icon}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center justify-between gap-3">
+          <span className="text-[17px] font-semibold tracking-tight text-white">{title}</span>
+          {detail ? <span className="text-sm font-semibold text-white/65">{detail}</span> : null}
+        </span>
+      </span>
+      <ArrowRight className="size-4 shrink-0 text-white/30 transition-transform group-hover:translate-x-0.5 group-hover:text-white/70" aria-hidden />
+    </button>
+  )
+}
+
 // ──────────────────────────────────────────────────────────────────────────────
 // Main page
 // ──────────────────────────────────────────────────────────────────────────────
 export function ReceiptPage() {
   const { receiptToken } = useParams<{ receiptToken: string }>()
+  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
 
   const [data, setData] = useState<ReceiptApiResponse | null>(null)
@@ -502,8 +486,13 @@ export function ReceiptPage() {
   const [addonPolling, setAddonPolling] = useState(false)
   const consumptionsCountRef = useRef(0)
 
-  const [activeTab, setActiveTab] = useState<ReceiptTab>("tickets")
+  const [activeView, setActiveView] = useState<ReceiptView>(() =>
+    searchParams.get("view") === "tickets" ? "tickets" : "home"
+  )
   const [shelf, setShelf] = useState<ShelfKind>("glass")
+  const [pickupMode, setPickupMode] = useState(false)
+  const [pickupSelection, setPickupSelection] = useState<Record<string, number>>({})
+  const [pickupSubmitting, setPickupSubmitting] = useState(false)
 
   // ─── Tarea 6.2 — Saldo (visión §2.7): bloque "Tu saldo" con carga (MP/transferencia)
   // y pago con saldo en el addon. ────────────────────────────────────────────────────
@@ -659,7 +648,7 @@ export function ReceiptPage() {
     if (count > consumptionsCountRef.current && consumptionsCountRef.current > 0 && addonPolling) {
       toast.success("¡Consumos agregados!")
       setAddonPolling(false)
-      setActiveTab("tickets")
+      setActiveView("consumos")
       setAddonDrinks({})
       try {
         sessionStorage.removeItem(ADDON_PURCHASE_KEY)
@@ -696,8 +685,6 @@ export function ReceiptPage() {
     }
   }, [depositPolling, data])
 
-  if (!receiptToken) return null
-
   const showPaidContent = data?.sale.paid === true
 
   // Addon (new) drink lines + total
@@ -715,10 +702,9 @@ export function ReceiptPage() {
       .toFixed(2)
   }, [addonDrinkLines, addonProducts])
 
-  const addonUnitCount = addonDrinkLines.reduce((a, l) => a + l.quantity, 0)
+  if (!receiptToken) return null
 
-  const addonConsumptions = (data?.consumptions ?? []).filter((c) => c.isAddon)
-  const regularConsumptions = (data?.consumptions ?? []).filter((c) => !c.isAddon)
+  const addonUnitCount = addonDrinkLines.reduce((a, l) => a + l.quantity, 0)
 
   const consumosAvailable =
     showPaidContent && addonProducts !== null && addonProducts.length > 0
@@ -727,6 +713,63 @@ export function ReceiptPage() {
   const hasPendingConsumptions = (data?.consumptions ?? []).some(
     (c) => c.status === "PENDING"
   )
+  const consumptionGroups = [...(data?.consumptions ?? []).reduce((groups, consumption) => {
+    const current = groups.get(consumption.product.id) ?? {
+      id: consumption.product.id,
+      name: consumption.product.name,
+      pendingIds: [] as string[],
+      pending: 0,
+      redeemed: 0,
+    }
+    if (consumption.status === "PENDING") {
+      current.pending += 1
+      current.pendingIds.push(consumption.id)
+    }
+    if (consumption.status === "REDEEMED") current.redeemed += 1
+    groups.set(consumption.product.id, current)
+    return groups
+  }, new Map<string, { id: string; name: string; pendingIds: string[]; pending: number; redeemed: number }>()).values()]
+
+  const pickupTotal = Object.values(pickupSelection).reduce((total, quantity) => total + quantity, 0)
+
+  const changePickupQuantity = (productId: string, change: number, max: number) => {
+    setPickupSelection((current) => {
+      const quantity = Math.max(0, Math.min(max, (current[productId] ?? 0) + change))
+      const next = { ...current }
+      if (quantity === 0) delete next[productId]
+      else next[productId] = quantity
+      return next
+    })
+  }
+
+  const handlePickup = async () => {
+    if (!pickupMode) {
+      setPickupMode(true)
+      return
+    }
+    if (pickupTotal === 0 || pickupSubmitting) return
+    const consumptionIds = consumptionGroups.flatMap((group) =>
+      group.pendingIds.slice(0, pickupSelection[group.id] ?? 0)
+    )
+    setPickupSubmitting(true)
+    try {
+      const pickup = await publicApiFetch<PickupApiResponse>("/public/pickups", {
+        method: "POST",
+        body: JSON.stringify({ receiptToken, consumptionIds }),
+        headers: { "Content-Type": "application/json" },
+      })
+      navigate(`/retiro/${pickup.token}?receipt=${encodeURIComponent(receiptToken)}`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo generar la orden")
+    } finally {
+      setPickupSubmitting(false)
+    }
+  }
+
+  const cancelPickup = () => {
+    setPickupMode(false)
+    setPickupSelection({})
+  }
 
   // ─── Pago handlers (addon) ───────────────────────────────────────────────────
   const handleAddonCheckout = async () => {
@@ -754,7 +797,7 @@ export function ReceiptPage() {
       if (addonMethod === "SALDO") {
         toast.success("¡Comprado con tu saldo!")
         setAddonDrinks({})
-        setActiveTab("tickets")
+        setActiveView("consumos")
         await load()
         return
       }
@@ -832,252 +875,260 @@ export function ReceiptPage() {
     })
   }
 
-  const onConsumosTab = activeTab === "consumos" && consumosAvailable
-  const showFooter = onConsumosTab && addonUnitCount > 0
+  const onShopView = activeView === "shop" && consumosAvailable
+  const showFooter = onShopView && addonUnitCount > 0
+  const showBuyMoreFooter = activeView === "consumos" && (consumosAvailable || pickupMode)
 
   // Tarea 6.2 — Con saldo, el addon ofrece pagar con saldo (sin tarjeta ni transferencia).
   const addonBalanceAvailable = parseFloat(data?.balance?.amount ?? "0") > 0
 
   return (
-    <div className={`min-h-dvh ${showFooter ? "pb-44" : "pb-24"}`}>
+    <div className={`min-h-dvh ${showFooter ? "pb-44" : showBuyMoreFooter ? "pb-28" : "pb-24"}`}>
 
       <div
         className={`mx-auto flex max-w-lg flex-col gap-10 px-6 pt-10 sm:px-8 ${
-          onConsumosTab ? "pr-14 sm:pr-[4.5rem]" : ""
+          onShopView ? "pr-14 sm:pr-[4.5rem]" : ""
         }`}
       >
-            {/* ─── Paid: tabs + content ─── */}
-            {showPaidContent ? (
-              <>
-                <ReceiptTabs
-                  value={activeTab}
-                  onChange={setActiveTab}
-                  showConsumos={consumosAvailable}
-                />
-
-                      {/* ─── Cross-tab CTA: prompt to buy consumos ─── */}
-                      {consumosAvailable && !addonPolling ? (
-                        <button
-                          type="button"
-                          onClick={() => setActiveTab("consumos")}
-                          className="group relative flex w-full flex-col gap-3 overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.03] px-6 py-7 text-left outline-none transition-colors hover:bg-white/[0.05] focus-visible:ring-2 focus-visible:ring-white/30"
-                        >
-                          <div className="flex items-baseline justify-between gap-4">
-                            <h3 className="text-lg font-semibold tracking-tight text-white">
-                              Sumar consumos
-                            </h3>
-                            <ArrowRight
-                              className="size-4 shrink-0 text-white/40 transition-transform group-hover:translate-x-0.5 group-hover:text-white"
-                              aria-hidden
-                            />
-                          </div>
-                          <p className="text-[14px] leading-relaxed text-white/55">
-                            Comprá bebidas desde acá durante el evento. Te entregamos cada
-                            una con un QR para mostrar en barra.
-                          </p>
-                        </button>
-                      ) : null}
-
-                      {/* ─── Cross-tab CTA: retirar tragos (tarea 4.1) ─── */}
-                      {hasPendingConsumptions ? (
-                        <Link
-                          to={`/receipt/${receiptToken}/retirar`}
-                          className="group relative flex w-full flex-col gap-3 overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.03] px-6 py-7 text-left outline-none transition-colors hover:bg-white/[0.05] focus-visible:ring-2 focus-visible:ring-white/30"
-                        >
-                          <div className="flex items-baseline justify-between gap-4">
-                            <h3 className="text-lg font-semibold tracking-tight text-white">
-                              Retirar tragos
-                            </h3>
-                            <ArrowRight
-                              className="size-4 shrink-0 text-white/40 transition-transform group-hover:translate-x-0.5 group-hover:text-white"
-                              aria-hidden
-                            />
-                          </div>
-                          <p className="text-[14px] leading-relaxed text-white/55">
-                            Elegí qué llevarte ahora y mostrá un solo código en la barra.
-                            Lo que no retires queda guardado.
-                          </p>
-                        </Link>
-                      ) : null}
-
-                      {/* ─── Tarea 6.2 — Tu saldo (visión §2.7) ─── */}
-                      <section className="flex items-center justify-between gap-4 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-6 py-5">
-                        <div className="flex min-w-0 items-center gap-4">
-                          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-white/70">
-                            <Coins className="size-5" strokeWidth={2} aria-hidden />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
-                              Tu saldo
-                            </p>
-                            <p className="mt-1 text-xl font-bold tabular-nums tracking-tight text-white">
-                              {formatMoneyArsExact(data.balance?.amount ?? "0.00")}
-                            </p>
-                          </div>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          className="shrink-0 rounded-xl"
-                          onClick={() => setDepositOpen(true)}
-                        >
-                          Cargar
-                        </Button>
-                      </section>
-                <AnimatePresence mode="wait" initial={false}>
-                  {activeTab === "tickets" ? (
-                    <motion.div
-                      key="tab-tickets"
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -8 }}
-                      transition={TAB_TRANSITION}
-                      className="flex flex-col gap-12"
-                    >
-
-                      {/* ─── Addon consumos (recently added) ─── */}
-                      {addonConsumptions.length > 0 ? (
-                        <section className="space-y-6">
-                          <div className="flex items-baseline gap-3">
-                            <h2 className="text-2xl font-bold tracking-tight text-white">
-                              Consumos
-                            </h2>
-                            <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
-                              Nuevos
-                            </span>
-                          </div>
-                          <div className="flex flex-col gap-10">
-                            {addonConsumptions.map((c) => {
-                              const active = c.status === "PENDING"
-                              return (
-                                <div key={c.id} className="space-y-4">
-                                  <div>
-                                    <p className="font-medium text-white">
-                                      {c.product.name}
-                                    </p>
-                                    <p className="mt-1.5 text-sm text-white/45">
-                                      {formatMoneyArsExact(c.product.price)} ·{" "}
-                                      {consumptionStatusLabel(c.status)}
-                                    </p>
-                                  </div>
-                                  <QrBlock
-                                    hash={c.qrHash}
-                                    active={active}
-                                    label={active ? "Canje en barra" : "Ya canjeada"}
-                                  />
-                                </div>
-                              )
-                            })}
-                          </div>
-                        </section>
-                      ) : null}
-
-                      {/* ─── Tickets ─── */}
-                      {data.tickets.length > 0 ? (
-                        <section className="space-y-6">
-                          <h2 className="text-2xl font-bold tracking-tight text-white">
-                            Entradas
-                          </h2>
-                          <div className="flex flex-col gap-10">
-                            {data.tickets.map((t) => {
-                              const active = t.status === "PENDING"
-                              return (
-                                <div key={t.id} className="space-y-4">
-                                  <div>
-                                    <p className="font-medium text-white">
-                                      {t.ticketType.name}
-                                    </p>
-                                    <p className="mt-1.5 text-sm text-white/45">
-                                      {formatMoneyArsExact(t.ticketType.price)} ·{" "}
-                                      {ticketStatusLabel(t.status)}
-                                    </p>
-                                  </div>
-                                  <QrBlock
-                                    hash={t.qrHash}
-                                    active={active}
-                                    label={
-                                      active
-                                        ? "Mostrá este código en el ingreso"
-                                        : "Entrada utilizada"
-                                    }
-                                  />
-                                </div>
-                              )
-                            })}
-                          </div>
-                        </section>
-                      ) : null}
-
-                      {/* ─── Regular consumos (from the original sale) ─── */}
-                      {regularConsumptions.length > 0 ? (
-                        <section className="space-y-6">
-                          <h2 className="text-2xl font-bold tracking-tight text-white">
-                            Consumos
-                          </h2>
-                          <div className="flex flex-col gap-10">
-                            {regularConsumptions.map((c) => {
-                              const active = c.status === "PENDING"
-                              return (
-                                <div key={c.id} className="space-y-4">
-                                  <div>
-                                    <p className="font-medium text-white">
-                                      {c.product.name}
-                                    </p>
-                                    <p className="mt-1.5 text-sm text-white/45">
-                                      {formatMoneyArsExact(c.product.price)} ·{" "}
-                                      {consumptionStatusLabel(c.status)}
-                                    </p>
-                                  </div>
-                                  <QrBlock
-                                    hash={c.qrHash}
-                                    active={active}
-                                    label={active ? "Canje en barra" : "Ya canjeada"}
-                                  />
-                                </div>
-                              )
-                            })}
-                          </div>
-                        </section>
-                      ) : null}
-                    </motion.div>
+        {data ? (
+          <div className="flex justify-end">
+            <Link
+              to={`/mi-cuenta/${encodeURIComponent(receiptToken)}`}
+              className="flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium text-white/35 transition-colors hover:bg-white/[0.06] hover:text-white/65"
+            >
+              <UserRound className="size-3.5" aria-hidden />
+              Mis eventos
+            </Link>
+          </div>
+        ) : null}
+        {!data ? (
+          <div className="flex items-center justify-center py-24 text-white/40">
+            <Loader2 className="size-6 animate-spin" aria-hidden />
+          </div>
+        ) : !showPaidContent ? (
+          <div className="flex flex-col gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-6 py-8 text-center">
+            <p className="text-lg font-semibold tracking-tight text-white">Pago pendiente</p>
+            <p className="mx-auto max-w-[280px] text-sm leading-relaxed text-white/50">
+              {formatMoneyArsExact(data.sale.totalAmount)} · {formatPaymentMethod(data.sale.paymentMethod)}.
+              Cuando se acredite vas a encontrar acá tus entradas, consumos y saldo.
+            </p>
+          </div>
+        ) : (
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={activeView}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={TAB_TRANSITION}
+              className="flex flex-col gap-8"
+            >
+              {activeView === "home" ? (
+                <>
+                  <header className="space-y-3 pb-2">
+                    <p className="text-sm font-medium text-white/45">{data.event.name}</p>
+                    <h1 className="text-4xl font-bold tracking-[-0.035em] text-white">
+                      Hola, {data.customerName}
+                    </h1>
+                    <p className="max-w-sm text-[15px] leading-relaxed text-white/50">
+                      Todo lo que necesitás para disfrutar el evento está acá.
+                    </p>
+                  </header>
+                  <nav className="flex flex-col gap-3" aria-label="Tu cuenta para el evento">
+                    <NavigationCard
+                      icon={<Ticket className="size-5" aria-hidden />}
+                      title="Tus entradas"
+                      detail={`${data.tickets.length}`}
+                      onClick={() => setActiveView("tickets")}
+                    />
+                    <NavigationCard
+                      icon={<Wine className="size-5" aria-hidden />}
+                      title="Tus consumos"
+                      detail={`${data.consumptions.filter((c) => c.status === "PENDING").length}`}
+                      onClick={() => setActiveView("consumos")}
+                    />
+                    <NavigationCard
+                      icon={<Coins className="size-5" aria-hidden />}
+                      title="Tu saldo"
+                      detail={formatMoneyArsExact(data.balance.amount)}
+                      onClick={() => setActiveView("balance")}
+                    />
+                  </nav>
+                </>
+              ) : activeView === "tickets" ? (
+                <>
+                  <SectionHeader title="Tus entradas" onBack={() => setActiveView("home")} />
+                  {data.tickets.length > 0 ? (
+                    <div className="flex flex-col gap-3">
+                      {data.tickets.map((ticket) => {
+                        const active = ticket.status === "PENDING"
+                        return (
+                          <article
+                            key={ticket.id}
+                            className="relative flex min-h-[6.25rem] min-w-0 overflow-hidden rounded-2xl bg-white text-zinc-950 shadow-[0_16px_45px_-24px_rgba(255,255,255,0.38)]"
+                          >
+                            <div className="flex min-w-0 flex-1 flex-col justify-center px-5 py-4 pr-4">
+                              <p className="truncate text-base font-extrabold tracking-tight">{ticket.ticketType.name}</p>
+                              <p className="mt-1 text-sm font-semibold tabular-nums text-zinc-600">
+                                {formatMoneyArsExact(ticket.ticketType.price)}
+                              </p>
+                              <span className={`mt-2 w-fit rounded-full px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-[0.14em] ${active ? "bg-emerald-100 text-emerald-700" : "bg-zinc-200 text-zinc-500"}`}>
+                                {ticketStatusLabel(ticket.status)}
+                              </span>
+                            </div>
+                            <div className="relative flex w-[6.5rem] shrink-0 items-center justify-center border-l-2 border-dotted border-zinc-300 px-4 py-3">
+                              <span aria-hidden className="absolute -left-[9px] -top-[9px] size-4 rounded-full bg-black" />
+                              <span aria-hidden className="absolute -bottom-[9px] -left-[9px] size-4 rounded-full bg-black" />
+                              <QrBlock
+                                hash={ticket.qrHash}
+                                active={active}
+                                receiptToken={receiptToken}
+                                ticketName={ticket.ticketType.name}
+                                ticketPrice={formatMoneyArsExact(ticket.ticketType.price)}
+                              />
+                            </div>
+                          </article>
+                        )
+                      })}
+                    </div>
                   ) : (
-                    <motion.div
-                      key="tab-consumos"
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -8 }}
-                      transition={TAB_TRANSITION}
-                      className="relative"
-                    >
-                      <ConsumosTabContent
-                        addonProducts={addonProducts ?? []}
-                        addonCategories={addonCategories}
-                        addonDrinks={addonDrinks}
-                        shelf={shelf}
-                        onAdd={bumpAddon}
-                        onRemove={trimAddon}
-                      />
-                    </motion.div>
+                    <p className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-6 py-8 text-center text-sm text-white/50">
+                      No hay entradas asociadas a esta compra.
+                    </p>
                   )}
-                </AnimatePresence>
-              </>
-            ) : data ? (
-              <div className="flex flex-col gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-6 py-8 text-center">
-                <p className="text-lg font-semibold tracking-tight text-white">
-                  Pago pendiente
-                </p>
-                <p className="mx-auto max-w-[260px] text-sm leading-relaxed text-white/50">
-                  {formatMoneyArsExact(data.sale.totalAmount)} ·{" "}
-                  {formatPaymentMethod(data.sale.paymentMethod)}. Cuando se acredite, tus
-                  códigos aparecen acá.
-                </p>
-              </div>
-            ) : null}
+                </>
+              ) : activeView === "consumos" ? (
+                <>
+                  <SectionHeader title="Tus consumos" onBack={() => setActiveView("home")} />
+                  {hasPendingConsumptions ? (
+                    <Button
+                      type="button"
+                      className={pickupMode
+                        ? "h-12 w-full rounded-2xl border border-white/15 bg-white/[0.06] font-semibold text-white hover:bg-white/[0.1]"
+                        : "h-12 w-full rounded-2xl bg-white font-semibold text-black hover:bg-zinc-200"}
+                      onClick={pickupMode ? cancelPickup : () => void handlePickup()}
+                    >
+                      {pickupMode ? "Cancelar" : "Armar orden de retiro"}
+                    </Button>
+                  ) : null}
+                  {consumptionGroups.length > 0 ? (
+                    <ul className="overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.03]">
+                      {consumptionGroups.map((group, index) => (
+                        <li key={group.id} className={`flex items-center justify-between gap-4 px-5 py-4 ${index > 0 ? "border-t border-white/[0.07]" : ""}`}>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold text-white">{group.name}</p>
+                            {group.redeemed > 0 ? <p className="mt-1 text-sm tabular-nums text-white/35">{group.redeemed} / {group.pending + group.redeemed}</p> : null}
+                          </div>
+                          {pickupMode && group.pending > 0 ? (
+                            <div className="flex shrink-0 items-center gap-3">
+                              <button
+                                type="button"
+                                disabled={(pickupSelection[group.id] ?? 0) === 0}
+                                onClick={() => changePickupQuantity(group.id, -1, group.pending)}
+                                className="flex size-9 items-center justify-center rounded-full border border-white/10 text-white/70 disabled:opacity-25"
+                                aria-label={`Restar ${group.name}`}
+                              >
+                                <Minus className="size-4" aria-hidden />
+                              </button>
+                              <span className="w-5 text-center text-base font-semibold tabular-nums text-white">
+                                {pickupSelection[group.id] ?? 0}
+                              </span>
+                              <button
+                                type="button"
+                                disabled={(pickupSelection[group.id] ?? 0) >= group.pending}
+                                onClick={() => changePickupQuantity(group.id, 1, group.pending)}
+                                className="flex size-9 items-center justify-center rounded-full bg-white text-black disabled:opacity-25"
+                                aria-label={`Sumar ${group.name}`}
+                              >
+                                <Plus className="size-4" aria-hidden />
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="min-w-8 text-right text-lg font-semibold tabular-nums text-white/65">{group.pending}</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-6 py-8 text-center text-sm text-white/50">
+                      Todavía no compraste consumos para este evento.
+                    </p>
+                  )}
+                </>
+              ) : activeView === "balance" ? (
+                <>
+                  <SectionHeader title="Tu saldo" onBack={() => setActiveView("home")} />
+                  <section className="py-4 text-center">
+                    <p className="text-4xl font-bold tabular-nums tracking-tight text-white">
+                      {formatMoneyArsExact(data.balance.amount)}
+                    </p>
+                    <p className="mx-auto mt-4 max-w-xs text-sm leading-relaxed text-white/50">
+                      Está asociado a tu DNI y podés usarlo para comprar consumos durante este evento.
+                    </p>
+                    <Button type="button" className="mt-7 h-12 w-full rounded-2xl bg-white font-semibold text-black" onClick={() => setDepositOpen(true)}>
+                      Cargar saldo
+                    </Button>
+                  </section>
+                </>
+              ) : (
+                <>
+                  <SectionHeader title="Comprar consumos" onBack={() => setActiveView("consumos")} />
+                  <section className="flex items-center justify-between gap-4 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-5 py-4">
+                    <div>
+                      <p className="text-lg font-bold text-white">{formatMoneyArsExact(data.balance.amount)}</p>
+                    </div>
+                    <Button type="button" variant="secondary" className="rounded-xl" onClick={() => setDepositOpen(true)}>Cargar</Button>
+                  </section>
+                  <ConsumosTabContent
+                    addonProducts={addonProducts ?? []}
+                    addonCategories={addonCategories}
+                    addonDrinks={addonDrinks}
+                    shelf={shelf}
+                    onAdd={bumpAddon}
+                    onRemove={trimAddon}
+                  />
+                </>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        )}
       </div>
+
+      <AnimatePresence>
+        {showBuyMoreFooter ? (
+          <motion.div
+            key="buy-more-consumptions"
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 18 }}
+            transition={EASE_OUT}
+            className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/[0.07] bg-black/70 px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 backdrop-blur-xl sm:px-8"
+          >
+            <div className="mx-auto max-w-lg">
+              <Button
+                type="button"
+                disabled={pickupMode && (pickupTotal === 0 || pickupSubmitting)}
+                className={pickupMode
+                  ? "h-14 w-full rounded-2xl bg-[#ff6a00] font-extrabold text-white ring-1 ring-inset ring-white/30 shadow-[0_10px_38px_-8px_rgba(255,106,0,0.95)] hover:bg-[#ff7a1a] hover:shadow-[0_12px_44px_-8px_rgba(255,106,0,1)] disabled:bg-orange-500/25 disabled:text-white/35 disabled:ring-transparent disabled:shadow-none"
+                  : "h-14 w-full rounded-2xl bg-violet-600 font-bold text-white shadow-[0_12px_36px_-16px_rgba(124,58,237,0.9)] hover:bg-violet-500"}
+                onClick={pickupMode ? () => void handlePickup() : () => setActiveView("shop")}
+              >
+                {pickupSubmitting ? (
+                  <Loader2 className="size-5 animate-spin" aria-hidden />
+                ) : pickupMode ? (
+                  pickupTotal > 0 ? `Confirmar retiro · ${pickupTotal}` : "Confirmar retiro"
+                ) : (
+                  "Comprar más consumos"
+                )}
+              </Button>
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
       {/* ─── Shelf rail (only on consumos tab) ─── */}
       <AnimatePresence>
-        {onConsumosTab ? (
+        {onShopView ? (
           <motion.div
             key="rail"
             initial={{ opacity: 0, x: 24 }}
@@ -1486,7 +1537,7 @@ function ConsumosTabContent({
                 {groupProductsByCategory(glassProducts, addonCategories).map((group) => (
                   <div key={group.id}>
                     {group.name ? <CategoryHeading>{group.name}</CategoryHeading> : null}
-                    <ul className="flex flex-col gap-4">
+                    <ul className="grid grid-cols-2 gap-3">
                       {group.products.map((p) => (
                         <li key={p.id}>
                           <ProductShelfRow
@@ -1495,8 +1546,8 @@ function ConsumosTabContent({
                             priceStr={formatMoneyArsExact(p.price)}
                             disabled={false}
                             count={addonDrinks[p.id] ?? 0}
-                            type="glass"
                             onAdd={() => onAdd(p.id)}
+                            onRemove={() => onRemove(p.id)}
                           />
                         </li>
                       ))}
@@ -1525,7 +1576,7 @@ function ConsumosTabContent({
                 {groupProductsByCategory(bottleProducts, addonCategories).map((group) => (
                   <div key={group.id}>
                     {group.name ? <CategoryHeading>{group.name}</CategoryHeading> : null}
-                    <ul className="flex flex-col gap-4">
+                    <ul className="grid grid-cols-2 gap-3">
                       {group.products.map((p) => (
                         <li key={p.id}>
                           <ProductShelfRow
@@ -1534,8 +1585,8 @@ function ConsumosTabContent({
                             priceStr={formatMoneyArsExact(p.price)}
                             disabled={false}
                             count={addonDrinks[p.id] ?? 0}
-                            type="bottle"
                             onAdd={() => onAdd(p.id)}
+                            onRemove={() => onRemove(p.id)}
                           />
                         </li>
                       ))}

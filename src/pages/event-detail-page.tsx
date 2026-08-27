@@ -351,9 +351,16 @@ export function EventDetailPage() {
 
   if (!slug) return null
 
-  if (data && (data.event.designType ?? "GLASS") === "MINIMAL") {
+  const appearance: EventAppearance | null = data
+    ? (data.event.designType ?? "GLASS") === "MINIMAL"
+      ? "minimal"
+      : "glass"
+    : null
+
+  if (data && appearance) {
     return (
       <MinimalEventDetail
+        appearance={appearance}
         data={data}
         ticketsFrom={ticketsFrom}
         consFrom={consFrom}
@@ -1191,6 +1198,7 @@ function ShelfRailButton({
 }
 
 function ProductShelfRow({
+  appearance = "minimal",
   name,
   imageUrl,
   priceStr,
@@ -1199,6 +1207,7 @@ function ProductShelfRow({
   onAdd,
   onRemove,
 }: {
+  appearance?: EventAppearance
   name: string
   imageUrl?: string | null
   priceStr: string
@@ -1219,7 +1228,11 @@ function ProductShelfRow({
   return (
       <motion.div
         layout
-        className={`group relative aspect-[4/5] w-full overflow-hidden rounded-2xl border border-white/[0.07] bg-zinc-950 text-left ${disabled ? "opacity-45" : ""}`}
+        className={`group relative aspect-[4/5] w-full overflow-hidden rounded-2xl border text-left ${
+          appearance === "glass"
+            ? "border-white/[0.14] bg-white/[0.1] shadow-xl shadow-black/30 backdrop-blur-xl"
+            : "border-white/[0.07] bg-zinc-950"
+        } ${disabled ? "opacity-45" : ""}`}
       >
         {showPhoto ? (
         <img
@@ -1230,7 +1243,7 @@ function ProductShelfRow({
           decoding="async"
         />
         ) : (
-          <div className="absolute inset-0 bg-[#141414]" />
+          <div className={`absolute inset-0 ${appearance === "glass" ? "bg-white/[0.07]" : "bg-[#141414]"}`} />
         )}
         {showPhoto ? (
           <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/95" />
@@ -1482,6 +1495,7 @@ function StoreCartPanel({
  */
 
 type MinimalStep = "cover" | "store"
+type EventAppearance = "minimal" | "glass"
 
 const MINIMAL_SPRING: Transition = { type: "spring", stiffness: 380, damping: 36 }
 
@@ -1492,6 +1506,7 @@ const minimalStepVariants = {
 }
 
 function MinimalEventDetail({
+  appearance,
   data,
   ticketsFrom,
   consFrom,
@@ -1514,6 +1529,7 @@ function MinimalEventDetail({
   initialStep,
   onStepChange,
 }: {
+  appearance: EventAppearance
   data: PublicEventDetailResponse
   ticketsFrom: Date | string | null
   consFrom: Date | string | null
@@ -1588,7 +1604,18 @@ function MinimalEventDetail({
   }
 
   return (
-    <div className="relative min-h-dvh overflow-hidden bg-[#0a0a0a] text-white">
+    <div className={`relative min-h-dvh overflow-hidden text-white ${appearance === "glass" ? "bg-black" : "bg-[#0a0a0a]"}`}>
+      {appearance === "glass" && data.event.imageUrl ? (
+        <>
+          <img
+            src={data.event.imageUrl}
+            alt=""
+            aria-hidden
+            className="pointer-events-none fixed inset-0 h-full w-full scale-110 object-cover opacity-40 blur-2xl"
+          />
+          <div aria-hidden className="pointer-events-none fixed inset-0 bg-black/50" />
+        </>
+      ) : null}
       <AnimatePresence initial={false} mode="wait" custom={dirRef.current}>
         {step === "cover" ? (
           <motion.div
@@ -1601,6 +1628,7 @@ function MinimalEventDetail({
             transition={MINIMAL_SPRING}
           >
             <MinimalCover
+              appearance={appearance}
               data={data}
               ticketsFrom={ticketsFrom}
               ticketsWindow={ticketsWindow}
@@ -1633,6 +1661,7 @@ function MinimalEventDetail({
             transition={MINIMAL_SPRING}
           >
             <MinimalStoreStep
+              appearance={appearance}
               data={data}
               consFrom={consFrom}
               consWindow={consWindow}
@@ -1656,6 +1685,7 @@ function MinimalEventDetail({
 }
 
 function MinimalCover({
+  appearance,
   data,
   ticketsFrom,
   ticketsWindow,
@@ -1676,6 +1706,7 @@ function MinimalCover({
   initialPurchaseTravelY,
   onDrawerTravelY,
 }: {
+  appearance: EventAppearance
   data: PublicEventDetailResponse
   ticketsFrom: Date | string | null
   ticketsWindow: { open: boolean; msLeft: number }
@@ -1746,13 +1777,17 @@ function MinimalCover({
   const saleOpen = ticketsWindow.open
 
   return (
-    <div className="relative h-dvh overflow-hidden bg-[#0a0a0a]">
+    <div className={`relative h-dvh overflow-hidden ${appearance === "glass" ? "bg-transparent" : "bg-[#0a0a0a]"}`}>
       <motion.div
         initial={{ opacity: 0, y: 20, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: drawerOpen ? 1.5 : 1 }}
         transition={MINIMAL_SPRING}
         style={{ transformOrigin: "top center" }}
-        className="absolute inset-x-5 top-[max(2rem,env(safe-area-inset-top))] mx-auto flex max-w-md items-center justify-center overflow-hidden rounded-[26px] bg-neutral-950 sm:inset-x-6"
+        className={`absolute inset-x-5 top-[max(2rem,env(safe-area-inset-top))] mx-auto flex max-w-md items-center justify-center overflow-hidden rounded-[26px] sm:inset-x-6 ${
+          appearance === "glass"
+            ? "bg-black/25 shadow-2xl shadow-black/50 backdrop-blur-xl"
+            : "bg-neutral-950"
+        }`}
       >
         {hero ? (
           <img
@@ -1795,7 +1830,11 @@ function MinimalCover({
             <motion.div
               layout
               transition={MINIMAL_SPRING}
-              className={`pointer-events-auto overflow-hidden border border-white/[0.1] bg-[#0a0a0a] shadow-2xl shadow-black/70 ${
+              className={`pointer-events-auto overflow-hidden border border-white/[0.1] shadow-2xl shadow-black/70 ${
+                appearance === "glass"
+                  ? "bg-black/35 backdrop-blur-2xl backdrop-saturate-150"
+                  : "bg-[#0a0a0a]"
+              } ${
                 mapExpanded
                   ? "w-full max-w-md rounded-[24px] p-3"
                   : "w-[min(16rem,calc(100vw-3rem))] rounded-full px-5 py-3"
@@ -1844,12 +1883,18 @@ function MinimalCover({
         initial={false}
         animate={{
           height: drawerOpen ? "60dvh" : "auto",
-          borderTopLeftRadius: drawerOpen ? 28 : 0,
-          borderTopRightRadius: drawerOpen ? 28 : 0,
+          borderTopLeftRadius: appearance === "glass" || drawerOpen ? 28 : 0,
+          borderTopRightRadius: appearance === "glass" || drawerOpen ? 28 : 0,
+          borderBottomLeftRadius: appearance === "glass" ? 28 : 0,
+          borderBottomRightRadius: appearance === "glass" ? 28 : 0,
           boxShadow: drawerOpen ? "0 -28px 70px -30px rgba(0,0,0,0.9)" : "0 0 0 rgba(0,0,0,0)",
         }}
         transition={{ duration: 0.52, ease: [0.22, 1, 0.36, 1] }}
-        className="fixed inset-x-0 bottom-0 z-20 mx-auto flex w-full max-w-lg flex-col overflow-hidden bg-[#0a0a0a] px-5 pt-5 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6"
+        className={`fixed z-20 mx-auto flex flex-col overflow-hidden px-5 pt-5 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 ${
+          appearance === "glass"
+            ? "inset-x-5 bottom-[max(1rem,env(safe-area-inset-bottom))] w-[calc(100%-2.5rem)] max-w-md rounded-[28px] bg-black/30 shadow-2xl shadow-black/60 backdrop-blur-2xl backdrop-saturate-150"
+            : "inset-x-0 bottom-0 w-full max-w-lg bg-[#0a0a0a]"
+        }`}
       >
         {drawerOpen ? (
           <div aria-hidden className="mx-auto mb-4 h-1 w-10 shrink-0 rounded-full bg-white/20" />
@@ -1925,6 +1970,7 @@ function MinimalCover({
                         transition={{ ...MINIMAL_SPRING, delay: i * 0.05 }}
                       >
                         <MinimalTicketRow
+                          appearance={appearance}
                           name={t.name}
                           priceStr={formatMoneyArsExact(t.price)}
                           count={count}
@@ -1971,6 +2017,7 @@ function MinimalCover({
 }
 
 function MinimalStoreStep({
+  appearance,
   data,
   consFrom,
   consWindow,
@@ -1986,6 +2033,7 @@ function MinimalStoreStep({
   onBack,
   onPay,
 }: {
+  appearance: EventAppearance
   data: PublicEventDetailResponse
   consFrom: Date | string | null
   consWindow: { open: boolean; msLeft: number }
@@ -2017,9 +2065,10 @@ function MinimalStoreStep({
     <div className="relative flex min-h-dvh flex-col">
       <div
         aria-hidden
-        className="pointer-events-none fixed inset-x-0 top-0 z-10 h-24 bg-gradient-to-b from-[#0a0a0a] to-transparent"
+        className={`pointer-events-none fixed inset-x-0 top-0 z-10 h-24 bg-gradient-to-b to-transparent ${appearance === "glass" ? "from-black/70" : "from-[#0a0a0a]"}`}
       />
       <MinimalShelfRail
+        appearance={appearance}
         shelf={shelf}
         onShelf={setShelf}
         cartCount={cartCount}
@@ -2047,6 +2096,7 @@ function MinimalStoreStep({
                 transition={STORE_SHELF_TRANSITION}
               >
                 <MinimalCartPanel
+                  appearance={appearance}
                   data={data}
                   ticketLines={ticketLines}
                   drinkLines={drinkLines}
@@ -2064,6 +2114,7 @@ function MinimalStoreStep({
                 transition={STORE_SHELF_TRANSITION}
               >
                 <MinimalProductShelf
+                  appearance={appearance}
                   groups={groupProductsByCategory(glassProducts, data.productCategories)}
                   emptyLabel="No hay productos tipo copa en este evento."
                   drinks={drinks}
@@ -2080,6 +2131,7 @@ function MinimalStoreStep({
                 transition={STORE_SHELF_TRANSITION}
               >
                 <MinimalProductShelf
+                  appearance={appearance}
                   groups={groupProductsByCategory(bottleProducts, data.productCategories)}
                   emptyLabel="No hay productos tipo botella en este evento."
                   drinks={drinks}
@@ -2092,7 +2144,7 @@ function MinimalStoreStep({
         </div>
       </div>
 
-      <MinimalBottomBar>
+      <MinimalBottomBar appearance={appearance}>
         <MinimalCheckoutRow
           totalStr={totalStr}
           cartCount={cartCount}
@@ -2106,12 +2158,14 @@ function MinimalStoreStep({
 }
 
 function MinimalProductShelf({
+  appearance,
   groups,
   emptyLabel,
   drinks,
   setDrinkQty,
   saleOpen,
 }: {
+  appearance: EventAppearance
   groups: ProductCategoryGroup[]
   emptyLabel: string
   drinks: Record<string, number>
@@ -2120,7 +2174,7 @@ function MinimalProductShelf({
 }) {
   if (groups.length === 0) {
     return (
-      <div className="rounded-2xl bg-white/[0.04] px-4 py-8 text-center text-sm text-white/50">
+      <div className={`rounded-2xl px-4 py-8 text-center text-sm text-white/50 ${appearance === "glass" ? "border border-white/[0.1] bg-white/[0.08] backdrop-blur-xl" : "bg-white/[0.04]"}`}>
         {emptyLabel}
       </div>
     )
@@ -2134,6 +2188,7 @@ function MinimalProductShelf({
             {group.products.map((p) => (
               <li key={p.id}>
                 <MinimalProductCard
+                  appearance={appearance}
                   name={p.name}
                   imageUrl={p.imageUrl?.trim() || null}
                   priceStr={formatMoneyArsExact(p.price)}
@@ -2158,6 +2213,7 @@ function MinimalProductShelf({
 }
 
 function MinimalProductCard({
+  appearance,
   name,
   imageUrl,
   priceStr,
@@ -2166,6 +2222,7 @@ function MinimalProductCard({
   onAdd,
   onRemove,
 }: {
+  appearance: EventAppearance
   name: string
   imageUrl?: string | null
   priceStr: string
@@ -2176,6 +2233,7 @@ function MinimalProductCard({
 }) {
   return (
     <ProductShelfRow
+      appearance={appearance}
       name={name}
       imageUrl={imageUrl}
       priceStr={priceStr}
@@ -2188,6 +2246,7 @@ function MinimalProductCard({
 }
 
 function MinimalCartPanel({
+  appearance,
   data,
   ticketLines,
   drinkLines,
@@ -2195,6 +2254,7 @@ function MinimalCartPanel({
   setDrinkQty,
   drinks,
 }: {
+  appearance: EventAppearance
   data: PublicEventDetailResponse
   ticketLines: CartTicketLine[]
   drinkLines: CartDrinkLine[]
@@ -2207,7 +2267,7 @@ function MinimalCartPanel({
 
   if (!hasTickets && !hasConsumos) {
     return (
-      <div className="rounded-2xl bg-white/[0.04] px-4 py-10 text-center text-sm text-white/50">
+      <div className={`rounded-2xl px-4 py-10 text-center text-sm text-white/50 ${appearance === "glass" ? "border border-white/[0.1] bg-white/[0.08] backdrop-blur-xl" : "bg-white/[0.04]"}`}>
         Tu carrito está vacío.
       </div>
     )
@@ -2226,6 +2286,7 @@ function MinimalCartPanel({
               return (
                 <li key={line.ticketTypeId}>
                   <MinimalCartRow
+                    appearance={appearance}
                     label={`${line.quantity} × ${name}`}
                     subStr={formatMoneyArsExact(sub)}
                     Icon={Ticket}
@@ -2251,6 +2312,7 @@ function MinimalCartPanel({
               return (
                 <li key={line.productId}>
                   <MinimalCartRow
+                    appearance={appearance}
                     label={`${line.quantity} × ${name}`}
                     subStr={formatMoneyArsExact(sub)}
                     Icon={Icon}
@@ -2267,11 +2329,13 @@ function MinimalCartPanel({
 }
 
 function MinimalCartRow({
+  appearance,
   label,
   subStr,
   Icon,
   onRemove,
 }: {
+  appearance: EventAppearance
   label: string
   subStr: string
   Icon: typeof Wine
@@ -2281,7 +2345,7 @@ function MinimalCartRow({
     <motion.div
       layout
       transition={MINIMAL_SPRING}
-      className="flex items-center justify-between gap-4 rounded-2xl bg-white/[0.04] px-4 py-3.5"
+      className={`flex items-center justify-between gap-4 rounded-2xl px-4 py-3.5 ${appearance === "glass" ? "border border-white/[0.1] bg-white/[0.09] shadow-lg shadow-black/20 backdrop-blur-xl" : "bg-white/[0.04]"}`}
     >
       <div className="flex min-w-0 items-center gap-3">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.06]">
@@ -2305,11 +2369,13 @@ function MinimalCartRow({
 }
 
 function MinimalShelfRail({
+  appearance,
   shelf,
   onShelf,
   cartCount,
   onBack,
 }: {
+  appearance: EventAppearance
   shelf: StoreShelf | null
   onShelf: (s: StoreShelf) => void
   cartCount: number
@@ -2318,7 +2384,7 @@ function MinimalShelfRail({
   return (
     <>
       <nav
-        className="fixed left-0 top-[max(1rem,env(safe-area-inset-top))] z-40 rounded-r-2xl bg-neutral-900 py-1 pr-1 shadow-[14px_0_44px_-16px_rgba(0,0,0,0.9)]"
+        className={`fixed left-0 top-[max(1rem,env(safe-area-inset-top))] z-40 rounded-r-2xl py-1 pr-1 shadow-[14px_0_44px_-16px_rgba(0,0,0,0.9)] ${appearance === "glass" ? "border border-l-0 border-white/[0.12] bg-black/35 backdrop-blur-2xl" : "bg-neutral-900"}`}
         aria-label="Volver"
       >
         <MinimalShelfButton label="Volver" active={false} dockEdge="left" onClick={onBack}>
@@ -2346,8 +2412,10 @@ function MinimalShelfRail({
         initial={false}
         animate={{ right: shelf === null ? "calc(50% - 6.5rem)" : 0 }}
         transition={STORE_SHELF_TRANSITION}
-        className={`fixed top-1/2 z-40 flex -translate-y-1/2 flex-col gap-px bg-neutral-900 py-1 pl-1 shadow-[-14px_0_44px_-16px_rgba(0,0,0,0.9)] ${
-          shelf === null ? "w-52 rounded-2xl pr-1" : "rounded-l-2xl"
+        className={`fixed top-1/2 z-40 flex -translate-y-1/2 flex-col gap-px py-1 pl-1 shadow-[-14px_0_44px_-16px_rgba(0,0,0,0.9)] ${
+          appearance === "glass" ? "border border-r-0 border-white/[0.12] bg-black/35 backdrop-blur-2xl" : "bg-neutral-900"
+        } ${
+          shelf === null ? `w-52 rounded-2xl pr-1 ${appearance === "glass" ? "border-r" : ""}` : "rounded-l-2xl"
         }`}
         aria-label="Secciones"
       >
@@ -2403,9 +2471,15 @@ function MinimalShelfButton({
   )
 }
 
-function MinimalBottomBar({ children }: { children: ReactNode }) {
+function MinimalBottomBar({
+  appearance,
+  children,
+}: {
+  appearance: EventAppearance
+  children: ReactNode
+}) {
   return (
-    <div className="fixed inset-x-0 bottom-0 z-30 bg-[#0a0a0a] px-5 pt-3.5 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6">
+    <div className={`fixed inset-x-0 bottom-0 z-30 px-5 pt-3.5 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 ${appearance === "glass" ? "border-t border-white/[0.1] bg-black/35 backdrop-blur-2xl backdrop-saturate-150" : "bg-[#0a0a0a]"}`}>
       <div className="mx-auto w-full max-w-md">{children}</div>
     </div>
   )
@@ -2453,6 +2527,7 @@ function MinimalCheckoutRow({
 }
 
 function MinimalTicketRow({
+  appearance,
   name,
   priceStr,
   count,
@@ -2460,6 +2535,7 @@ function MinimalTicketRow({
   onAdd,
   onRemove,
 }: {
+  appearance: EventAppearance
   name: string
   priceStr: string
   count: number
@@ -2473,11 +2549,17 @@ function MinimalTicketRow({
       layout
       transition={MINIMAL_SPRING}
       className={`relative flex items-stretch overflow-hidden rounded-2xl transition-colors ${active ? "w-full" : "w-[calc(100%-3.5rem)]"} ${
-        active ? "bg-white/[0.08]" : "bg-white/[0.04]"
+        appearance === "glass"
+          ? active
+            ? "border border-white/[0.16] bg-white/[0.18] shadow-xl shadow-black/30 backdrop-blur-xl"
+            : "border border-white/[0.1] bg-white/[0.11] shadow-xl shadow-black/25 backdrop-blur-xl"
+          : active
+            ? "bg-white/[0.08]"
+            : "bg-white/[0.04]"
       } ${disabled ? "opacity-45" : ""}`}
     >
       {/* Talón del ticket */}
-      <div className="flex w-14 shrink-0 items-center justify-center bg-white/[0.03]">
+      <div className={`flex w-14 shrink-0 items-center justify-center ${appearance === "glass" ? "border-r border-white/[0.08] bg-white/[0.06]" : "bg-white/[0.03]"}`}>
         <Ticket className="size-6 text-white/60" strokeWidth={1.75} aria-hidden />
       </div>
 

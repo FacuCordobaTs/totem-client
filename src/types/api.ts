@@ -178,6 +178,8 @@ export type ConsumptionsCheckoutResponse = {
 
 export type ReceiptApiResponse = {
   receiptToken: string
+  /** Nombre completo de la persona que hizo la compra. */
+  customerName: string
   /** Tarea 6.1 — Saldo del cliente en este evento ("0.00" si nunca cargó). */
   balance: { amount: string }
   sale: {
@@ -210,5 +212,21 @@ export type ReceiptApiResponse = {
     status: ConsumptionStatus
     product: { id: string; name: string; price: string }
     isAddon?: boolean
+  }>
+}
+
+export type CustomerProfileResponse = {
+  customer: { name: string }
+  events: Array<{
+    id: string
+    name: string
+    date: string
+    location: string | null
+    imageUrl: string | null
+    status: "draft" | "on_sale" | "live" | "closed"
+    productoraName: string
+    receiptToken: string
+    tickets: number
+    pendingConsumptions: number
   }>
 }
