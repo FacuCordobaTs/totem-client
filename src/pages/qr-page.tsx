@@ -2,6 +2,20 @@ import { useEffect, useState } from "react"
 import { useNavigate, useParams, useSearchParams } from "react-router"
 import QRCode from "qrcode"
 import { Button } from "@/components/ui/button"
+import { publicApiFetch, publicWebSocketUrl } from "@/lib/api"
+import type { ReceiptApiResponse } from "@/types/api"
+
+function receiptTokenFromReturnTo(returnTo: string | null): string | null {
+  if (!returnTo) return null
+
+  try {
+    const pathname = new URL(returnTo, window.location.origin).pathname
+    const match = pathname.match(/^\/receipt\/([^/]+)$/)
+    return match ? decodeURIComponent(match[1]) : null
+  } catch {
+    return null
+  }
+}
 
 export function QrPage() {
   const { hash } = useParams<{ hash: string }>()
@@ -11,6 +25,8 @@ export function QrPage() {
   const ticketLayout = searchParams.get("layout") === "ticket"
   const ticketName = searchParams.get("name")
   const ticketPrice = searchParams.get("price")
+  const receiptToken = receiptTokenFromReturnTo(searchParams.get("returnTo"))
+  const [ticketUsed, setTicketUsed] = useState(false)
 
   useEffect(() => {
     if (!hash) return
@@ -33,6 +49,46 @@ export function QrPage() {
       cancelled = true
     }
   }, [hash, ticketLayout])
+
+  // Al abrir una entrada desde "Tus entradas", esta página queda montada mientras el QR se
+  // valida en puerta. Se suscribe al mismo aviso del comprobante para ocultarlo al instante.
+  useEffect(() => {
+    if (!hash || !receiptToken) return
+
+    let disposed = false
+    let socket: WebSocket | null = null
+    let retry: number | null = null
+
+    const loadTicketStatus = async () => {
+      try {
+        const receipt = await publicApiFetch<ReceiptApiResponse>(
+          `/public/receipts/${encodeURIComponent(receiptToken)}`
+        )
+        const ticket = receipt.tickets.find((item) => item.qrHash === hash)
+        if (!disposed) setTicketUsed(ticket?.status === "USED")
+      } catch {
+        // No reemplazamos un QR válido ante un error temporal de red.
+      }
+    }
+
+    const connect = () => {
+      socket = new WebSocket(
+        publicWebSocketUrl(`/ws/public/receipts/${encodeURIComponent(receiptToken)}`)
+      )
+      socket.onmessage = () => void loadTicketStatus()
+      socket.onclose = () => {
+        if (!disposed) retry = window.setTimeout(connect, 3_000)
+      }
+    }
+
+    void loadTicketStatus()
+    connect()
+    return () => {
+      disposed = true
+      if (retry != null) window.clearTimeout(retry)
+      socket?.close()
+    }
+  }, [hash, receiptToken])
 
   if (!hash) return null
 
@@ -63,7 +119,11 @@ export function QrPage() {
             Mostrá este código en la entrada o en la barra.
           </p>
           <div className="rounded-2xl bg-[#1C1C1E] p-6">
-            {dataUrl ? (
+            {ticketUsed ? (
+              <div className="flex aspect-square w-full max-w-[280px] items-center justify-center rounded-2xl border-2 border-dashed border-zinc-300 bg-zinc-100 px-6 text-center text-sm font-bold uppercase tracking-[0.16em] text-zinc-400">
+                Entrada utilizada
+              </div>
+            ) : dataUrl ? (
               <img
                 src={dataUrl}
                 alt="Código QR"
@@ -118,6 +178,11 @@ export function QrPage() {
           </div>
 
           <div className="shrink-0 px-8 pb-12 pt-8 text-center">
+            {ticketUsed ? (
+              <p className="mb-3 text-sm font-extrabold uppercase tracking-[0.14em] text-zinc-500">
+                Usada
+              </p>
+            ) : null}
             {ticketName ? (
               <p className="text-3xl font-extrabold tracking-tight text-zinc-950">
                 {ticketName}
