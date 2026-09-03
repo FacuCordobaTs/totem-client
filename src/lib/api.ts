@@ -4,6 +4,13 @@ export function getApiBase(): string {
   return base().replace(/\/$/, "")
 }
 
+/** Builds a WebSocket URL against the same API origin used by public requests. */
+export function publicWebSocketUrl(path: string): string {
+  const url = new URL(`${getApiBase()}${path}`)
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:"
+  return url.toString()
+}
+
 type Json = Record<string, unknown>
 
 export class ApiError extends Error {

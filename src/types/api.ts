@@ -9,6 +9,7 @@ export type PublicEventSummary = {
   id: string
   name: string
   date: string
+  venue: string | null
   location: string | null
   productora: { id: string; name: string }
 }
@@ -53,9 +54,10 @@ export type PublicEventDetailResponse = {
     /** Slug público del evento (`/:slug`) — para navegar "Volver" desde el checkout. */
     slug?: string | null
     date: string
+    venue: string | null
     location: string | null
     imageUrl?: string | null
-    /** GLASS = diseño glassmorphism (default), MINIMAL = diseño plano/minimalista. */
+    /** MINIMAL = diseño clásico (default), GLASS = diseño glassmorphism. */
     designType?: "GLASS" | "MINIMAL"
     ticketsAvailableFrom: Date | string | null
     consumptionsAvailableFrom: Date | string | null
@@ -123,6 +125,7 @@ export type CourtesyInvitationResponse = {
     id: string
     name: string
     date: string
+    venue: string | null
     location: string | null
   }
   ticketTypeName: string
@@ -197,6 +200,7 @@ export type ReceiptApiResponse = {
     id: string
     name: string
     date: string
+    venue: string | null
     location: string | null
   }
   productora: { name: string; mpPublicKey?: string | null }
@@ -213,6 +217,13 @@ export type ReceiptApiResponse = {
     product: { id: string; name: string; price: string }
     isAddon?: boolean
   }>
+  pickups: Array<{
+    token: string
+    status: PickupStatus
+    createdAt: string | null
+    deliveredAt: string | null
+    items: PickupItem[]
+  }>
 }
 
 export type CustomerProfileResponse = {
@@ -221,6 +232,7 @@ export type CustomerProfileResponse = {
     id: string
     name: string
     date: string
+    venue: string | null
     location: string | null
     imageUrl: string | null
     status: "draft" | "on_sale" | "live" | "closed"

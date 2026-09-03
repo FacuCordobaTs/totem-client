@@ -3,8 +3,9 @@ import { MapPin, Navigation } from "lucide-react"
 /**
  * Mapa del evento (tarea 11.1 — PLAN_VISION_FINAL.md).
  *
- * El evento solo guarda la dirección como texto libre (`events.location`), así
- * que el mapa es un embed estático de Google Maps consultado por dirección
+ * El evento guarda el nombre visible del salón en `events.venue` y la dirección
+ * geográfica en `events.location`; el mapa usa exclusivamente esta última. Es
+ * un embed estático de Google Maps consultado por dirección
  * (sin API key) + link "Cómo llegar" que abre la navegación en Google Maps.
  * Si la dirección no existe, no renderiza nada.
  */

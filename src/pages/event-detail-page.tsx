@@ -352,7 +352,7 @@ export function EventDetailPage() {
   if (!slug) return null
 
   const appearance: EventAppearance | null = data
-    ? (data.event.designType ?? "GLASS") === "MINIMAL"
+    ? (data.event.designType ?? "MINIMAL") === "MINIMAL"
       ? "minimal"
       : "glass"
     : null
@@ -1734,6 +1734,8 @@ function MinimalCover({
   const [purchaseTravelY, setPurchaseTravelY] = useState(initialPurchaseTravelY)
   const purchaseHeaderRef = useRef<HTMLElement | null>(null)
   const drawerCycleRef = useRef(0)
+  // El nombre del salón es lo que se comunica; la dirección queda reservada al mapa.
+  const venueLabel = data.event.venue ?? data.event.location
   const titleLength = data.event.name.trim().length
   const titleSize = titleLength > 54
     ? "clamp(1.3rem, 5.6vw, 1.8rem)"
@@ -1818,7 +1820,7 @@ function MinimalCover({
       />
 
       <AnimatePresence initial={false}>
-        {drawerOpen && data.event.location ? (
+        {drawerOpen && venueLabel ? (
           <motion.div
             key="location-island"
             initial={{ opacity: 0, y: -32, scale: 0.92 }}
@@ -1842,23 +1844,24 @@ function MinimalCover({
             >
               <button
                 type="button"
-                onClick={() => setMapExpanded((expanded) => !expanded)}
+                onClick={() => data.event.location && setMapExpanded((expanded) => !expanded)}
                 aria-expanded={mapExpanded}
-                className="block w-full text-white"
+                disabled={!data.event.location}
+                className="block w-full text-white disabled:cursor-default"
               >
                 <span className="flex min-w-0 items-center justify-center gap-2">
                   <MapPin className="size-4 shrink-0 text-white/70" aria-hidden />
                   <span className="truncate text-[14px] font-semibold">
-                    {data.event.location}
+                    {venueLabel}
                   </span>
                 </span>
                 <span className="mt-0.5 block text-center text-[11px] font-medium text-white/45">
-                  {mapExpanded ? "Ocultar ubicación" : "Ver ubicación"}
+                  {data.event.location ? (mapExpanded ? "Ocultar ubicación" : "Ver ubicación") : "Ubicación próximamente"}
                 </span>
               </button>
 
               <AnimatePresence initial={false}>
-                {mapExpanded ? (
+                {mapExpanded && data.event.location ? (
                   <motion.div
                     key="location-map"
                     initial={{ height: 0, opacity: 0, y: -8 }}

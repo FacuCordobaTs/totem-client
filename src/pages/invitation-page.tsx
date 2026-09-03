@@ -174,10 +174,10 @@ function InvitationCard({
                 <Calendar className="size-4 shrink-0 text-white/35" aria-hidden />
                 <span>{formatEventDate(event.date)}</span>
               </div>
-              {event.location ? (
+              {event.venue ?? event.location ? (
                 <div className="flex items-center gap-3 text-[14px] text-white/60">
                   <MapPin className="size-4 shrink-0 text-white/35" aria-hidden />
-                  <span>{event.location}</span>
+                  <span>{event.venue ?? event.location}</span>
                 </div>
               ) : null}
             </div>

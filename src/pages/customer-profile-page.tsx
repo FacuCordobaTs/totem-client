@@ -71,7 +71,7 @@ export function CustomerProfilePage() {
                 <h2 className="mt-1 text-2xl font-bold tracking-tight text-white">{event.name}</h2>
                 <div className="mt-3 flex flex-col gap-1.5 text-xs text-white/55">
                   <span className="flex items-center gap-2"><CalendarDays className="size-3.5" aria-hidden />{formatEventDate(event.date)}</span>
-                  {event.location ? <span className="flex items-center gap-2"><MapPin className="size-3.5" aria-hidden />{event.location}</span> : null}
+                  {event.venue ?? event.location ? <span className="flex items-center gap-2"><MapPin className="size-3.5" aria-hidden />{event.venue ?? event.location}</span> : null}
                 </div>
                 <div className="mt-4 flex gap-2">
                   <span className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium text-white/70"><Ticket className="size-3.5" aria-hidden />{event.tickets}</span>

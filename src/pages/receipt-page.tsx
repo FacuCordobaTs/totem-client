@@ -10,6 +10,7 @@ import {
   Loader2,
   Maximize2,
   Minus,
+  PackageCheck,
   Plus,
   Ticket,
   Wine,
@@ -19,7 +20,7 @@ import { initMercadoPago } from "@mercadopago/sdk-react"
 import { toast } from "sonner"
 import { AnimatePresence, motion, useAnimationControls, type Transition } from "motion/react"
 import Decimal from "decimal.js"
-import { publicApiFetch } from "@/lib/api"
+import { publicApiFetch, publicWebSocketUrl } from "@/lib/api"
 import type {
   BalanceDepositResponse,
   ConsumptionsCheckoutResponse,
@@ -539,6 +540,32 @@ export function ReceiptPage() {
     void load()
   }, [load])
 
+  // El scanner de puerta y la barra notifican este comprobante al confirmar el canje.
+  // Así el QR deja de verse disponible sin que el cliente tenga que recargar la página.
+  useEffect(() => {
+    if (!receiptToken) return
+    let disposed = false
+    let socket: WebSocket | null = null
+    let retry: number | null = null
+
+    const connect = () => {
+      socket = new WebSocket(
+        publicWebSocketUrl(`/ws/public/receipts/${encodeURIComponent(receiptToken)}`)
+      )
+      socket.onmessage = () => void load()
+      socket.onclose = () => {
+        if (!disposed) retry = window.setTimeout(connect, 3_000)
+      }
+    }
+
+    connect()
+    return () => {
+      disposed = true
+      if (retry != null) window.clearTimeout(retry)
+      socket?.close()
+    }
+  }, [load, receiptToken])
+
   useLayoutEffect(() => {
     if (!data) return
     if (data.sale.paid) return
@@ -1000,24 +1027,19 @@ export function ReceiptPage() {
               ) : activeView === "consumos" ? (
                 <>
                   <SectionHeader title="Tus consumos" onBack={() => setActiveView("home")} />
-                  {hasPendingConsumptions ? (
-                    <Button
-                      type="button"
-                      className={pickupMode
-                        ? "h-12 w-full rounded-2xl border border-white/15 bg-white/[0.06] font-semibold text-white hover:bg-white/[0.1]"
-                        : "h-12 w-full rounded-2xl bg-white font-semibold text-black hover:bg-zinc-200"}
-                      onClick={pickupMode ? cancelPickup : () => void handlePickup()}
-                    >
-                      {pickupMode ? "Cancelar" : "Armar orden de retiro"}
-                    </Button>
-                  ) : null}
                   {consumptionGroups.length > 0 ? (
                     <ul className="overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.03]">
                       {consumptionGroups.map((group, index) => (
                         <li key={group.id} className={`flex items-center justify-between gap-4 px-5 py-4 ${index > 0 ? "border-t border-white/[0.07]" : ""}`}>
                           <div className="min-w-0 flex-1">
                             <p className="font-semibold text-white">{group.name}</p>
-                            {group.redeemed > 0 ? <p className="mt-1 text-sm tabular-nums text-white/35">{group.redeemed} / {group.pending + group.redeemed}</p> : null}
+                            {pickupMode ? (
+                              <p className="mt-1 text-sm tabular-nums text-white/45">
+                                {group.pending} {group.pending === 1 ? "disponible para retirar" : "disponibles para retirar"}
+                              </p>
+                            ) : group.redeemed > 0 ? (
+                              <p className="mt-1 text-sm tabular-nums text-white/35">{group.redeemed} / {group.pending + group.redeemed}</p>
+                            ) : null}
                           </div>
                           {pickupMode && group.pending > 0 ? (
                             <div className="flex shrink-0 items-center gap-3">
@@ -1054,6 +1076,69 @@ export function ReceiptPage() {
                       Todavía no compraste consumos para este evento.
                     </p>
                   )}
+                  {hasPendingConsumptions ? (
+                    <section className="rounded-2xl border border-white/[0.09] bg-white/[0.045] p-4">
+                      {pickupMode ? (
+                        <div className="flex items-center justify-between gap-4">
+                          <div>
+                            <p className="font-semibold text-white">Elegí lo que retirás ahora</p>
+                            <p className="mt-1 text-sm text-white/45">Después mostrás un único QR en la barra.</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={cancelPickup}
+                            className="shrink-0 rounded-xl px-3 py-2 text-sm font-semibold text-white/55 transition-colors hover:bg-white/[0.07] hover:text-white"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      ) : (
+                        <Button
+                          type="button"
+                          className="h-14 w-full justify-between rounded-xl bg-white px-4 font-bold text-black hover:bg-zinc-200"
+                          onClick={() => void handlePickup()}
+                        >
+                          <span className="flex items-center gap-3"><PackageCheck className="size-5" aria-hidden />Armar orden de retiro</span>
+                          <ArrowRight className="size-5" aria-hidden />
+                        </Button>
+                      )}
+                    </section>
+                  ) : null}
+                  <section className="space-y-3">
+                    <div className="flex items-baseline justify-between gap-3 px-1">
+                      <h2 className="text-lg font-bold tracking-tight text-white">Mis retiros</h2>
+                      {data.pickups.length > 0 ? <span className="text-xs text-white/40">{data.pickups.length}</span> : null}
+                    </div>
+                    {data.pickups.length > 0 ? (
+                      <ul className="overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.03]">
+                        {data.pickups.map((pickup, index) => (
+                          <li key={pickup.token} className={index > 0 ? "border-t border-white/[0.07]" : ""}>
+                            <Link
+                              to={`/retiro/${encodeURIComponent(pickup.token)}?receipt=${encodeURIComponent(receiptToken)}`}
+                              className="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-white/[0.045]"
+                            >
+                              <span className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${pickup.status === "DELIVERED" ? "bg-emerald-400/10 text-emerald-300" : pickup.status === "CANCELLED" ? "bg-red-400/10 text-red-300" : "bg-white/[0.07] text-white/75"}`}>
+                                <PackageCheck className="size-5" aria-hidden />
+                              </span>
+                              <span className="min-w-0 flex-1">
+                                <span className="block text-sm font-semibold text-white">
+                                  {pickup.items.map((item) => `${item.quantity}× ${item.productName}`).join(" · ")}
+                                </span>
+                                <span className="mt-1 block text-xs text-white/40">
+                                  {pickup.status === "DELIVERED" ? "Entregado" : pickup.status === "CANCELLED" ? "Cancelado" : "Listo para retirar"}
+                                </span>
+                              </span>
+                              <ArrowRight className="size-4 shrink-0 text-white/30" aria-hidden />
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="rounded-2xl border border-dashed border-white/[0.09] px-5 py-5 text-sm leading-relaxed text-white/40">
+                        Cuando armes una orden para la barra, va a aparecer acá.
+                      </p>
+                    )}
+                  </section>
                 </>
               ) : activeView === "balance" ? (
                 <>

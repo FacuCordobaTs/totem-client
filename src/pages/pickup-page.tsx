@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Link, useNavigate, useParams, useSearchParams } from "react-router"
 import QRCode from "qrcode"
 import { Check, Loader2 } from "lucide-react"
-import { publicApiFetch } from "@/lib/api"
+import { publicApiFetch, publicWebSocketUrl } from "@/lib/api"
 import type { PickupApiResponse } from "@/types/api"
 import { Button } from "@/components/ui/button"
 
@@ -26,7 +26,7 @@ export function PickupPage() {
   const [notFound, setNotFound] = useState(false)
   const [qrSrc, setQrSrc] = useState<string | null>(null)
 
-  useEffect(() => {
+  const load = useCallback(() => {
     if (!token) return
     let cancelled = false
     publicApiFetch<PickupApiResponse>(`/public/pickups/${token}`)
@@ -52,6 +52,30 @@ export function PickupPage() {
       cancelled = true
     }
   }, [token])
+
+  useEffect(() => load(), [load])
+
+  useEffect(() => {
+    if (!token) return
+    let disposed = false
+    let socket: WebSocket | null = null
+    let retry: number | null = null
+    const connect = () => {
+      socket = new WebSocket(
+        publicWebSocketUrl(`/ws/public/pickups/${encodeURIComponent(token)}`)
+      )
+      socket.onmessage = () => { load() }
+      socket.onclose = () => {
+        if (!disposed) retry = window.setTimeout(connect, 3_000)
+      }
+    }
+    connect()
+    return () => {
+      disposed = true
+      if (retry != null) window.clearTimeout(retry)
+      socket?.close()
+    }
+  }, [load, token])
 
   const receiptToken = searchParams.get("receipt")
   const delivered = data?.status === "DELIVERED"
