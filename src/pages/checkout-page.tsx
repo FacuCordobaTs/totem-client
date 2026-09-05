@@ -30,6 +30,7 @@ import { formatMoneyArsExact } from "@/lib/format"
 
 type Step = "contact" | "method" | "pay"
 type Method = "TRANSFER" | "CARD" | "MERCADOPAGO" | "SALDO"
+type PaymentMethods = PublicEventDetailResponse["productora"]["paymentMethods"]
 
 const STEP_EASE: Transition = { duration: 0.44, ease: [0.22, 1, 0.36, 1] as const }
 
@@ -96,6 +97,7 @@ export function CheckoutPage() {
   // Tarea 2.2 — el "Volver" navega a la página del evento por slug (la ruta
   // `/e/:eventId` no existe). Se resuelve al montar con `GET /public/events/:id`.
   const [eventSlug, setEventSlug] = useState<string | null>(null)
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethods | null>(null)
   // Tarea 6.2 — Saldo del cliente en este evento ("0.00" si no tiene): "Saldo disponible"
   // se ofrece como método solo cuando hay fondos (visión §2.7).
   const [balanceAmount, setBalanceAmount] = useState<string>("0.00")
@@ -105,10 +107,16 @@ export function CheckoutPage() {
     let cancelled = false
     publicApiFetch<PublicEventDetailResponse>(`/public/events/${eventId}`)
       .then((d) => {
-        if (!cancelled) setEventSlug(d.event.slug ?? null)
+        if (!cancelled) {
+          setEventSlug(d.event.slug ?? null)
+          setPaymentMethods(d.productora.paymentMethods)
+        }
       })
       .catch(() => {
-        if (!cancelled) setEventSlug(null)
+        if (!cancelled) {
+          setEventSlug(null)
+          setPaymentMethods(null)
+        }
       })
     return () => {
       cancelled = true
@@ -174,14 +182,23 @@ export function CheckoutPage() {
 
   // Si el DNI cambió y el saldo ya no está disponible, no dejar "Saldo disponible"
   // seleccionado (el backend lo rechazaría igual, pero mejor corregir la UI).
+  const availableMethods = useMemo<Method[]>(() => {
+    if (!paymentMethods) return []
+    return [
+      ...(balanceAvailable ? (["SALDO"] as const) : []),
+      ...(paymentMethods.transfer ? (["TRANSFER"] as const) : []),
+      ...(paymentMethods.mercadoPago ? (["CARD", "MERCADOPAGO"] as const) : []),
+    ]
+  }, [balanceAvailable, paymentMethods])
+
   useEffect(() => {
-    if (method === "SALDO" && !balanceAvailable) {
-      setMethod("TRANSFER")
+    if (availableMethods.length > 0 && !availableMethods.includes(method)) {
+      setMethod(availableMethods[0])
     }
-  }, [method, balanceAvailable])
+  }, [method, availableMethods])
 
   const submitPurchase = async () => {
-    if (!snapshot || submitting) return
+    if (!snapshot || submitting || !availableMethods.includes(method)) return
     setErr(null)
     setSubmitting(true)
     try {
@@ -318,6 +335,7 @@ export function CheckoutPage() {
                 error={err}
                 balanceAmount={balanceAmount}
                 balanceAvailable={balanceAvailable}
+                paymentMethods={paymentMethods}
               />
             </motion.div>
           ) : (
@@ -563,6 +581,7 @@ function MethodStep({
   error,
   balanceAmount,
   balanceAvailable,
+  paymentMethods,
 }: {
   method: Method
   setMethod: (m: Method) => void
@@ -571,7 +590,18 @@ function MethodStep({
   error: string | null
   balanceAmount: string
   balanceAvailable: boolean
+  paymentMethods: PaymentMethods | null
 }) {
+  const availableMethods = [
+    ...(balanceAvailable ? (["SALDO"] as const) : []),
+    ...(paymentMethods?.transfer ? (["TRANSFER"] as const) : []),
+    ...(paymentMethods?.mercadoPago ? (["CARD", "MERCADOPAGO"] as const) : []),
+  ]
+
+  // No se muestran medios ni CTA hasta tener la configuración; si la productora
+  // no habilitó ninguno, el paso queda vacío.
+  if (!paymentMethods || availableMethods.length === 0) return null
+
   const ctaLabel =
     method === "TRANSFER"
       ? "Generar transferencia"
@@ -603,15 +633,19 @@ function MethodStep({
             onSelect={() => setMethod("SALDO")}
           />
         ) : null}
-        <MethodCard
-          icon={<ArrowLeftRight className="size-5" strokeWidth={2} />}
+        {paymentMethods?.transfer ? (
+          <MethodCard
+            icon={<ArrowLeftRight className="size-5" strokeWidth={2} />}
           label="Transferencia"
           description="Pago verificado por alias."
           selected={method === "TRANSFER"}
-          onSelect={() => setMethod("TRANSFER")}
-        />
-        <MethodCard
-          icon={<CreditCard className="size-5" strokeWidth={2} />}
+            onSelect={() => setMethod("TRANSFER")}
+          />
+        ) : null}
+        {paymentMethods?.mercadoPago ? (
+          <>
+            <MethodCard
+              icon={<CreditCard className="size-5" strokeWidth={2} />}
           label="Tarjeta"
           description="Crédito o débito."
           selected={method === "CARD"}
@@ -622,8 +656,10 @@ function MethodStep({
           label="Mercado Pago"
           description="Pagás desde tu cuenta."
           selected={method === "MERCADOPAGO"}
-          onSelect={() => setMethod("MERCADOPAGO")}
-        />
+              onSelect={() => setMethod("MERCADOPAGO")}
+            />
+          </>
+        ) : null}
       </div>
 
       <div className="flex flex-col gap-4">

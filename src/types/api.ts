@@ -47,7 +47,15 @@ export type PublicProductCategory = {
 }
 
 export type PublicEventDetailResponse = {
-  productora: { id: string; name: string }
+  productora: {
+    id: string
+    name: string
+    /** Métodos de cobro públicos habilitados por la productora. */
+    paymentMethods: {
+      mercadoPago: boolean
+      transfer: boolean
+    }
+  }
   event: {
     id: string
     name: string
