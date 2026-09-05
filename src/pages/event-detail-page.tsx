@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
-import { useNavigate, useParams } from "react-router"
+import { useNavigate, useParams, useSearchParams } from "react-router"
 import {
   BottleWine,
   MapPin,
@@ -98,7 +98,11 @@ function useWindowOpen(iso: Date | string | null | undefined) {
 export function EventDetailPage() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const setCart = useCartStore((s) => s.setCart)
+  // `promotor` viaja en el enlace que comparte cada promotor. También soportamos
+  // `promoter` para no romper links que se hayan armado antes del nombre en español.
+  const promoterId = searchParams.get("promotor") ?? searchParams.get("promoter") ?? undefined
 
   const [data, setData] = useState<PublicEventDetailResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -254,7 +258,8 @@ export function EventDetailPage() {
   const continueClick = () => {
     if (!cartPreview || !canContinue) return
     setCart(cartPreview)
-    navigate(`/checkout/${data!.event.id}`)
+    const promoterQuery = promoterId ? `?promotor=${encodeURIComponent(promoterId)}` : ""
+    navigate(`/checkout/${data!.event.id}${promoterQuery}`)
   }
 
   const storeBack = () => {

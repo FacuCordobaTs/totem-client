@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from "react"
-import { useNavigate, useParams } from "react-router"
+import { useNavigate, useParams, useSearchParams } from "react-router"
 import {
   ArrowLeft,
   ArrowLeftRight,
@@ -77,6 +77,8 @@ function normalizeArPhone(raw: string): string {
 export function CheckoutPage() {
   const { eventId } = useParams<{ eventId: string }>()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const promoterId = searchParams.get("promotor") ?? searchParams.get("promoter") ?? undefined
   const cart = useCartStore((s) => s.cart)
   const hydrated = useCartStore((s) => s._hydrated)
   const clearCart = useCartStore((s) => s.clearCart)
@@ -131,7 +133,8 @@ export function CheckoutPage() {
   const goToEventPage = () => {
     // Volver desde el checkout restaura la parte de consumos del evento.
     setEventRestoreFlag(eventSlug)
-    navigate(eventSlug ? `/${eventSlug}` : "/")
+    const promoterQuery = promoterId ? `?promotor=${encodeURIComponent(promoterId)}` : ""
+    navigate(eventSlug ? `/${eventSlug}${promoterQuery}` : "/")
   }
 
   const handleBack = () => {
@@ -202,6 +205,7 @@ export function CheckoutPage() {
             productId: l.productId,
             quantity: l.quantity,
           })),
+          ...(promoterId ? { promoterId } : {}),
         }),
       })
 
@@ -248,7 +252,8 @@ export function CheckoutPage() {
   if (!hydrated) return null
   if (!snapshot && !result) {
     setEventRestoreFlag(eventSlug)
-    navigate(eventSlug ? `/${eventSlug}` : "/", { replace: true })
+    const promoterQuery = promoterId ? `?promotor=${encodeURIComponent(promoterId)}` : ""
+    navigate(eventSlug ? `/${eventSlug}${promoterQuery}` : "/", { replace: true })
     return null
   }
 
