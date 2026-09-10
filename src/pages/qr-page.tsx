@@ -4,6 +4,7 @@ import QRCode from "qrcode"
 import { Button } from "@/components/ui/button"
 import { publicApiFetch, publicWebSocketUrl } from "@/lib/api"
 import type { ReceiptApiResponse } from "@/types/api"
+import { formatAdmissionWindow } from "@/lib/ticket-admission"
 
 function receiptTokenFromReturnTo(returnTo: string | null): string | null {
   if (!returnTo) return null
@@ -27,6 +28,7 @@ export function QrPage() {
   const ticketPrice = searchParams.get("price")
   const receiptToken = receiptTokenFromReturnTo(searchParams.get("returnTo"))
   const [ticketUsed, setTicketUsed] = useState(false)
+  const [admissionWindow, setAdmissionWindow] = useState<string | null>(null)
 
   useEffect(() => {
     if (!hash) return
@@ -65,7 +67,10 @@ export function QrPage() {
           `/public/receipts/${encodeURIComponent(receiptToken)}`
         )
         const ticket = receipt.tickets.find((item) => item.qrHash === hash)
-        if (!disposed) setTicketUsed(ticket?.status === "USED")
+        if (!disposed) {
+          setTicketUsed(ticket?.status === "USED")
+          setAdmissionWindow(ticket ? formatAdmissionWindow(ticket.ticketType) : null)
+        }
       } catch {
         // No reemplazamos un QR válido ante un error temporal de red.
       }
@@ -156,6 +161,7 @@ export function QrPage() {
       </header>
       <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-end px-5">
         <article className="flex flex-col rounded-t-[1.75rem] bg-white text-zinc-950 shadow-[0_-18px_50px_-28px_rgba(255,255,255,0.45)]">
+          {admissionWindow && <p className="px-6 pt-6 text-center text-sm font-semibold text-amber-800">{admissionWindow}</p>}
           <div className="flex shrink-0 items-center justify-center px-6 pb-7 pt-8">
             {dataUrl ? (
               <img

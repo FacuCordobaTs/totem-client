@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { Link, useNavigate, useParams, useSearchParams } from "react-router"
 import QRCode from "qrcode"
+import { formatAdmissionWindow } from "@/lib/ticket-admission"
 import {
   ArrowLeft,
   ArrowRight,
@@ -996,6 +997,7 @@ export function ReceiptPage() {
                           >
                             <div className="flex min-w-0 flex-1 flex-col justify-center px-5 py-4 pr-4">
                               <p className="truncate text-base font-extrabold tracking-tight">{ticket.ticketType.name}</p>
+                              {formatAdmissionWindow(ticket.ticketType) && <p className="mt-1 text-xs font-medium leading-relaxed text-amber-800">{formatAdmissionWindow(ticket.ticketType)}</p>}
                               <p className="mt-1 text-sm font-semibold tabular-nums text-zinc-600">
                                 {formatMoneyArsExact(ticket.ticketType.price)}
                               </p>

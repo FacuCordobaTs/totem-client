@@ -15,6 +15,7 @@ import {
 import { CardPayment, initMercadoPago } from "@mercadopago/sdk-react"
 import { AnimatePresence, motion, type Transition } from "motion/react"
 import { publicApiFetch } from "@/lib/api"
+import { formatAdmissionWindow } from "@/lib/ticket-admission"
 import type {
   BalanceLookupResponse,
   GuestCheckoutResponse,
@@ -98,6 +99,7 @@ export function CheckoutPage() {
   // `/e/:eventId` no existe). Se resuelve al montar con `GET /public/events/:id`.
   const [eventSlug, setEventSlug] = useState<string | null>(null)
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethods | null>(null)
+  const [ticketTypes, setTicketTypes] = useState<PublicEventDetailResponse["ticketTypes"]>([])
   // Tarea 6.2 — Saldo del cliente en este evento ("0.00" si no tiene): "Saldo disponible"
   // se ofrece como método solo cuando hay fondos (visión §2.7).
   const [balanceAmount, setBalanceAmount] = useState<string>("0.00")
@@ -110,12 +112,14 @@ export function CheckoutPage() {
         if (!cancelled) {
           setEventSlug(d.event.slug ?? null)
           setPaymentMethods(d.productora.paymentMethods)
+          setTicketTypes(d.ticketTypes)
         }
       })
       .catch(() => {
         if (!cancelled) {
           setEventSlug(null)
           setPaymentMethods(null)
+          setTicketTypes([])
         }
       })
     return () => {
@@ -297,6 +301,10 @@ export function CheckoutPage() {
       </header>
 
       <main className="mx-auto flex w-full max-w-lg flex-col px-6 pb-32 pt-16 sm:px-8">
+        {step !== "pay" && ticketTypes.filter((type) => snapshot?.ticketLines.some((line) => line.ticketTypeId === type.id)).map((type) => {
+          const schedule = formatAdmissionWindow(type)
+          return schedule ? <p key={type.id} className="mb-4 rounded-xl border border-amber-200/20 bg-amber-200/5 p-3 text-sm text-amber-200"><strong>{type.name}:</strong> {schedule}</p> : null
+        })}
         <AnimatePresence mode="wait" initial={false}>
           {step === "contact" ? (
             <motion.div

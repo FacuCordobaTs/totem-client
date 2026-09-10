@@ -74,7 +74,7 @@ export function EventLinkHintPage() {
           ) : (
             <form onSubmit={(event) => void submit(event)}>
               <h2 className="text-lg font-semibold text-white">Entrar a mi cuenta</h2>
-              <p className="mt-1.5 text-[13px] leading-relaxed text-white/40">Te enviaremos un enlace para ver tus entradas, consumos y saldo.</p>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-white/40">Te enviaremos un enlace para ver tus entradas, sus horarios de ingreso, consumos y saldo.</p>
               <div className="mt-5 grid grid-cols-3 rounded-xl bg-black/35 p-1" role="tablist" aria-label="Dato de acceso">
                 {OPTIONS.map((option) => (
                   <button key={option.id} type="button" role="tab" aria-selected={type === option.id} onClick={() => changeType(option.id)} className={`rounded-lg px-2 py-2.5 text-xs font-semibold transition-colors ${type === option.id ? "bg-white text-black" : "text-white/40 hover:text-white/65"}`}>{option.label}</button>

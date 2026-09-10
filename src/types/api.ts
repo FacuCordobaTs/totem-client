@@ -19,6 +19,8 @@ export type PublicEventsResponse = {
 }
 
 export type PublicTicketTypeItem = {
+  validFrom: string | null
+  validUntil: string | null
   id: string
   name: string
   price: string
@@ -216,7 +218,7 @@ export type ReceiptApiResponse = {
     id: string
     qrHash: string
     status: TicketStatus
-    ticketType: { name: string; price: string }
+    ticketType: { name: string; price: string; validFrom: string | null; validUntil: string | null }
   }>
   consumptions: Array<{
     id: string

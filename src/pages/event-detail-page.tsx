@@ -12,6 +12,7 @@ import {
 import { AnimatePresence, motion, useAnimationControls, type Transition } from "motion/react"
 import Decimal from "decimal.js"
 import { publicApiFetch } from "@/lib/api"
+import { formatAdmissionWindow } from "@/lib/ticket-admission"
 import type {
   PublicDrinkProductItem,
   PublicEventDetailResponse,
@@ -703,6 +704,7 @@ function TicketStep({
               <li key={t.id}>
                 <TicketPickRow
                   name={t.name}
+                  admissionWindow={formatAdmissionWindow(t)}
                   priceStr={formatMoneyArsExact(t.price)}
                   count={count}
                   disabled={disabled}
@@ -721,6 +723,7 @@ function TicketStep({
 
 function TicketPickRow({
   name,
+  admissionWindow,
   priceStr,
   count,
   disabled,
@@ -729,6 +732,7 @@ function TicketPickRow({
   onRemove,
 }: {
   name: string
+  admissionWindow: string | null
   priceStr: string
   count: number
   disabled: boolean
@@ -787,6 +791,7 @@ function TicketPickRow({
             <span className="text-lg font-bold mb-1leading-tight text-white">
               {name}
             </span>
+            {admissionWindow && <span className="text-xs leading-relaxed text-amber-200">{admissionWindow}</span>}
             <span className="text-base font-semibold tabular-nums tracking-tight text-white/85">
               {priceStr}
             </span>
@@ -1980,6 +1985,7 @@ function MinimalCover({
                         <MinimalTicketRow
                           appearance={appearance}
                           name={t.name}
+                          admissionWindow={formatAdmissionWindow(t)}
                           priceStr={formatMoneyArsExact(t.price)}
                           count={count}
                           disabled={disabled}
@@ -2537,6 +2543,7 @@ function MinimalCheckoutRow({
 function MinimalTicketRow({
   appearance,
   name,
+  admissionWindow,
   priceStr,
   count,
   disabled,
@@ -2545,6 +2552,7 @@ function MinimalTicketRow({
 }: {
   appearance: EventAppearance
   name: string
+  admissionWindow: string | null
   priceStr: string
   count: number
   disabled: boolean
@@ -2614,6 +2622,7 @@ function MinimalTicketRow({
           <span className="truncate text-[16px] font-bold leading-tight tracking-tight text-white">
             {name}
           </span>
+          {admissionWindow && <span className="mt-1 text-xs leading-relaxed text-amber-200">{admissionWindow}</span>}
           <span className="mt-1 text-[14px] font-semibold tabular-nums text-white/60">
             {priceStr}
           </span>
