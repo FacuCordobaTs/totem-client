@@ -36,7 +36,7 @@ export function EventAccessPage() {
   const clearSession = useSessionStore((state) => state.clearSession)
 
   const [data, setData] = useState<EventAccessResponse | null>(null)
-  const [loadFailed, setLoadFailed] = useState(false)
+  const [loadError, setLoadError] = useState<{ status: number; message: string } | null>(null)
 
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState<Step>("identify")
@@ -58,8 +58,13 @@ export function EventAccessPage() {
       .then((response) => {
         if (!cancelled) setData(response)
       })
-      .catch(() => {
-        if (!cancelled) setLoadFailed(true)
+      .catch((e: unknown) => {
+        if (cancelled) return
+        setLoadError(
+          e instanceof ApiError
+            ? { status: e.status, message: e.message }
+            : { status: 0, message: "No pudimos conectarnos con el servidor." }
+        )
       })
     return () => {
       cancelled = true
@@ -325,18 +330,27 @@ export function EventAccessPage() {
   )
 
   if (!data) {
-    if (!loadFailed) {
+    if (!loadError) {
       return (
         <main className="flex min-h-dvh items-center justify-center bg-[#0B0B0C]">
           <Loader2 className="size-6 animate-spin text-white/40" aria-label="Cargando" />
         </main>
       )
     }
-    // El evento no cargó, pero el ingreso no depende de esto: el slug alcanza para pedir el código.
+    // El link no existe: no hay evento al que entrar, así que no ofrecemos el drawer.
+    if (loadError.status === 404) {
+      return (
+        <main className="mx-auto flex min-h-dvh max-w-lg flex-col items-center justify-center bg-[#0B0B0C] px-6 text-center">
+          <h1 className="text-2xl font-bold text-white">Este evento no está disponible</h1>
+          <p className="mt-3 text-sm leading-relaxed text-white/50">Revisá que el link esté completo o pedíselo a quien te lo compartió.</p>
+        </main>
+      )
+    }
+    // Falla de red o del servidor: el ingreso no depende de esto, el slug alcanza para pedir el código.
     return (
       <main className="mx-auto flex min-h-dvh max-w-lg flex-col items-center justify-center bg-[#0B0B0C] px-6 text-center">
         <h1 className="text-2xl font-bold text-white">No pudimos cargar el evento</h1>
-        <p className="mt-3 text-sm leading-relaxed text-white/50">Podés ingresar igual con tu DNI o tu celular.</p>
+        <p className="mt-3 text-sm leading-relaxed text-white/50">{loadError.message} Podés ingresar igual con tu DNI o tu celular.</p>
         <Button
           type="button"
           onClick={() => setOpen(true)}
