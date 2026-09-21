@@ -35,11 +35,14 @@ export function QrPage() {
     const value = decodeURIComponent(hash)
     let cancelled = false
     QRCode.toDataURL(value, {
-      width: 280,
-      margin: ticketLayout ? 1 : 2,
-      color: ticketLayout
-        ? { dark: "#09090b", light: "#ffffff" }
-        : { dark: "#fafafa", light: "#121212" },
+      // Un único formato de QR para los dos layouts, porque los dos se escanean con la misma
+      // cámara: oscuro sobre claro, quiet zone de 4 módulos (la del estándar, y la única que
+      // existe cuando la tarjeta de fondo es oscura) y render a 1036 px = 37 módulos × 28, para
+      // que el navegador nunca tenga que interpolar el PNG hacia arriba al pintarlo.
+      width: 1036,
+      margin: 4,
+      errorCorrectionLevel: "M",
+      color: { dark: "#09090b", light: "#ffffff" },
     })
       .then((url) => {
         if (!cancelled) setDataUrl(url)
@@ -50,7 +53,7 @@ export function QrPage() {
     return () => {
       cancelled = true
     }
-  }, [hash, ticketLayout])
+  }, [hash])
 
   // Al abrir una entrada desde "Tus entradas", esta página queda montada mientras el QR se
   // valida en puerta. Se suscribe al mismo aviso del comprobante para ocultarlo al instante.
@@ -125,19 +128,19 @@ export function QrPage() {
           </p>
           <div className="rounded-2xl bg-[#1C1C1E] p-6">
             {ticketUsed ? (
-              <div className="flex aspect-square w-full max-w-[280px] items-center justify-center rounded-2xl border-2 border-dashed border-zinc-300 bg-zinc-100 px-6 text-center text-sm font-bold uppercase tracking-[0.16em] text-zinc-400">
+              <div className="flex aspect-square w-full max-w-[min(88vw,320px)] items-center justify-center rounded-2xl border-2 border-dashed border-zinc-300 bg-zinc-100 px-6 text-center text-sm font-bold uppercase tracking-[0.16em] text-zinc-400">
                 Entrada utilizada
               </div>
             ) : dataUrl ? (
               <img
                 src={dataUrl}
                 alt="Código QR"
-                className="max-w-[min(85vw,280px)] rounded-xl"
-                width={280}
-                height={280}
+                className="w-full max-w-[min(88vw,320px)] rounded-xl"
+                width={320}
+                height={320}
               />
             ) : (
-              <div className="flex h-64 w-64 max-w-[85vw] items-center justify-center rounded-xl text-sm text-[#8E8E93]">
+              <div className="flex size-80 max-w-[88vw] items-center justify-center rounded-xl text-sm text-[#8E8E93]">
                 Generando…
               </div>
             )}
@@ -167,12 +170,12 @@ export function QrPage() {
               <img
                 src={dataUrl}
                 alt="Código QR"
-                className="aspect-square w-full max-w-[280px]"
-                width={280}
-                height={280}
+                className="aspect-square w-full max-w-[min(88vw,320px)]"
+                width={320}
+                height={320}
               />
             ) : (
-              <div className="flex aspect-square w-full max-w-[280px] items-center justify-center text-sm text-zinc-400">
+              <div className="flex aspect-square w-full max-w-[min(88vw,320px)] items-center justify-center text-sm text-zinc-400">
                 Generando…
               </div>
             )}

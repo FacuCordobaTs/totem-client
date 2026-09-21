@@ -1,7 +1,7 @@
 import { MapPin, Navigation } from "lucide-react"
 
 /**
- * Mapa del evento (tarea 11.1 — PLAN_VISION_FINAL.md).
+ * Mapa público del evento.
  *
  * El evento guarda el nombre visible del salón en `events.venue` y la dirección
  * geográfica en `events.location`; el mapa usa exclusivamente esta última. Es

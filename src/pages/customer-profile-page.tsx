@@ -1,14 +1,22 @@
 import { useEffect, useState } from "react"
-import { Link, useParams } from "react-router"
+import { Link, useNavigate, useParams } from "react-router"
 import { ArrowRight, CalendarDays, Loader2, MapPin, Ticket, Wine } from "lucide-react"
 import { publicApiFetch } from "@/lib/api"
 import { formatEventDate } from "@/lib/format"
+import { useSessionStore } from "@/stores/session-store"
 import type { CustomerProfileResponse } from "@/types/api"
 
 export function CustomerProfilePage() {
   const { token } = useParams<{ token: string }>()
+  const navigate = useNavigate()
+  const sessionToken = useSessionStore((state) => state.token)
+  const clearSession = useSessionStore((state) => state.clearSession)
   const [data, setData] = useState<CustomerProfileResponse | null>(null)
   const [failed, setFailed] = useState(false)
+
+  // Sólo se puede cerrar sesión si esta página se abrió con la sesión guardada en el teléfono: un
+  // link del mail (`/mi-cuenta/{receiptToken}`) no inició sesión, así que no hay nada que cerrar.
+  const hasSession = Boolean(sessionToken && sessionToken === token)
 
   useEffect(() => {
     if (!token) return
@@ -83,6 +91,18 @@ export function CustomerProfilePage() {
         ))}
       </section>
       <p className="mt-10 text-center text-xs leading-relaxed text-white/25">Este enlace es personal. Guardalo para volver cuando quieras.</p>
+      {hasSession ? (
+        <button
+          type="button"
+          onClick={() => {
+            clearSession()
+            navigate("/")
+          }}
+          className="mx-auto mt-4 block text-xs font-medium text-white/35 underline underline-offset-4 transition-colors hover:text-white/60"
+        >
+          Cerrar sesión
+        </button>
+      ) : null}
     </main>
   )
 }

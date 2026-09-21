@@ -128,8 +128,11 @@ function QrBlock({
     }
     let cancelled = false
     QRCode.toDataURL(hash, {
-      width: 88,
-      margin: 1,
+      // 296 px = 37 módulos (29 de datos + 4 de quiet zone por lado) × 8 px exactos, para que
+      // el navegador no tenga que interpolar el PNG al pintarlo a 96 px CSS.
+      width: 296,
+      margin: 4,
+      errorCorrectionLevel: "M",
       color: { dark: "#09090b", light: "#ffffff" },
     })
       .then((url) => {
@@ -145,7 +148,7 @@ function QrBlock({
 
   if (!active) {
     return (
-      <div className="flex size-[4.5rem] items-center justify-center rounded-lg border border-dashed border-zinc-300 bg-zinc-100">
+      <div className="flex size-24 items-center justify-center rounded-lg border border-dashed border-zinc-300 bg-zinc-100">
           <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-zinc-400">
             Usada
           </span>
@@ -163,9 +166,9 @@ function QrBlock({
         <Maximize2 className="size-3" aria-hidden />
       </Link>
       {src ? (
-        <img src={src} alt="Código QR de entrada" className="size-[4.5rem] rounded-lg" width={72} height={72} />
+        <img src={src} alt="Código QR de entrada" className="size-24 rounded-lg" width={96} height={96} />
       ) : (
-        <div className="flex size-[4.5rem] items-center justify-center text-sm text-zinc-400">…</div>
+        <div className="flex size-24 items-center justify-center text-sm text-zinc-400">…</div>
       )}
     </div>
   )

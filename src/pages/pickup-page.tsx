@@ -34,9 +34,12 @@ export function PickupPage() {
         if (cancelled) return
         setData(d)
         QRCode.toDataURL(token, {
-          width: 280,
-          margin: 2,
-          color: { dark: "#fafafa", light: "#121212" },
+          // Mismo formato que el QR de las entradas: oscuro sobre claro, quiet zone de 4
+          // módulos y render a 37 módulos × 28 px para que el navegador no lo interpole.
+          width: 1036,
+          margin: 4,
+          errorCorrectionLevel: "M",
+          color: { dark: "#09090b", light: "#ffffff" },
         })
           .then((url) => {
             if (!cancelled) setQrSrc(url)
@@ -133,12 +136,12 @@ export function PickupPage() {
               <img
                 src={qrSrc}
                 alt="Código de retiro"
-                className="max-w-[min(85vw,280px)] rounded-xl"
-                width={280}
-                height={280}
+                className="w-full max-w-[min(88vw,320px)] rounded-xl"
+                width={320}
+                height={320}
               />
             ) : (
-              <div className="flex h-64 w-64 max-w-[85vw] items-center justify-center rounded-xl text-sm text-[#8E8E93]">
+              <div className="flex size-80 max-w-[88vw] items-center justify-center rounded-xl text-sm text-[#8E8E93]">
                 Generando…
               </div>
             )}

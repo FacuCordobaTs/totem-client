@@ -12,6 +12,7 @@ import { RetirarPage } from "@/pages/retirar-page"
 import { PickupPage } from "@/pages/pickup-page"
 import { InvitationPage } from "@/pages/invitation-page"
 import { EventLinkHintPage } from "@/pages/event-link-hint-page"
+import { EventAccessPage } from "@/pages/event-access-page"
 import { CustomerProfilePage } from "@/pages/customer-profile-page"
 import { AppShell } from "@/components/app-shell"
 
@@ -41,6 +42,16 @@ const router = createBrowserRouter([
     element: (
       <NightRoot>
         <CustomerProfilePage />
+      </NightRoot>
+    ),
+  },
+  // Acceso del cliente por evento (`crow.ar/{slug}/acceso`): el flyer y el ingreso con DNI/celular.
+  // Va antes de `/:slug`, que matchea un solo segmento y no compite con esta ruta.
+  {
+    path: "/:slug/acceso",
+    element: (
+      <NightRoot>
+        <EventAccessPage />
       </NightRoot>
     ),
   },

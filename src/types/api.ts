@@ -252,3 +252,42 @@ export type CustomerProfileResponse = {
     pendingConsumptions: number
   }>
 }
+
+/** Motivos por los que el acceso pide un dato más, en vez de mandar el código. */
+export type EventAccessReason =
+  | "NEEDS_PHONE"
+  | "NEEDS_REGISTRATION"
+  | "WHATSAPP_UNAVAILABLE"
+  | "SEND_FAILED"
+
+/** `GET /public/events/:id/access` — lo justo para la pantalla de acceso (`/{slug}/acceso`). */
+export type EventAccessResponse = {
+  event: {
+    id: string
+    name: string
+    date: string
+    venue: string | null
+    location: string | null
+    imageUrl: string | null
+    status: "draft" | "on_sale" | "live" | "closed"
+  }
+  productora: { name: string }
+  /** Si es false, no hay WhatsApp configurado y el drawer deriva a la caja. */
+  whatsappEnabled: boolean
+}
+
+/** `POST /public/events/:id/access/request` — el código ya salió hacia `to`. */
+export type EventAccessRequestResponse = {
+  ok: true
+  /** Identifica el código pedido; viaja tal cual al verificar. */
+  challenge: string
+  /** Celular enmascarado al que se envió ("+54 9 •••• 1234"). */
+  to: string
+}
+
+/** `POST /public/events/:id/access/verify` — la sesión del cliente. */
+export type EventAccessVerifyResponse = {
+  ok: true
+  token: string
+  name: string
+}
