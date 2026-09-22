@@ -14,6 +14,7 @@ import { InvitationPage } from "@/pages/invitation-page"
 import { EventLinkHintPage } from "@/pages/event-link-hint-page"
 import { EventAccessPage } from "@/pages/event-access-page"
 import { CustomerProfilePage } from "@/pages/customer-profile-page"
+import { CustomerEventPage } from "@/pages/customer-event-page"
 import { AppShell } from "@/components/app-shell"
 
 function NightRoot({ children }: { children: ReactNode }) {
@@ -42,6 +43,16 @@ const router = createBrowserRouter([
     element: (
       <NightRoot>
         <CustomerProfilePage />
+      </NightRoot>
+    ),
+  },
+  // El evento visto por el cliente que entró por `/{slug}/acceso` sin haber comprado: misma
+  // estética que el comprobante, pero anclado al evento y no a una venta.
+  {
+    path: "/mi-cuenta/:token/evento/:eventId",
+    element: (
+      <NightRoot>
+        <CustomerEventPage />
       </NightRoot>
     ),
   },

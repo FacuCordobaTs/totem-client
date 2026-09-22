@@ -62,7 +62,13 @@ export function CustomerProfilePage() {
         ) : data.events.map((event) => (
           <Link
             key={event.id}
-            to={`/receipt/${encodeURIComponent(event.receiptToken)}`}
+            // Con compra, el comprobante; sin compra (se entró por el link de acceso), la vista del
+            // evento. El `receiptToken` es lo que distingue un caso del otro.
+            to={
+              event.receiptToken
+                ? `/receipt/${encodeURIComponent(event.receiptToken)}`
+                : `/mi-cuenta/${encodeURIComponent(token ?? "")}/evento/${encodeURIComponent(event.id)}`
+            }
             className="group relative min-h-56 overflow-hidden rounded-3xl border border-white/[0.09] bg-[#171719] p-6 shadow-[0_18px_50px_-30px_rgba(255,255,255,0.25)]"
           >
             {event.imageUrl ? <img src={event.imageUrl} alt="" className="absolute inset-0 size-full object-cover opacity-45 transition-transform duration-500 group-hover:scale-[1.03]" /> : null}
@@ -82,8 +88,14 @@ export function CustomerProfilePage() {
                   {event.venue ?? event.location ? <span className="flex items-center gap-2"><MapPin className="size-3.5" aria-hidden />{event.venue ?? event.location}</span> : null}
                 </div>
                 <div className="mt-4 flex gap-2">
-                  <span className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium text-white/70"><Ticket className="size-3.5" aria-hidden />{event.tickets}</span>
+                  {event.tickets > 0 ? (
+                    <span className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium text-white/70"><Ticket className="size-3.5" aria-hidden />{event.tickets}</span>
+                  ) : null}
                   {event.pendingConsumptions > 0 ? <span className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium text-white/70"><Wine className="size-3.5" aria-hidden />{event.pendingConsumptions}</span> : null}
+                  {/* Entró por el link de acceso y todavía no compró: la tarjeta no muestra ceros. */}
+                  {event.receiptToken === null ? (
+                    <span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium text-white/60">Ingresaste</span>
+                  ) : null}
                 </div>
               </div>
             </div>

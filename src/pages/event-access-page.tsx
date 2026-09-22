@@ -27,6 +27,16 @@ type Step = "identify" | "details" | "code"
 const JSON_HEADERS = { "Content-Type": "application/json" }
 const RESEND_COOLDOWN_S = 60
 
+/**
+ * A dónde va el cliente recién verificado. El comprobante manda cuando existe (ahí están los
+ * retiros, el saldo y la compra de consumos); si no compró nada, la vista del evento deja ver que
+ * ya está adentro y ofrece la tienda en vez de una lista de eventos que no incluiría este.
+ */
+function eventDestination(token: string, eventId: string, receiptToken: string | null): string {
+  if (receiptToken) return `/receipt/${encodeURIComponent(receiptToken)}`
+  return `/mi-cuenta/${encodeURIComponent(token)}/evento/${encodeURIComponent(eventId)}`
+}
+
 export function EventAccessPage() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
@@ -149,7 +159,9 @@ export function EventAccessPage() {
       )
       setSession({ token: response.token, customerName: response.name })
       closeDrawer()
-      navigate(`/mi-cuenta/${encodeURIComponent(response.token)}`)
+      // Directo al evento por el que se entró: al comprobante si ya compró (ahí están los retiros
+      // y la compra de consumos), o a la vista del evento si todavía no tiene nada.
+      navigate(eventDestination(response.token, response.eventId, response.receiptToken))
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "No pudimos verificar el código.")
     } finally {
@@ -398,7 +410,11 @@ export function EventAccessPage() {
             ) : null}
             <Button
               type="button"
-              onClick={() => navigate(`/mi-cuenta/${encodeURIComponent(token)}`)}
+              // Ya hay sesión: va directo a este evento (y de ahí al comprobante si compró) en vez
+              // de a la lista de eventos, que es lo que el cliente ya sabe que tiene.
+              onClick={() =>
+                navigate(`/mi-cuenta/${encodeURIComponent(token)}/evento/${encodeURIComponent(event.id)}`)
+              }
               className="h-14 w-full rounded-2xl bg-white font-semibold text-black"
             >
               <Ticket className="size-4" aria-hidden /> Ver mis entradas

@@ -247,7 +247,8 @@ export type CustomerProfileResponse = {
     imageUrl: string | null
     status: "draft" | "on_sale" | "live" | "closed"
     productoraName: string
-    receiptToken: string
+    /** `null` en los eventos a los que sólo se entró por el link de acceso, sin compra. */
+    receiptToken: string | null
     tickets: number
     pendingConsumptions: number
   }>
@@ -290,4 +291,46 @@ export type EventAccessVerifyResponse = {
   ok: true
   token: string
   name: string
+  /** Evento por el que se entró: es el destino de la redirección. */
+  eventId: string
+  /** Receipt de una compra completada en ese evento; `null` si todavía no compró nada. */
+  receiptToken: string | null
+}
+
+/**
+ * `GET /public/customers/profile/:token/events/:eventId` — el evento del cliente con lo mismo que
+ * muestra el comprobante (entradas, consumos y saldo), pero sin venta de por medio.
+ */
+export type CustomerEventResponse = {
+  customer: { name: string }
+  event: {
+    id: string
+    slug: string | null
+    name: string
+    date: string
+    venue: string | null
+    location: string | null
+    imageUrl: string | null
+    status: "draft" | "on_sale" | "live" | "closed"
+  }
+  productora: { name: string }
+  balance: { amount: string }
+  receiptToken: string | null
+  tickets: Array<{
+    id: string
+    qrHash: string
+    status: "PENDING" | "USED" | "CANCELLED"
+    ticketType: {
+      name: string
+      price: string
+      validFrom: string | null
+      validUntil: string | null
+    }
+  }>
+  consumptions: Array<{
+    id: string
+    qrHash: string
+    status: "PENDING" | "REDEEMED" | "CANCELLED"
+    product: { id: string; name: string; price: string }
+  }>
 }
