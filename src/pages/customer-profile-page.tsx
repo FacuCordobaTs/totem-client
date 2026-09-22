@@ -62,8 +62,8 @@ export function CustomerProfilePage() {
         ) : data.events.map((event) => (
           <Link
             key={event.id}
-            // Con compra, el comprobante; sin compra (se entró por el link de acceso), la vista del
-            // evento. El `receiptToken` es lo que distingue un caso del otro.
+            // Las dos rutas son la misma pantalla de comprobante; el `receiptToken` sólo elige por
+            // dónde entrar: el link del mail si hay compra, el evento de la cuenta si no.
             to={
               event.receiptToken
                 ? `/receipt/${encodeURIComponent(event.receiptToken)}`

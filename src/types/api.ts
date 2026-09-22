@@ -189,8 +189,15 @@ export type ConsumptionsCheckoutResponse = {
   error?: string
 }
 
+/**
+ * La pantalla del comprobante. La sirven dos endpoints con la misma forma:
+ * `GET /public/receipts/:receiptToken` (el link del mail) y
+ * `GET /public/customers/profile/:token/events/:eventId` (la sesión del link de acceso, que puede
+ * no tener ninguna compra). Por eso `sale` y `receiptToken` son nullables: sin venta la pantalla es
+ * la misma, sólo que las acciones que necesitan una venta no están disponibles.
+ */
 export type ReceiptApiResponse = {
-  receiptToken: string
+  receiptToken: string | null
   /** Nombre completo de la persona que hizo la compra. */
   customerName: string
   /** Tarea 6.1 — Saldo del cliente en este evento ("0.00" si nunca cargó). */
@@ -205,7 +212,7 @@ export type ReceiptApiResponse = {
     paidAt: string | null
     cucuruAlias: string | null
     cucuruCvu: string | null
-  }
+  } | null
   event: {
     id: string
     name: string
@@ -295,42 +302,4 @@ export type EventAccessVerifyResponse = {
   eventId: string
   /** Receipt de una compra completada en ese evento; `null` si todavía no compró nada. */
   receiptToken: string | null
-}
-
-/**
- * `GET /public/customers/profile/:token/events/:eventId` — el evento del cliente con lo mismo que
- * muestra el comprobante (entradas, consumos y saldo), pero sin venta de por medio.
- */
-export type CustomerEventResponse = {
-  customer: { name: string }
-  event: {
-    id: string
-    slug: string | null
-    name: string
-    date: string
-    venue: string | null
-    location: string | null
-    imageUrl: string | null
-    status: "draft" | "on_sale" | "live" | "closed"
-  }
-  productora: { name: string }
-  balance: { amount: string }
-  receiptToken: string | null
-  tickets: Array<{
-    id: string
-    qrHash: string
-    status: "PENDING" | "USED" | "CANCELLED"
-    ticketType: {
-      name: string
-      price: string
-      validFrom: string | null
-      validUntil: string | null
-    }
-  }>
-  consumptions: Array<{
-    id: string
-    qrHash: string
-    status: "PENDING" | "REDEEMED" | "CANCELLED"
-    product: { id: string; name: string; price: string }
-  }>
 }

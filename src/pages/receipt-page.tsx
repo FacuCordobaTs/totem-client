@@ -403,11 +403,27 @@ function NavigationCard({
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Main page
+//
+// Es **una sola pantalla** para las dos credenciales del cliente:
+//   - `/receipt/:receiptToken`  → el link del mail, anclado a una compra;
+//   - `/mi-cuenta/:token/evento/:eventId` → la sesión de `/{slug}/acceso`, anclada al cliente y al
+//     evento, que puede no tener ninguna compra.
+// El diseño, los tres tabs y los textos son los mismos siempre. Comprar consumos y cargar saldo
+// funcionan con las dos anclas: con compra se cuelgan de su `receiptToken` y, sin compra, de la
+// sesión de acceso (el backend resuelve al cliente por el token). Lo que sigue necesitando una
+// venta es el retiro en barra, porque una orden se arma sobre consumiciones ya compradas.
 // ──────────────────────────────────────────────────────────────────────────────
 export function ReceiptPage() {
-  const { receiptToken } = useParams<{ receiptToken: string }>()
+  const {
+    receiptToken: routeReceiptToken,
+    token: profileToken,
+    eventId,
+  } = useParams<{ receiptToken?: string; token?: string; eventId?: string }>()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+
+  // Modo evento: la credencial es la sesión del cliente, no un comprobante.
+  const eventMode = !routeReceiptToken && Boolean(profileToken && eventId)
 
   const [data, setData] = useState<ReceiptApiResponse | null>(null)
   const [moreOpen, setMoreOpen] = useState(false)
@@ -457,17 +473,41 @@ export function ReceiptPage() {
     [searchParams]
   )
 
+  /**
+   * El comprobante con el que operan las acciones de esta pantalla (comprar consumos, cargar saldo,
+   * armar un retiro). En el link del mail es el de la URL; en el acceso por evento es el de la
+   * última compra completada del cliente en ese evento, que puede no existir.
+   */
+  const receiptToken = routeReceiptToken ?? data?.receiptToken ?? null
+  /** La credencial de la cuenta: el perfil se abre con la sesión o, si no, con el comprobante. */
+  const accountToken = profileToken ?? receiptToken
+  /**
+   * A dónde vuelve el QR a pantalla completa: esta misma pantalla. El `receipt` viaja como pista
+   * para que esa pantalla pueda consultar el estado del código contra el comprobante (es el único
+   * endpoint que además escucha el WebSocket de canjes); en el link del mail ya está en el path.
+   */
+  const ticketsReturnTo = `${
+    eventMode
+      ? `/mi-cuenta/${encodeURIComponent(profileToken ?? "")}/evento/${encodeURIComponent(eventId ?? "")}`
+      : `/receipt/${encodeURIComponent(routeReceiptToken ?? "")}`
+  }?view=tickets${receiptToken ? `&receipt=${encodeURIComponent(receiptToken)}` : ""}`
+
   const load = useCallback(async () => {
-    if (!receiptToken) return
     try {
-      const d = await publicApiFetch<ReceiptApiResponse>(
-        `/public/receipts/${receiptToken}`
-      )
+      const d = routeReceiptToken
+        ? await publicApiFetch<ReceiptApiResponse>(
+            `/public/receipts/${encodeURIComponent(routeReceiptToken)}`
+          )
+        : profileToken && eventId
+          ? await publicApiFetch<ReceiptApiResponse>(
+              `/public/customers/profile/${encodeURIComponent(profileToken)}/events/${encodeURIComponent(eventId)}`
+            )
+          : null
       setData(d)
     } catch {
       setData(null)
     }
-  }, [receiptToken])
+  }, [routeReceiptToken, profileToken, eventId])
 
   useEffect(() => {
     void load()
@@ -500,7 +540,7 @@ export function ReceiptPage() {
   }, [load, receiptToken])
 
   useLayoutEffect(() => {
-    if (!data) return
+    if (!data?.sale) return
     if (data.sale.paid) return
     if (data.sale.status !== "PENDING" || data.sale.paymentMethod !== "CARD") return
     const pk = data.productora.mpPublicKey
@@ -519,14 +559,14 @@ export function ReceiptPage() {
   ])
 
   useEffect(() => {
-    if (typeof window === "undefined" || !data?.sale.id) return
+    if (typeof window === "undefined" || !data?.sale?.id) return
     if (data.sale.paid) {
       return
     }
-  }, [data?.sale.id, data?.sale.paid, receiptToken])
+  }, [data?.sale?.id, data?.sale?.paid, receiptToken])
 
   const shouldPoll =
-    data != null && data.sale.paid === false && data.sale.status === "PENDING"
+    data != null && data.sale != null && data.sale.paid === false && data.sale.status === "PENDING"
 
   useEffect(() => {
     if (!shouldPoll) return
@@ -545,7 +585,7 @@ export function ReceiptPage() {
   }, [shouldPoll, load])
 
   useEffect(() => {
-    if (!data) return
+    if (!data?.sale) return
     const pending = !data.sale.paid && data.sale.status === "PENDING"
     if (pending) hadPendingPaymentRef.current = true
     if (data.sale.paid && hadPendingPaymentRef.current) {
@@ -555,8 +595,15 @@ export function ReceiptPage() {
     }
   }, [data])
 
+  // Sin venta (acceso por evento sin compras) no hay nada pendiente de pago: se muestra el
+  // contenido igual. El bloque "Pago pendiente" es sólo del comprobante de una compra sin acreditar.
+  // Va acá arriba porque los efectos de la tienda y del addon lo consultan.
+  const showPaidContent = data != null && (data.sale == null || data.sale.paid)
+
+  // La tienda de consumos del evento se carga también sin compra: adentro del evento se puede
+  // comprar aunque el cliente no haya comprado nada antes.
   useEffect(() => {
-    if (!data?.sale.paid || !data.event?.id) return
+    if (!showPaidContent || !data?.event?.id) return
     publicApiFetch<PublicEventDetailResponse>(`/public/events/${data.event.id}`)
       .then((r) => {
         setAddonProducts(r.drinkProducts)
@@ -566,10 +613,10 @@ export function ReceiptPage() {
         setAddonProducts([])
         setAddonCategories([])
       })
-  }, [data?.sale.paid, data?.event?.id])
+  }, [showPaidContent, data?.event?.id])
 
   useEffect(() => {
-    if (!data?.sale.paid || !receiptToken) return
+    if (!data?.sale?.paid || !receiptToken) return
     try {
       if (sessionStorage.getItem(ADDON_PURCHASE_KEY) === receiptToken || mpCheckoutReturnParams) {
         setAddonPolling(true)
@@ -577,7 +624,7 @@ export function ReceiptPage() {
     } catch {
       /* noop */
     }
-  }, [data?.sale.paid, receiptToken, mpCheckoutReturnParams])
+  }, [data?.sale?.paid, receiptToken, mpCheckoutReturnParams])
 
   useEffect(() => {
     if (!addonPolling) return
@@ -645,8 +692,6 @@ export function ReceiptPage() {
     }
   }, [depositPolling, data])
 
-  const showPaidContent = data?.sale.paid === true
-
   // Addon (new) drink lines + total
   const addonDrinkLines = Object.entries(addonDrinks)
     .filter(([, q]) => q > 0)
@@ -662,7 +707,8 @@ export function ReceiptPage() {
       .toFixed(2)
   }, [addonDrinkLines, addonProducts])
 
-  if (!receiptToken) return null
+  // Sin ninguna de las dos credenciales no hay pantalla que mostrar.
+  if (!routeReceiptToken && !eventMode) return null
 
   const addonUnitCount = addonDrinkLines.reduce((a, l) => a + l.quantity, 0)
 
@@ -703,11 +749,15 @@ export function ReceiptPage() {
   }
 
   const handlePickup = async () => {
+    // Armar un retiro crea una orden sobre las consumiciones compradas: sin comprobante no hay
+    // nada que retirar y el botón no se muestra.
+    if (!receiptToken) return
     if (!pickupMode) {
       setPickupMode(true)
       return
     }
     if (pickupTotal === 0 || pickupSubmitting) return
+    const pickupReceiptToken = receiptToken
     const consumptionIds = consumptionGroups.flatMap((group) =>
       group.pendingIds.slice(0, pickupSelection[group.id] ?? 0)
     )
@@ -715,10 +765,10 @@ export function ReceiptPage() {
     try {
       const pickup = await publicApiFetch<PickupApiResponse>("/public/pickups", {
         method: "POST",
-        body: JSON.stringify({ receiptToken, consumptionIds }),
+        body: JSON.stringify({ receiptToken: pickupReceiptToken, consumptionIds }),
         headers: { "Content-Type": "application/json" },
       })
-      navigate(`/retiro/${pickup.token}?receipt=${encodeURIComponent(receiptToken)}`)
+      navigate(`/retiro/${pickup.token}?receipt=${encodeURIComponent(pickupReceiptToken)}`)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo generar la orden")
     } finally {
@@ -733,23 +783,28 @@ export function ReceiptPage() {
 
   // ─── Pago handlers (addon) ───────────────────────────────────────────────────
   const handleAddonCheckout = async () => {
-    if (!addonDrinkLines.length || !receiptToken || addonSubmitting) return
+    if (!addonDrinkLines.length || addonSubmitting) return
+    // Dos anclas para la misma compra: el comprobante de una compra anterior y, sin ninguna
+    // compra todavía (adentro del evento, entrando por `/{slug}/acceso`), el evento de la sesión.
+    const endpoint = receiptToken
+      ? `/public/receipts/${receiptToken}/consumptions-checkout`
+      : profileToken && eventId
+        ? `/public/customers/profile/${encodeURIComponent(profileToken)}/events/${encodeURIComponent(eventId)}/consumptions-checkout`
+        : null
+    if (!endpoint) return
     setAddonSubmitting(true)
     try {
-      const result = await publicApiFetch<ConsumptionsCheckoutResponse>(
-        `/public/receipts/${receiptToken}/consumptions-checkout`,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            drinkLines: addonDrinkLines,
-            clientTotal: addonTotalStr,
-            // Tarea 6.2 — SALDO: la sale queda COMPLETED al instante (el backend la
-            // debita del saldo del cliente). Sin redirección: se refresca el comprobante.
-            paymentMethod: addonMethod,
-          }),
-          headers: { "Content-Type": "application/json" },
-        }
-      )
+      const result = await publicApiFetch<ConsumptionsCheckoutResponse>(endpoint, {
+        method: "POST",
+        body: JSON.stringify({
+          drinkLines: addonDrinkLines,
+          clientTotal: addonTotalStr,
+          // Tarea 6.2 — SALDO: la sale queda COMPLETED al instante (el backend la
+          // debita del saldo del cliente). Sin redirección: se refresca el comprobante.
+          paymentMethod: addonMethod,
+        }),
+        headers: { "Content-Type": "application/json" },
+      })
       if (!result.success) {
         toast.error(result.error ?? "No se pudo iniciar el pago")
         return
@@ -765,10 +820,14 @@ export function ReceiptPage() {
         toast.error(result.error ?? "No se pudo iniciar el pago")
         return
       }
-      try {
-        sessionStorage.setItem(ADDON_PURCHASE_KEY, receiptToken)
-      } catch {
-        /* noop */
+      // La marca que hace sondear el comprobante al volver de Mercado Pago. Sin comprobante
+      // previo no hay dónde marcarla: el pago vuelve al comprobante de la venta nueva.
+      if (receiptToken) {
+        try {
+          sessionStorage.setItem(ADDON_PURCHASE_KEY, receiptToken)
+        } catch {
+          /* noop */
+        }
       }
       window.location.href = result.url_pago
     } catch (e) {
@@ -779,12 +838,12 @@ export function ReceiptPage() {
   }
 
   // ─── Tarea 6.2 — Carga de saldo (visión §2.7) ────────────────────────────────
-  // El contacto se reusa del snapshot de esta compra (el cliente ya está identificado):
-  // el backend solo necesita el `receiptToken` de este comprobante.
+  // El contacto sale del backend: del snapshot de esta compra cuando hay comprobante y de la
+  // ficha del cliente cuando el ancla es la sesión de acceso (adentro del evento sin compra).
   const handleDeposit = async () => {
     const amt = depositAmount.trim()
     if (!/^\d+(\.\d{1,2})?$/.test(amt) || parseFloat(amt) <= 0 || depositSubmitting) return
-    if (!data?.event?.id || !receiptToken) return
+    if (!data?.event?.id || (!receiptToken && !profileToken)) return
     setDepositSubmitting(true)
     try {
       const res = await publicApiFetch<BalanceDepositResponse>(
@@ -794,7 +853,7 @@ export function ReceiptPage() {
           body: JSON.stringify({
             amount: amt,
             paymentMethod: depositMethod,
-            receiptToken,
+            ...(receiptToken ? { receiptToken } : { customerToken: profileToken }),
           }),
           headers: { "Content-Type": "application/json" },
         }
@@ -853,7 +912,7 @@ export function ReceiptPage() {
         {data ? (
           <div className="flex justify-end">
             <Link
-              to={`/mi-cuenta/${encodeURIComponent(receiptToken)}`}
+              to={`/mi-cuenta/${encodeURIComponent(accountToken ?? "")}`}
               className="flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium text-white/35 transition-colors hover:bg-white/[0.06] hover:text-white/65"
             >
               <UserRound className="size-3.5" aria-hidden />
@@ -869,7 +928,7 @@ export function ReceiptPage() {
           <div className="flex flex-col gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-6 py-8 text-center">
             <p className="text-lg font-semibold tracking-tight text-white">Pago pendiente</p>
             <p className="mx-auto max-w-[280px] text-sm leading-relaxed text-white/50">
-              {formatMoneyArsExact(data.sale.totalAmount)} · {formatPaymentMethod(data.sale.paymentMethod)}.
+              {data.sale ? `${formatMoneyArsExact(data.sale.totalAmount)} · ${formatPaymentMethod(data.sale.paymentMethod)}. ` : ""}
               Cuando se acredite vas a encontrar acá tus entradas, consumos y saldo.
             </p>
           </div>
@@ -943,7 +1002,7 @@ export function ReceiptPage() {
                               <QrBlock
                                 hash={ticket.qrHash}
                                 active={active}
-                                returnTo={`/receipt/${encodeURIComponent(receiptToken)}?view=tickets`}
+                                returnTo={ticketsReturnTo}
                                 ticketName={ticket.ticketType.name}
                                 ticketPrice={formatMoneyArsExact(ticket.ticketType.price)}
                               />
@@ -954,7 +1013,9 @@ export function ReceiptPage() {
                     </div>
                   ) : (
                     <p className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-6 py-8 text-center text-sm text-white/50">
-                      No hay entradas asociadas a esta compra.
+                      {data.sale
+                        ? "No hay entradas asociadas a esta compra."
+                        : "No hay entradas para este evento."}
                     </p>
                   )}
                 </>
@@ -1010,7 +1071,7 @@ export function ReceiptPage() {
                       Todavía no compraste consumos para este evento.
                     </p>
                   )}
-                  {hasPendingConsumptions ? (
+                  {hasPendingConsumptions && receiptToken ? (
                     <section className="rounded-2xl border border-white/[0.09] bg-white/[0.045] p-4">
                       {pickupMode ? (
                         <div className="flex items-center justify-between gap-4">
@@ -1048,7 +1109,7 @@ export function ReceiptPage() {
                         {data.pickups.map((pickup, index) => (
                           <li key={pickup.token} className={index > 0 ? "border-t border-white/[0.07]" : ""}>
                             <Link
-                              to={`/retiro/${encodeURIComponent(pickup.token)}?receipt=${encodeURIComponent(receiptToken)}`}
+                              to={`/retiro/${encodeURIComponent(pickup.token)}${receiptToken ? `?receipt=${encodeURIComponent(receiptToken)}` : ""}`}
                               className="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-white/[0.045]"
                             >
                               <span className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${pickup.status === "DELIVERED" ? "bg-emerald-400/10 text-emerald-300" : pickup.status === "CANCELLED" ? "bg-red-400/10 text-red-300" : "bg-white/[0.07] text-white/75"}`}>
@@ -1084,6 +1145,9 @@ export function ReceiptPage() {
                     <p className="mx-auto mt-4 max-w-xs text-sm leading-relaxed text-white/50">
                       Está asociado a tu DNI y podés usarlo para comprar consumos durante este evento.
                     </p>
+                    {/* El saldo se carga con cualquiera de las dos credenciales: con el
+                        comprobante de una compra o con la sesión del evento, que es la que
+                        tiene alguien que entró a la barra y todavía no compró nada. */}
                     <Button type="button" className="mt-7 h-12 w-full rounded-2xl bg-white font-semibold text-black" onClick={() => setDepositOpen(true)}>
                       Cargar saldo
                     </Button>
@@ -1246,44 +1310,6 @@ export function ReceiptPage() {
           description="Acciones y datos para soporte."
         >
           <div className="flex flex-col gap-6">
-            {data.sale.cucuruAlias ? (
-              <div className="flex flex-col gap-2">
-                <p className="text-xs font-semibold uppercase tracking-wider text-white/45">
-                  Copiar alias
-                </p>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="h-12 justify-start gap-2 rounded-xl"
-                  onClick={() => {
-                    void copyText("Alias", data.sale.cucuruAlias as string)
-                    setMoreOpen(false)
-                  }}
-                >
-                  <Copy className="size-4 shrink-0" aria-hidden />
-                  <span className="truncate font-mono text-sm">{data.sale.cucuruAlias}</span>
-                </Button>
-              </div>
-            ) : null}
-            {data.sale.cucuruCvu ? (
-              <div className="flex flex-col gap-2">
-                <p className="text-xs font-semibold uppercase tracking-wider text-white/45">
-                  Copiar CVU
-                </p>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="h-12 justify-start gap-2 rounded-xl"
-                  onClick={() => {
-                    void copyText("CVU", data.sale.cucuruCvu as string)
-                    setMoreOpen(false)
-                  }}
-                >
-                  <Copy className="size-4 shrink-0" aria-hidden />
-                  <span className="truncate font-mono text-sm">{data.sale.cucuruCvu}</span>
-                </Button>
-              </div>
-            ) : null}
             <div className="flex flex-col gap-2">
               <Button
                 type="button"
@@ -1302,63 +1328,108 @@ export function ReceiptPage() {
                 Apple Wallet (próximamente)
               </Button>
             </div>
-            <div className="flex flex-col">
-              <div className="ml-4 h-px shrink-0 bg-white/[0.08]" aria-hidden />
-              <div className="pt-6">
-                <p className="text-xs font-semibold uppercase tracking-wider text-white/45">
-                  Detalle de compra
-                </p>
-                <p className="mt-3 text-sm text-white/55">
-                  Fecha:{" "}
-                  <span className="text-white/90">
-                    {data.sale.createdAt ? formatEventDate(data.sale.createdAt) : "—"}
-                  </span>
-                </p>
-                <p className="mt-2 text-sm text-white/55">
-                  Pago:{" "}
-                  <span className="text-white/90">
-                    {formatPaymentMethod(data.sale.paymentMethod)}
-                    {data.sale.paid ? " · Acreditado" : " · Pendiente"}
-                  </span>
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-col">
-              <div className="ml-4 h-px shrink-0 bg-white/[0.08]" aria-hidden />
-              <div className="pt-6">
-                <p className="text-xs font-semibold uppercase tracking-wider text-white/45">
-                  Referencias (soporte)
-                </p>
-                <p className="mt-3 break-all font-mono text-[11px] leading-relaxed text-white/45">
-                  Pedido: {truncateHash(receiptToken, 12, 8)}
-                </p>
-                {data.sale.paid ? (
-                  <ul className="mt-4 space-y-3">
-                    {data.tickets.map((t, i) => (
-                      <li
-                        key={t.id}
-                        className="font-mono text-[11px] leading-relaxed text-white/45"
-                      >
-                        Entrada {i + 1}: {truncateHash(t.qrHash, 10, 6)}
-                      </li>
-                    ))}
-                    {data.consumptions.map((c, i) => (
-                      <li
-                        key={c.id}
-                        className="font-mono text-[11px] leading-relaxed text-white/45"
-                      >
-                        Consumo {i + 1}: {truncateHash(c.qrHash, 10, 6)}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="mt-4 text-[11px] leading-relaxed text-white/35">
-                    Los códigos de entradas y consumos se mostrarán aquí para soporte una vez
-                    acreditado el pago.
-                  </p>
-                )}
-              </div>
-            </div>
+            {/* Sin compra no hay nada que detallar: la pantalla es la misma, pero estos bloques
+                hablan de una venta concreta. */}
+            {data.sale ? (
+              <>
+                {/* Datos de cobro de esta venta: sólo existen si se pagó por transferencia. */}
+                {data.sale.cucuruAlias ? (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-white/45">
+                      Copiar alias
+                    </p>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="h-12 justify-start gap-2 rounded-xl"
+                      onClick={() => {
+                        void copyText("Alias", data.sale!.cucuruAlias as string)
+                        setMoreOpen(false)
+                      }}
+                    >
+                      <Copy className="size-4 shrink-0" aria-hidden />
+                      <span className="truncate font-mono text-sm">{data.sale.cucuruAlias}</span>
+                    </Button>
+                  </div>
+                ) : null}
+                {data.sale.cucuruCvu ? (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-white/45">
+                      Copiar CVU
+                    </p>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="h-12 justify-start gap-2 rounded-xl"
+                      onClick={() => {
+                        void copyText("CVU", data.sale!.cucuruCvu as string)
+                        setMoreOpen(false)
+                      }}
+                    >
+                      <Copy className="size-4 shrink-0" aria-hidden />
+                      <span className="truncate font-mono text-sm">{data.sale.cucuruCvu}</span>
+                    </Button>
+                  </div>
+                ) : null}
+                <div className="flex flex-col">
+                  <div className="ml-4 h-px shrink-0 bg-white/[0.08]" aria-hidden />
+                  <div className="pt-6">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-white/45">
+                      Detalle de compra
+                    </p>
+                    <p className="mt-3 text-sm text-white/55">
+                      Fecha:{" "}
+                      <span className="text-white/90">
+                        {data.sale.createdAt ? formatEventDate(data.sale.createdAt) : "—"}
+                      </span>
+                    </p>
+                    <p className="mt-2 text-sm text-white/55">
+                      Pago:{" "}
+                      <span className="text-white/90">
+                        {formatPaymentMethod(data.sale.paymentMethod)}
+                        {data.sale.paid ? " · Acreditado" : " · Pendiente"}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-col">
+                  <div className="ml-4 h-px shrink-0 bg-white/[0.08]" aria-hidden />
+                  <div className="pt-6">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-white/45">
+                      Referencias (soporte)
+                    </p>
+                    <p className="mt-3 break-all font-mono text-[11px] leading-relaxed text-white/45">
+                      Pedido: {receiptToken ? truncateHash(receiptToken, 12, 8) : "—"}
+                    </p>
+                    {data.sale.paid ? (
+                      <ul className="mt-4 space-y-3">
+                        {data.tickets.map((t, i) => (
+                          <li
+                            key={t.id}
+                            className="font-mono text-[11px] leading-relaxed text-white/45"
+                          >
+                            Entrada {i + 1}: {truncateHash(t.qrHash, 10, 6)}
+                          </li>
+                        ))}
+                        {data.consumptions.map((c, i) => (
+                          <li
+                            key={c.id}
+                            className="font-mono text-[11px] leading-relaxed text-white/45"
+                          >
+                            Consumo {i + 1}: {truncateHash(c.qrHash, 10, 6)}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-4 text-[11px] leading-relaxed text-white/35">
+                        Los códigos de entradas y consumos se mostrarán aquí para soporte una vez
+                        acreditado el pago.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </>
+            ) : null}
           </div>
         </AppleSheet>
       ) : null}

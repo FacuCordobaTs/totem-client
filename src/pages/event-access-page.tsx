@@ -28,9 +28,9 @@ const JSON_HEADERS = { "Content-Type": "application/json" }
 const RESEND_COOLDOWN_S = 60
 
 /**
- * A dónde va el cliente recién verificado. El comprobante manda cuando existe (ahí están los
- * retiros, el saldo y la compra de consumos); si no compró nada, la vista del evento deja ver que
- * ya está adentro y ofrece la tienda en vez de una lista de eventos que no incluiría este.
+ * A dónde va el cliente recién verificado: a la pantalla del comprobante, que es la misma para las
+ * dos credenciales. Si ya compró, el link del mail; si no, el evento de su cuenta, que sirve el
+ * mismo diseño con los tres tabs (entradas, consumos y saldo) en cero.
  */
 function eventDestination(token: string, eventId: string, receiptToken: string | null): string {
   if (receiptToken) return `/receipt/${encodeURIComponent(receiptToken)}`

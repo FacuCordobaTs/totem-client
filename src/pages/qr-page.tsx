@@ -26,7 +26,11 @@ export function QrPage() {
   const ticketLayout = searchParams.get("layout") === "ticket"
   const ticketName = searchParams.get("name")
   const ticketPrice = searchParams.get("price")
-  const receiptToken = receiptTokenFromReturnTo(searchParams.get("returnTo"))
+  // El comprobante detrás del QR: en el link del mail viaja dentro de `returnTo`; en el evento de la
+  // cuenta (`/mi-cuenta/:token/evento/:id`) el path es del cliente y no de una venta, así que llega
+  // aparte. Sin comprobante no hay estado que consultar: se muestra el QR y nada más.
+  const receiptToken =
+    searchParams.get("receipt") ?? receiptTokenFromReturnTo(searchParams.get("returnTo"))
   const [ticketUsed, setTicketUsed] = useState(false)
   const [admissionWindow, setAdmissionWindow] = useState<string | null>(null)
 
@@ -102,7 +106,8 @@ export function QrPage() {
 
   const closeQr = () => {
     const returnTo = searchParams.get("returnTo")
-    if (returnTo?.startsWith("/receipt/")) {
+    // Las dos formas del comprobante: el link del mail y el evento de la cuenta.
+    if (returnTo?.startsWith("/receipt/") || returnTo?.startsWith("/mi-cuenta/")) {
       navigate(returnTo, { replace: true })
       return
     }

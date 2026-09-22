@@ -14,7 +14,6 @@ import { InvitationPage } from "@/pages/invitation-page"
 import { EventLinkHintPage } from "@/pages/event-link-hint-page"
 import { EventAccessPage } from "@/pages/event-access-page"
 import { CustomerProfilePage } from "@/pages/customer-profile-page"
-import { CustomerEventPage } from "@/pages/customer-event-page"
 import { AppShell } from "@/components/app-shell"
 
 function NightRoot({ children }: { children: ReactNode }) {
@@ -46,13 +45,14 @@ const router = createBrowserRouter([
       </NightRoot>
     ),
   },
-  // El evento visto por el cliente que entró por `/{slug}/acceso` sin haber comprado: misma
-  // estética que el comprobante, pero anclado al evento y no a una venta.
+  // El evento del cliente que entró por `/{slug}/acceso`: es el mismo comprobante
+  // (`ReceiptPage`), que sirve las dos credenciales y los mismos tres tabs. Adentro del evento la
+  // pantalla es siempre esta, haya comprado o no.
   {
     path: "/mi-cuenta/:token/evento/:eventId",
     element: (
       <NightRoot>
-        <CustomerEventPage />
+        <ReceiptPage />
       </NightRoot>
     ),
   },

@@ -139,7 +139,7 @@ export function RetirarPage() {
           <div className="flex items-center justify-center py-24 text-white/40">
             <Loader2 className="size-6 animate-spin" aria-hidden />
           </div>
-        ) : !data.sale.paid ? (
+        ) : !data.sale?.paid ? (
           <div className="flex flex-col gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-6 py-8 text-center">
             <p className="text-lg font-semibold tracking-tight text-white">
               Pago pendiente
@@ -206,7 +206,7 @@ export function RetirarPage() {
       </div>
 
       <AnimatePresence>
-        {data?.sale.paid === true && groups.length > 0 ? (
+        {data?.sale?.paid === true && groups.length > 0 ? (
           <motion.div
             key="retirar-bar"
             initial={{ opacity: 0, y: 28 }}
