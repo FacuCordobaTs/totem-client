@@ -61,6 +61,8 @@ export type PublicEventDetailResponse = {
   event: {
     id: string
     name: string
+    /** Descripcion libre del evento (texto publico). null = sin descripcion. */
+    description?: string | null
     /** Slug público del evento (`/:slug`) — para navegar "Volver" desde el checkout. */
     slug?: string | null
     date: string

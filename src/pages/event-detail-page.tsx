@@ -1938,6 +1938,11 @@ function MinimalCover({
               <p className="mt-2 text-[12px] font-semibold uppercase tracking-[0.2em] text-white/45">
                 {formatEventDay(data.event.date)}
               </p>
+              {data.event.description ? (
+                <p className="mt-2 max-h-[4.5em] overflow-hidden whitespace-pre-line text-[14px] leading-snug text-white/70">
+                  {data.event.description}
+                </p>
+              ) : null}
             </motion.header>
           ) : (
             <motion.header
