@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { Link, useNavigate, useParams, useSearchParams } from "react-router"
 import { formatAdmissionWindow } from "@/lib/ticket-admission"
-import { hasScheduledTicketSale } from "@/lib/ticket-sale"
 import {
   ArrowLeft,
   ArrowRight,
@@ -602,16 +601,18 @@ export function ReceiptPage() {
   const showPaidContent = data != null && (data.sale == null || data.sale.paid)
 
   // La tienda de consumos del evento se carga también sin compra: adentro del evento se puede
-  // comprar aunque el cliente no haya comprado nada antes. Con la venta de entradas agendada el
-  // evento no ofrece consumos: sin catálogo no hay "Comprar más consumos" ni tienda, y el cliente
-  // no ve los precios (misma regla que la compra en `event-detail-page`).
+  // comprar aunque el cliente no haya comprado nada antes. Mientras la venta de consumos no abrió
+  // (`consumptionsAvailableFrom` en el futuro; el backend los rechaza igual) no hay catálogo: sin
+  // "Comprar más consumos" ni tienda, el cliente no ve los precios (misma regla que la tienda del
+  // evento en `event-detail-page`).
   useEffect(() => {
     if (!showPaidContent || !data?.event?.id) return
     publicApiFetch<PublicEventDetailResponse>(`/public/events/${data.event.id}`)
       .then((r) => {
-        const consumptionsSkipped = hasScheduledTicketSale(r.event)
-        setAddonProducts(consumptionsSkipped ? [] : r.drinkProducts)
-        setAddonCategories(consumptionsSkipped ? [] : (r.productCategories ?? []))
+        const opensAt = r.event.consumptionsAvailableFrom
+        const consumptionsOpen = opensAt == null || Date.now() >= new Date(opensAt).getTime()
+        setAddonProducts(consumptionsOpen ? r.drinkProducts : [])
+        setAddonCategories(consumptionsOpen ? (r.productCategories ?? []) : [])
       })
       .catch(() => {
         setAddonProducts([])

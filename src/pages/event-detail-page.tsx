@@ -13,7 +13,6 @@ import { AnimatePresence, motion, useAnimationControls, type Transition } from "
 import Decimal from "decimal.js"
 import { publicApiFetch } from "@/lib/api"
 import { formatAdmissionWindow } from "@/lib/ticket-admission"
-import { hasScheduledTicketSale } from "@/lib/ticket-sale"
 import type {
   PublicDrinkProductItem,
   PublicEventDetailResponse,
@@ -145,17 +144,13 @@ export function EventDetailPage() {
     load()
   }, [load])
 
-  // Con la venta de entradas agendada la compra es sólo de entradas: el catálogo de consumos se
-  // ignora, así no hay paso de tienda y se pasa de las entradas directo al checkout sin mostrar
-  // los precios de la barra.
-  const skipConsumptions = !!data && hasScheduledTicketSale(data.event)
   const hasTicketCatalog = (data?.ticketTypes.length ?? 0) > 0
-  const hasProductCatalog = !skipConsumptions && (data?.drinkProducts.length ?? 0) > 0
+  const hasProductCatalog = (data?.drinkProducts.length ?? 0) > 0
 
   useEffect(() => {
     if (!data) return
     const hasT = data.ticketTypes.length > 0
-    const hasP = !hasScheduledTicketSale(data.event) && data.drinkProducts.length > 0
+    const hasP = data.drinkProducts.length > 0
     if (hasT) setWorkflow("tickets")
     else if (hasP) setWorkflow("products")
     else setWorkflow(null)
@@ -190,8 +185,9 @@ export function EventDetailPage() {
   }
 
   const drinkLines: CartDrinkLine[] = useMemo(() => {
-    // Un progreso guardado antes de agendar la venta puede traer consumos: no viajan al carrito.
-    if (!data || skipConsumptions) return []
+    // Con la venta de consumos sin abrir no viajan al carrito (p. ej. un progreso guardado antes
+    // de que se agendara la fecha): el backend los rechazaría.
+    if (!data || !consWindow.open) return []
     const out: CartDrinkLine[] = []
     for (const [pid, q] of Object.entries(drinks)) {
       if (q <= 0) continue
@@ -199,7 +195,7 @@ export function EventDetailPage() {
       if (p) out.push({ productId: pid, quantity: q, unitPrice: p.price })
     }
     return out
-  }, [data, drinks, skipConsumptions])
+  }, [data, drinks, consWindow.open])
 
   const cartPreview = useMemo(() => {
     if (!data) return null
@@ -1568,8 +1564,10 @@ function MinimalEventDetail({
   initialStep: MinimalStep
   onStepChange: (step: MinimalStep) => void
 }) {
-  // Sin catálogo de consumos no existe el paso de tienda: un progreso guardado en "store" no se restaura.
-  const [step, setStep] = useState<MinimalStep>(hasProductCatalog ? initialStep : "cover")
+  // El paso de tienda sólo existe si los consumos ya se pueden comprar. Con su venta todavía sin
+  // abrir (o sin catálogo) se pasa de las entradas directo al checkout, sin tienda ni precios; un
+  // progreso guardado en "store" tampoco se restaura.
+  const [step, setStep] = useState<MinimalStep>(productsPurchasable ? initialStep : "cover")
   const [returnToOpenTickets, setReturnToOpenTickets] = useState(false)
   const [savedDrawerTravelY, setSavedDrawerTravelY] = useState(0)
   const dirRef = useRef(1)
@@ -1592,7 +1590,7 @@ function MinimalEventDetail({
           ?.availableForPurchase === true
     )
   const canGoStoreFromTickets =
-    hasProductCatalog && ticketCount > 0 && ticketsBuyable
+    productsPurchasable && ticketCount > 0 && ticketsBuyable
 
   const hasAnyCatalog = hasTicketCatalog || hasProductCatalog
   const anythingPurchasable = anyTicketPurchasable || productsPurchasable
@@ -1610,7 +1608,7 @@ function MinimalEventDetail({
     go("store", 1)
   }
   const ticketsNext = () => {
-    if (hasProductCatalog) {
+    if (productsPurchasable) {
       setReturnToOpenTickets(true)
       go("store", 1)
     }
@@ -1655,8 +1653,8 @@ function MinimalEventDetail({
               anyTicketPurchasable={anyTicketPurchasable}
               totalStr={totalStr}
               cartCount={ticketCount}
-              primaryLabel={hasProductCatalog ? "Continuar" : "Continuar al pago"}
-              primaryEnabled={hasProductCatalog ? canGoStoreFromTickets : canContinue}
+              primaryLabel={productsPurchasable ? "Continuar" : "Continuar al pago"}
+              primaryEnabled={productsPurchasable ? canGoStoreFromTickets : canContinue}
               onPrimary={ticketsNext}
               opensTickets={anyTicketPurchasable}
               ctaLabel={coverCtaLabel}
