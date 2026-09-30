@@ -11,7 +11,7 @@ import {
 } from "lucide-react"
 import { AnimatePresence, motion, useAnimationControls, type Transition } from "motion/react"
 import Decimal from "decimal.js"
-import { publicApiFetch } from "@/lib/api"
+import { ApiError, publicApiFetch } from "@/lib/api"
 import { formatAdmissionWindow } from "@/lib/ticket-admission"
 import type {
   PublicDrinkProductItem,
@@ -137,7 +137,10 @@ export function EventDetailPage() {
         setCommerceSurface(saved?.commerceSurface ?? "hero")
         setMinimalStep(saved?.minimalStep ?? "cover")
       })
-      .catch(() => setError("No pudimos cargar el evento."))
+      .catch((err) => {
+        const detail = err instanceof ApiError ? err.message : err instanceof Error ? err.message : ""
+        setError(detail ? `No pudimos cargar el evento. ${detail}` : "No pudimos cargar el evento.")
+      })
   }, [slug, restoreSession])
 
   useEffect(() => {
