@@ -147,6 +147,31 @@ export function EventDetailPage() {
     load()
   }, [load])
 
+  // Navegadores embebidos (p. ej. el de Instagram) muestran el fondo del canvas del
+  // documento al hacer rebote de scroll arriba/abajo. El negro de la página lo pinta el
+  // contenido, no <html>/<body>, así que el rebote destapa el blanco por defecto.
+  // Mientras esta pantalla vive, forzamos el fondo negro y cortamos el overscroll.
+  useEffect(() => {
+    const html = document.documentElement
+    const body = document.body
+    const previous = {
+      htmlBackground: html.style.backgroundColor,
+      bodyBackground: body.style.backgroundColor,
+      htmlOverscroll: html.style.overscrollBehaviorY,
+      bodyOverscroll: body.style.overscrollBehaviorY,
+    }
+    html.style.backgroundColor = "#000"
+    body.style.backgroundColor = "#000"
+    html.style.overscrollBehaviorY = "none"
+    body.style.overscrollBehaviorY = "none"
+    return () => {
+      html.style.backgroundColor = previous.htmlBackground
+      body.style.backgroundColor = previous.bodyBackground
+      html.style.overscrollBehaviorY = previous.htmlOverscroll
+      body.style.overscrollBehaviorY = previous.bodyOverscroll
+    }
+  }, [])
+
   const hasTicketCatalog = (data?.ticketTypes.length ?? 0) > 0
   const hasProductCatalog = (data?.drinkProducts.length ?? 0) > 0
 
