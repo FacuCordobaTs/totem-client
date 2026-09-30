@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react"
-import { useNavigate, useParams } from "react-router"
+import { useLocation, useNavigate, useParams } from "react-router"
 import { ArrowRight, CalendarDays, Check, Loader2, MapPin, Ticket } from "lucide-react"
 import { AppleSheet } from "@/components/apple-sheet"
 import { Button } from "@/components/ui/button"
@@ -45,12 +45,17 @@ export function EventAccessPage() {
   const setSession = useSessionStore((state) => state.setSession)
   const clearSession = useSessionStore((state) => state.clearSession)
 
+  // Quien llega desde "reclamar entrada" (`/t/:token`) trae su DNI en el estado de la navegación
+  // —no en la URL— y el drawer se abre con el dato ya cargado: sólo falta pedir el código.
+  const handoff = (useLocation().state as { identifier?: unknown } | null)?.identifier
+  const handoffIdentifier = typeof handoff === "string" ? handoff : ""
+
   const [data, setData] = useState<EventAccessResponse | null>(null)
   const [loadError, setLoadError] = useState<{ status: number; message: string } | null>(null)
 
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(handoffIdentifier !== "")
   const [step, setStep] = useState<Step>("identify")
-  const [value, setValue] = useState("")
+  const [value, setValue] = useState(handoffIdentifier)
   const [name, setName] = useState("")
   const [phone, setPhone] = useState("")
   const [needsName, setNeedsName] = useState(false)

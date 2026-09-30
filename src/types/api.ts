@@ -227,6 +227,8 @@ export type ReceiptApiResponse = {
     id: string
     qrHash: string
     status: TicketStatus
+    /** Link de "compartir entradas" que la tiene reservada para un amigo; `null` si no está en ninguno. */
+    shareId?: string | null
     ticketType: { name: string; price: string; validFrom: string | null; validUntil: string | null }
   }>
   consumptions: Array<{
@@ -243,6 +245,80 @@ export type ReceiptApiResponse = {
     deliveredAt: string | null
     items: PickupItem[]
   }>
+  /** Compartir entradas con amigos. Ausente en un backend que todavía no lo soporta. */
+  shares?: TicketSharesInfo
+}
+
+/**
+ * Compartir entradas: quien compró varias arma un link (`/t/:token`) y cada amigo reclama una.
+ * `ACTIVE` = todavía quedan cupos sin reclamar; `COMPLETED` = se reclamaron todos; `CANCELLED` =
+ * el dueño lo dio de baja (sólo se lista si alguien alcanzó a reclamar).
+ */
+export type TicketShareStatus = "ACTIVE" | "COMPLETED" | "CANCELLED"
+
+export type TicketShareLink = {
+  id: string
+  token: string
+  ticketTypeName: string
+  /** Cupos vivos del link: los reclamados más los que todavía se pueden reclamar. */
+  total: number
+  claimed: number
+  pending: number
+  status: TicketShareStatus
+  createdAt: string | null
+  /** Quiénes reclamaron, con el nombre tal cual lo escribieron. */
+  claims: Array<{ name: string; claimedAt: string | null }>
+}
+
+export type TicketSharesInfo = {
+  /** Hay al menos una entrada para compartir y el evento sigue abierto. */
+  canShare: boolean
+  /** Lo que se puede poner en un link nuevo, por tipo de entrada. */
+  eligible: Array<{ ticketTypeId: string; ticketTypeName: string; available: number }>
+  links: TicketShareLink[]
+}
+
+/** `POST /public/ticket-shares` — el link recién armado. */
+export type TicketShareCreateResponse = { share: TicketShareLink }
+
+export type TicketSharePreviewState = "AVAILABLE" | "SOLD_OUT" | "CANCELLED" | "EVENT_CLOSED"
+
+/** `GET /public/ticket-shares/:token` — lo que ve el amigo antes de reclamar. */
+export type TicketSharePreviewResponse = {
+  state: TicketSharePreviewState
+  /** Nombre de pila de quien armó el link. */
+  hostName: string
+  event: {
+    id: string
+    slug: string | null
+    name: string
+    date: string
+    venue: string | null
+    location: string | null
+    imageUrl: string | null
+  }
+  productora: { name: string }
+  ticketType: { name: string; validFrom: string | null; validUntil: string | null }
+  remaining: number
+  total: number
+}
+
+/** `POST /public/ticket-shares/:token/claim` — la entrada ya es del amigo, con QR nuevo. */
+export type TicketShareClaimResponse = {
+  ticket: {
+    id: string
+    qrHash: string
+    status: TicketStatus
+    ticketType: { name: string; validFrom: string | null; validUntil: string | null }
+  }
+  /** El nombre que escribió, nunca el de una ficha existente. */
+  holderName: string
+  event: TicketSharePreviewResponse["event"]
+  /**
+   * Sólo cuando el reclamo creó la ficha del cliente: sesión lista para entrar a su cuenta. Con una
+   * ficha que ya existía es `null` (el DNI no se verifica; entra con el código de WhatsApp).
+   */
+  session: { token: string } | null
 }
 
 export type CustomerProfileResponse = {

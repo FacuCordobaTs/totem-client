@@ -11,6 +11,7 @@ import { QrPage } from "@/pages/qr-page"
 import { RetirarPage } from "@/pages/retirar-page"
 import { PickupPage } from "@/pages/pickup-page"
 import { InvitationPage } from "@/pages/invitation-page"
+import { TicketSharePage } from "@/pages/ticket-share-page"
 import { EventLinkHintPage } from "@/pages/event-link-hint-page"
 import { EventAccessPage } from "@/pages/event-access-page"
 import { CustomerProfilePage } from "@/pages/customer-profile-page"
@@ -121,6 +122,16 @@ const router = createBrowserRouter([
     element: (
       <NightRoot>
         <InvitationPage />
+      </NightRoot>
+    ),
+  },
+  // Compartir entradas: el link que el comprador manda a sus amigos (`${client}/t/:token`). El amigo
+  // completa sus datos y reclama una entrada; el token del link es la credencial (sin auth).
+  {
+    path: "/t/:token",
+    element: (
+      <NightRoot>
+        <TicketSharePage />
       </NightRoot>
     ),
   },

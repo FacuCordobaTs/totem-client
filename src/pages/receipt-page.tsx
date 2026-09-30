@@ -12,6 +12,7 @@ import {
   PackageCheck,
   Plus,
   Ticket,
+  Users,
   Wine,
   UserRound,
 } from "lucide-react"
@@ -40,6 +41,11 @@ import {
   truncateHash,
 } from "@/lib/format"
 import { AppleSheet } from "@/components/apple-sheet"
+import {
+  TicketShareHistory,
+  TicketSharePanel,
+  type ShareCredentials,
+} from "@/components/ticket-share-panel"
 
 const MP_CHECKOUT_LAUNCHED_KEY = "mpCheckoutLaunched"
 const ADDON_PURCHASE_KEY = "addonPurchaseForReceipt"
@@ -491,6 +497,17 @@ export function ReceiptPage() {
       ? `/mi-cuenta/${encodeURIComponent(profileToken ?? "")}/evento/${encodeURIComponent(eventId ?? "")}`
       : `/receipt/${encodeURIComponent(routeReceiptToken ?? "")}`
   }?view=tickets${receiptToken ? `&receipt=${encodeURIComponent(receiptToken)}` : ""}`
+  /**
+   * Con qué credencial se comparten las entradas: la misma con la que se abrió esta pantalla. El
+   * backend resuelve al dueño igual con las dos (comprobante, o sesión del evento).
+   */
+  const shareCredentials: ShareCredentials | null = eventMode
+    ? profileToken && eventId
+      ? { customerToken: profileToken, eventId }
+      : null
+    : routeReceiptToken
+      ? { receiptToken: routeReceiptToken }
+      : null
 
   const load = useCallback(async () => {
     try {
@@ -719,6 +736,12 @@ export function ReceiptPage() {
 
   const consumosAvailable =
     showPaidContent && addonProducts !== null && addonProducts.length > 0
+
+  /** Entradas que el cliente puede repartir hoy (sin las ya reservadas en un link). */
+  const shareableTickets = (data?.shares?.eligible ?? []).reduce(
+    (total, type) => total + type.available,
+    0
+  )
 
   // Hay tragos comprados y no canjeados → se habilita el retiro en barra (tarea 4.1).
   const hasPendingConsumptions = (data?.consumptions ?? []).some(
@@ -958,6 +981,28 @@ export function ReceiptPage() {
                       Todo lo que necesitás para disfrutar el evento está acá.
                     </p>
                   </header>
+                  {/* Quien compró varias entradas suele ir con amigos: se le ofrece repartirlas
+                      desde el inicio, sin tener que descubrirlo dentro de "Tus entradas". */}
+                  {data.shares?.canShare && shareableTickets >= 2 ? (
+                    <button
+                      type="button"
+                      onClick={() => setActiveView("tickets")}
+                      className="group flex w-full items-center gap-4 rounded-2xl border border-violet-400/25 bg-violet-500/10 px-5 py-4 text-left outline-none transition-colors hover:bg-violet-500/15 focus-visible:ring-2 focus-visible:ring-violet-300/40"
+                    >
+                      <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-violet-400/15 text-violet-200">
+                        <Users className="size-5" aria-hidden />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[15px] font-semibold tracking-tight text-white">
+                          Pasales entradas a tus amigos
+                        </span>
+                        <span className="mt-0.5 block text-[13px] leading-snug text-white/50">
+                          Podés pasar hasta {shareableTickets} entradas: mandás un link y cada uno reclama la suya.
+                        </span>
+                      </span>
+                      <ArrowRight className="size-4 shrink-0 text-white/30 transition-transform group-hover:translate-x-0.5 group-hover:text-white/70" aria-hidden />
+                    </button>
+                  ) : null}
                   <nav className="flex flex-col gap-3" aria-label="Tu cuenta para el evento">
                     <NavigationCard
                       icon={<Ticket className="size-5" aria-hidden />}
@@ -982,6 +1027,15 @@ export function ReceiptPage() {
               ) : activeView === "tickets" ? (
                 <>
                   <SectionHeader title="Tus entradas" onBack={() => setActiveView("home")} />
+                  {/* Compartir con amigos: un link para el grupo y cada uno reclama la suya. */}
+                  {data.shares && shareCredentials ? (
+                    <TicketSharePanel
+                      shares={data.shares}
+                      credentials={shareCredentials}
+                      eventName={data.event.name}
+                      onChanged={load}
+                    />
+                  ) : null}
                   {data.tickets.length > 0 ? (
                     <div className="flex flex-col gap-3">
                       {data.tickets.map((ticket) => {
@@ -1000,6 +1054,12 @@ export function ReceiptPage() {
                               <span className={`mt-2 w-fit rounded-full px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-[0.14em] ${active ? "bg-emerald-100 text-emerald-700" : "bg-zinc-200 text-zinc-500"}`}>
                                 {ticketStatusLabel(ticket.status)}
                               </span>
+                              {/* Reservada en un link: sigue siendo tuya hasta que un amigo la reclama. */}
+                              {active && ticket.shareId ? (
+                                <span className="mt-1.5 w-fit rounded-full bg-violet-100 px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-[0.14em] text-violet-700">
+                                  Para un amigo
+                                </span>
+                              ) : null}
                             </div>
                             <div className="relative flex w-[6.5rem] shrink-0 items-center justify-center border-l-2 border-dotted border-zinc-300 px-4 py-3">
                               <span aria-hidden className="absolute -left-[9px] -top-[9px] size-4 rounded-full bg-black" />
@@ -1023,6 +1083,7 @@ export function ReceiptPage() {
                         : "No hay entradas para este evento."}
                     </p>
                   )}
+                  {data.shares ? <TicketShareHistory links={data.shares.links} /> : null}
                 </>
               ) : activeView === "consumos" ? (
                 <>
