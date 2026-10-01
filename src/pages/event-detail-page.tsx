@@ -12,7 +12,7 @@ import {
 import { AnimatePresence, motion, useAnimationControls, type Transition } from "motion/react"
 import Decimal from "decimal.js"
 import { ApiError, publicApiFetch } from "@/lib/api"
-import { formatAdmissionWindow } from "@/lib/ticket-admission"
+import { formatAdmissionWindow, formatAdmissionWindowShort } from "@/lib/ticket-admission"
 import type {
   PublicDrinkProductItem,
   PublicEventDetailResponse,
@@ -1774,8 +1774,13 @@ function MinimalCover({
   const [drawerOpen, setDrawerOpen] = useState(initialDrawerOpen)
   const [ticketsReady, setTicketsReady] = useState(initialDrawerOpen)
   const [mapExpanded, setMapExpanded] = useState(false)
+  // La isla vuelve a pastilla recién cuando el mapa terminó de plegarse. Si cambiara de forma antes,
+  // el mapa quedaría más angosto y el alto de la isla caería de golpe: el drawer, que está debajo y
+  // sigue su layout, pegaría un salto.
+  const [islandWide, setIslandWide] = useState(false)
   const [purchaseTravelY, setPurchaseTravelY] = useState(initialPurchaseTravelY)
   const purchaseHeaderRef = useRef<HTMLElement | null>(null)
+  const islandRowRef = useRef<HTMLDivElement | null>(null)
   const drawerCycleRef = useRef(0)
   // El nombre del salón es lo que se comunica; la dirección queda reservada al mapa.
   const venueLabel = data.event.venue ?? data.event.location
@@ -1794,8 +1799,10 @@ function MinimalCover({
     }
 
     const headerTop = purchaseHeaderRef.current?.getBoundingClientRect().top
-    const openDrawerHeaderTop = window.innerHeight * 0.4 + 45
-    const travelY = headerTop == null ? 0 : openDrawerHeaderTop - headerTop
+    // El drawer abierto arranca justo debajo de la fila de la isla de ubicación. Desde su borde hasta
+    // el título hay 40 (relleno + manija) y 5 más de ajuste para que el título calce.
+    const drawerTop = islandRowRef.current?.getBoundingClientRect().bottom
+    const travelY = headerTop == null || drawerTop == null ? 0 : drawerTop + 45 - headerTop
     drawerCycleRef.current += 1
     setPurchaseTravelY(travelY)
     onDrawerTravelY(travelY)
@@ -1822,7 +1829,7 @@ function MinimalCover({
   const saleOpen = ticketsWindow.open
 
   return (
-    <div className={`relative h-dvh overflow-hidden ${appearance === "glass" ? "bg-transparent" : "bg-[#0a0a0a]"}`}>
+    <div className={`relative flex h-dvh flex-col overflow-hidden pt-[max(1rem,env(safe-area-inset-top))] ${appearance === "glass" ? "bg-transparent" : "bg-[#0a0a0a]"}`}>
       <motion.div
         initial={{ opacity: 0, y: 20, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: drawerOpen ? 1.5 : 1 }}
@@ -1862,15 +1869,19 @@ function MinimalCover({
         className={`absolute inset-0 z-10 bg-black ${drawerOpen ? "pointer-events-auto" : "pointer-events-none"}`}
       />
 
-      <AnimatePresence initial={false}>
-        {drawerOpen && venueLabel ? (
+      {/*
+        Fila de la isla de ubicación. Va en flujo, encima del drawer: el drawer abierto se queda con todo
+        el alto que esta fila deja libre, así que sube hasta apoyarse debajo de la isla y baja solo, a la
+        par del mapa, cuando la isla se agranda. Sin ubicación se reserva el alto de la isla plegada.
+      */}
+      <div ref={islandRowRef} className="pointer-events-none relative z-30 shrink-0 px-5 pb-2">
+        {venueLabel ? (
           <motion.div
-            key="location-island"
-            initial={{ opacity: 0, y: -32, scale: 0.92 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -24, scale: 0.94 }}
+            initial={false}
+            animate={drawerOpen ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: -32, scale: 0.92 }}
             transition={MINIMAL_SPRING}
-            className="pointer-events-none fixed inset-x-0 top-[max(1rem,env(safe-area-inset-top))] z-30 flex justify-center px-5"
+            inert={!drawerOpen}
+            className="flex justify-center"
           >
             <motion.div
               layout
@@ -1880,14 +1891,18 @@ function MinimalCover({
                   ? "bg-black/35 backdrop-blur-2xl backdrop-saturate-150"
                   : "bg-[#0a0a0a]"
               } ${
-                mapExpanded
+                islandWide
                   ? "w-full max-w-md rounded-[24px] p-3"
                   : "w-[min(16rem,calc(100vw-3rem))] rounded-full px-5 py-3"
               }`}
             >
               <button
                 type="button"
-                onClick={() => data.event.location && setMapExpanded((expanded) => !expanded)}
+                onClick={() => {
+                  if (!data.event.location) return
+                  setIslandWide(true)
+                  setMapExpanded((expanded) => !expanded)
+                }}
                 aria-expanded={mapExpanded}
                 disabled={!data.event.location}
                 className="block w-full text-white disabled:cursor-default"
@@ -1903,7 +1918,7 @@ function MinimalCover({
                 </span>
               </button>
 
-              <AnimatePresence initial={false}>
+              <AnimatePresence initial={false} onExitComplete={() => setIslandWide(false)}>
                 {mapExpanded && data.event.location ? (
                   <motion.div
                     key="location-map"
@@ -1921,14 +1936,16 @@ function MinimalCover({
               </AnimatePresence>
             </motion.div>
           </motion.div>
-        ) : null}
-      </AnimatePresence>
+        ) : (
+          <div aria-hidden className="h-[4.1rem]" />
+        )}
+      </div>
 
       <motion.section
         aria-label={drawerOpen ? "Selección de entradas" : "Información del evento"}
         initial={false}
         animate={{
-          height: drawerOpen ? "60dvh" : "auto",
+          flexGrow: drawerOpen ? 1 : 0,
           borderTopLeftRadius: appearance === "glass" || drawerOpen ? 28 : 0,
           borderTopRightRadius: appearance === "glass" || drawerOpen ? 28 : 0,
           borderBottomLeftRadius: appearance === "glass" ? 28 : 0,
@@ -1936,10 +1953,10 @@ function MinimalCover({
           boxShadow: drawerOpen ? "0 -28px 70px -30px rgba(0,0,0,0.9)" : "0 0 0 rgba(0,0,0,0)",
         }}
         transition={{ duration: 0.52, ease: [0.22, 1, 0.36, 1] }}
-        className={`fixed z-20 mx-auto flex flex-col overflow-hidden px-5 pt-5 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 ${
+        className={`relative z-20 mx-auto mt-auto flex flex-col overflow-hidden px-5 pt-5 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 ${
           appearance === "glass"
-            ? "inset-x-5 bottom-[max(1rem,env(safe-area-inset-bottom))] w-[calc(100%-2.5rem)] max-w-md rounded-[28px] bg-black/30 shadow-2xl shadow-black/60 backdrop-blur-2xl backdrop-saturate-150"
-            : "inset-x-0 bottom-0 w-full max-w-lg bg-[#0a0a0a]"
+            ? "mb-[max(1rem,env(safe-area-inset-bottom))] w-[calc(100%-2.5rem)] max-w-md rounded-[28px] bg-black/30 shadow-2xl shadow-black/60 backdrop-blur-2xl backdrop-saturate-150"
+            : "w-full max-w-lg bg-[#0a0a0a]"
         }`}
       >
         {drawerOpen ? (
@@ -2023,7 +2040,7 @@ function MinimalCover({
                         <MinimalTicketRow
                           appearance={appearance}
                           name={t.name}
-                          admissionWindow={formatAdmissionWindow(t)}
+                          admissionWindow={formatAdmissionWindowShort(t)}
                           priceStr={formatMoneyArsExact(t.price)}
                           count={count}
                           disabled={disabled}
@@ -2660,7 +2677,7 @@ function MinimalTicketRow({
           <span className="truncate text-[16px] font-bold leading-tight tracking-tight text-white">
             {name}
           </span>
-          {admissionWindow && <span className="mt-1 text-xs leading-relaxed text-amber-200">{admissionWindow}</span>}
+          {admissionWindow && <span className="mt-1 text-balance text-xs leading-relaxed text-amber-200">{admissionWindow}</span>}
           <span className="mt-1 text-[14px] font-semibold tabular-nums text-white/60">
             {priceStr}
           </span>
