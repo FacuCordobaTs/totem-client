@@ -2619,7 +2619,7 @@ function MinimalTicketRow({
     <motion.div
       layout
       transition={MINIMAL_SPRING}
-      className={`relative flex items-stretch overflow-hidden rounded-2xl transition-colors ${active ? "w-full" : "w-[calc(100%-3.5rem)]"} ${
+      className={`relative flex w-full items-stretch overflow-hidden rounded-2xl transition-colors ${
         appearance === "glass"
           ? active
             ? "border border-white/[0.16] bg-white/[0.18] shadow-xl shadow-black/30 backdrop-blur-xl"
@@ -2674,7 +2674,7 @@ function MinimalTicketRow({
         </AnimatePresence>
 
         <motion.div layout className="flex min-w-0 flex-1 flex-col justify-center">
-          <span className="truncate text-[16px] font-bold leading-tight tracking-tight text-white">
+          <span className="whitespace-normal text-[16px] font-bold leading-tight tracking-tight text-white [overflow-wrap:anywhere]">
             {name}
           </span>
           {admissionWindow && <span className="mt-1 text-balance text-xs leading-relaxed text-amber-200">{admissionWindow}</span>}
@@ -2682,38 +2682,39 @@ function MinimalTicketRow({
             {priceStr}
           </span>
         </motion.div>
-
-        <span
-          className="flex size-10 shrink-0 items-center justify-center text-white"
-          aria-hidden
-        >
-          <Plus className="size-6" strokeWidth={2.5} />
-        </span>
       </motion.button>
 
-      {/* Rail para restar */}
-      <AnimatePresence initial={false} mode="popLayout">
-        {active ? (
-          <motion.button
-            key="rail"
-            type="button"
-            initial={{ opacity: 0, x: 16 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 12 }}
-            transition={EASE_OUT}
-            whileTap={{ scale: 0.96 }}
-            onClick={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              onRemove()
-            }}
-            className="flex w-14 shrink-0 items-center justify-center border-l border-white/10 text-white/60 outline-none transition-colors hover:bg-white/[0.05] hover:text-white/90 focus-visible:ring-2 focus-visible:ring-white/25"
-            aria-label={`Sacar una entrada ${name}`}
-          >
-            <Minus className="size-5" aria-hidden />
-          </motion.button>
-        ) : null}
-      </AnimatePresence>
+      {/* Controles apilados para dejar más ancho al nombre */}
+      <div className="flex w-12 shrink-0 flex-col justify-center border-l border-white/10">
+        <motion.button
+          type="button"
+          disabled={disabled}
+          onClick={onAdd}
+          whileTap={disabled ? undefined : { scale: 0.96 }}
+          className="flex min-h-11 flex-1 items-center justify-center text-white outline-none transition-colors hover:bg-white/[0.05] focus-visible:ring-2 focus-visible:ring-white/30"
+          aria-label={`Sumar una entrada ${name}`}
+        >
+          <Plus className="size-6" strokeWidth={2.5} aria-hidden />
+        </motion.button>
+        <AnimatePresence initial={false}>
+          {active ? (
+            <motion.button
+              key="remove"
+              type="button"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={EASE_OUT}
+              whileTap={{ scale: 0.96 }}
+              onClick={onRemove}
+              className="flex min-h-11 flex-1 items-center justify-center border-t border-white/10 text-white/60 outline-none transition-colors hover:bg-white/[0.05] hover:text-white/90 focus-visible:ring-2 focus-visible:ring-white/25"
+              aria-label={`Sacar una entrada ${name}`}
+            >
+              <Minus className="size-5" aria-hidden />
+            </motion.button>
+          ) : null}
+        </AnimatePresence>
+      </div>
 
       {/* Subrayado activo */}
       {!disabled ? (
