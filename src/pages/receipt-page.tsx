@@ -1088,7 +1088,7 @@ export function ReceiptPage() {
                     <h2 className="text-xl font-bold">Tu transporte</h2>
                     {data.transports?.map((transport) => <div key={transport.id} className="space-y-3 rounded-2xl border border-black/10 bg-white p-4 text-zinc-950">
                       <div><p className="font-bold">{transport.quantity} × {transport.name}</p><p className="mt-1 text-sm text-black/60">{transport.address}</p><p className="mt-2 text-sm font-semibold">{formatMoneyArsExact(new Decimal(transport.price).mul(transport.quantity).toFixed(2))} · Pagado</p></div>
-                      <TransportMap transport={transport} />
+                      <TransportMap transport={transport} showDirections={false} />
                     </div>)}
                   </section>}
                   {data.shares ? <TicketShareHistory links={data.shares.links} /> : null}
