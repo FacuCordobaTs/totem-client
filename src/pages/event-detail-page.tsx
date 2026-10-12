@@ -1822,8 +1822,8 @@ function MinimalCover({
   const purchaseHeaderRef = useRef<HTMLElement | null>(null)
   const islandRowRef = useRef<HTMLDivElement | null>(null)
   const drawerCycleRef = useRef(0)
-  // El nombre del salón es lo que se comunica; la dirección queda reservada al mapa.
-  const venueLabel = data.event.venue ?? data.event.location
+  // Sin dirección textual, la isla invita a abrir la ubicación del mapa.
+  const venueLabel = data.event.venue?.trim() || (data.event.location?.trim() ? "Hacé clic para ver la ubicación" : null)
   const titleLength = data.event.name.trim().length
   const titleSize = titleLength > 54
     ? "clamp(1.3rem, 5.6vw, 1.8rem)"
@@ -1949,7 +1949,7 @@ function MinimalCover({
               >
                 <span className="flex min-w-0 items-center justify-center gap-2">
                   <MapPin className="size-4 shrink-0 text-white/70" aria-hidden />
-                  <span className="truncate text-[14px] font-semibold">
+                  <span className="text-center text-[14px] font-semibold leading-snug">
                     {venueLabel}
                   </span>
                 </span>
