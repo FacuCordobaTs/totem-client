@@ -28,6 +28,7 @@ import {
   type CartSnapshot,
 } from "@/stores/cart-store"
 import { formatMoneyArsExact } from "@/lib/format"
+import Decimal from "decimal.js"
 
 type Step = "contact" | "method" | "pay"
 type Method = "TRANSFER" | "CARD" | "MERCADOPAGO" | "SALDO"
@@ -218,6 +219,7 @@ export function CheckoutPage() {
             email: email.trim(),
             phone: phone.trim(),
           },
+          transportLines: (snapshot.transportLines ?? []).map((l) => ({ transportId: l.transportId, quantity: l.quantity })),
           ticketLines: snapshot.ticketLines.map((l) => ({
             ticketTypeId: l.ticketTypeId,
             quantity: l.quantity,
@@ -301,6 +303,7 @@ export function CheckoutPage() {
       </header>
 
       <main className="mx-auto flex w-full max-w-lg flex-col px-6 pb-32 pt-16 sm:px-8">
+        {step !== "pay" && (snapshot?.transportLines ?? []).map((line) => <div key={line.transportId} className="mb-6 rounded-xl border border-white/15 bg-white/5 p-4 text-sm"><p className="font-semibold">{line.quantity} × {line.name} · Transporte</p><p className="mt-1 text-white/60">{line.address}</p><p className="mt-2">{formatMoneyArsExact(new Decimal(line.unitPrice).mul(line.quantity).toFixed(2))}</p></div>)}
         {step !== "pay" && ticketTypes.filter((type) => snapshot?.ticketLines.some((line) => line.ticketTypeId === type.id)).map((type) => {
           const schedule = formatAdmissionWindow(type)
           return schedule ? <p key={type.id} className="mb-4 rounded-xl border border-amber-200/20 bg-amber-200/5 p-3 text-sm text-amber-200"><strong>{type.name}:</strong> {schedule}</p> : null

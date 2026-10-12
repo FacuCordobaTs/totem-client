@@ -27,6 +27,7 @@ import {
 } from "@/lib/format"
 import { Button } from "@/components/ui/button"
 import { EventMap } from "@/components/event-map"
+import { TransportPicker } from "@/components/transport-picker"
 import {
   computeCartTotalString,
   useCartStore,
@@ -47,6 +48,7 @@ function readSavedProgress(slugOrId: string | undefined) {
       commerceSurface?: CommerceSurface
       ticketQtys?: Record<string, number>
       drinks?: Record<string, number>
+      transportQtys?: Record<string, number>
       minimalStep?: MinimalStep
     }
   } catch {
@@ -114,6 +116,7 @@ export function EventDetailPage() {
   const [workflow, setWorkflow] = useState<PurchaseWorkflow | null>(null)
   const [ticketQtys, setTicketQtys] = useState<Record<string, number>>(() => savedProgress?.ticketQtys ?? {})
   const [drinks, setDrinks] = useState<Record<string, number>>(() => savedProgress?.drinks ?? {})
+  const [transportQtys, setTransportQtys] = useState<Record<string, number>>(() => savedProgress?.transportQtys ?? {})
   const [minimalStep, setMinimalStep] = useState<MinimalStep>(() => savedProgress?.minimalStep ?? "cover")
 
   const ticketsFrom = data?.event.ticketsAvailableFrom ?? null
@@ -133,6 +136,7 @@ export function EventDetailPage() {
         setData(r)
         setTicketQtys(saved?.ticketQtys ?? {})
         setDrinks(saved?.drinks ?? {})
+        setTransportQtys(saved?.transportQtys ?? {})
         setPurchaseOpen(saved?.purchaseOpen ?? false)
         setCommerceSurface(saved?.commerceSurface ?? "hero")
         setMinimalStep(saved?.minimalStep ?? "cover")
@@ -225,6 +229,17 @@ export function EventDetailPage() {
     return out
   }, [data, drinks, consWindow.open])
 
+  const transportLines = useMemo(() => {
+    let remaining = ticketLines.reduce((sum, line) => sum + line.quantity, 0)
+    return (data?.transports ?? []).flatMap((transport) => {
+      const quantity = Math.min(remaining, transportQtys[transport.id] ?? 0)
+      remaining -= quantity
+      return quantity > 0 ? [{ transportId: transport.id, quantity, unitPrice: transport.price, name: transport.name, address: transport.address }] : []
+    })
+  }, [data, transportQtys, ticketLines])
+  const selectedTransportQtys = Object.fromEntries(transportLines.map((line) => [line.transportId, line.quantity]))
+  const transportCount = transportLines.reduce((sum, line) => sum + line.quantity, 0)
+
   const cartPreview = useMemo(() => {
     if (!data) return null
     return {
@@ -233,8 +248,9 @@ export function EventDetailPage() {
       productoraName: data.productora.name,
       ticketLines,
       drinkLines,
+      transportLines,
     }
-  }, [data, ticketLines, drinkLines])
+  }, [data, ticketLines, drinkLines, transportLines])
 
   const totalStr = cartPreview ? computeCartTotalString(cartPreview) : "0.00"
 
@@ -354,6 +370,7 @@ export function EventDetailPage() {
       setCommerceSurface("hero")
       setTicketQtys({})
       setDrinks({})
+      setTransportQtys({})
     }
   }, [purchaseOpen])
 
@@ -362,10 +379,10 @@ export function EventDetailPage() {
     try {
       localStorage.setItem(
         `crow_event_progress_${slug}`,
-        JSON.stringify({ purchaseOpen, commerceSurface, ticketQtys, drinks, minimalStep })
+        JSON.stringify({ purchaseOpen, commerceSurface, ticketQtys, drinks, transportQtys, minimalStep })
       )
     } catch { /* noop */ }
-  }, [slug, purchaseOpen, commerceSurface, ticketQtys, drinks, minimalStep])
+  }, [slug, purchaseOpen, commerceSurface, ticketQtys, drinks, transportQtys, minimalStep])
 
   useEffect(() => {
     if (purchaseOpen || ctaDisabled) return
@@ -396,6 +413,9 @@ export function EventDetailPage() {
   if (data && appearance) {
     return (
       <MinimalEventDetail
+        transportPicker={<TransportPicker transports={data.transports ?? []} quantities={selectedTransportQtys} maxSeats={ticketCount} onQuantity={(id, quantity) => setTransportQtys({ ...selectedTransportQtys, [id]: quantity })} />}
+        transportCount={transportCount}
+        transportSummary={transportLines.length > 0 ? <section className="space-y-3"><CategoryHeading>Transporte</CategoryHeading>{transportLines.map((line) => <p key={line.transportId} className="rounded-2xl bg-white/5 p-4 text-sm"><span className="block font-semibold">{line.quantity} × {line.name} · {formatMoneyArsExact(new Decimal(line.unitPrice).mul(line.quantity).toFixed(2))}</span><span className="mt-1 block text-white/60">{line.address}</span></p>)}</section> : null}
         appearance={appearance}
         data={data}
         ticketsFrom={ticketsFrom}
@@ -1546,6 +1566,9 @@ const minimalStepVariants = {
 }
 
 function MinimalEventDetail({
+  transportPicker,
+  transportCount,
+  transportSummary,
   appearance,
   data,
   ticketsFrom,
@@ -1569,6 +1592,9 @@ function MinimalEventDetail({
   initialStep,
   onStepChange,
 }: {
+  transportPicker: ReactNode
+  transportCount: number
+  transportSummary: ReactNode
   appearance: EventAppearance
   data: PublicEventDetailResponse
   ticketsFrom: Date | string | null
@@ -1671,6 +1697,8 @@ function MinimalEventDetail({
             transition={MINIMAL_SPRING}
           >
             <MinimalCover
+              transportPicker={transportPicker}
+              transportCount={transportCount}
               appearance={appearance}
               data={data}
               ticketsFrom={ticketsFrom}
@@ -1680,7 +1708,7 @@ function MinimalEventDetail({
               trimTicket={trimTicket}
               anyTicketPurchasable={anyTicketPurchasable}
               totalStr={totalStr}
-              cartCount={ticketCount}
+              cartCount={ticketCount + transportCount}
               primaryLabel={productsPurchasable ? "Continuar" : "Continuar al pago"}
               primaryEnabled={productsPurchasable ? canGoStoreFromTickets : canContinue}
               onPrimary={ticketsNext}
@@ -1704,6 +1732,7 @@ function MinimalEventDetail({
             transition={MINIMAL_SPRING}
           >
             <MinimalStoreStep
+              transportSummary={transportSummary}
               appearance={appearance}
               data={data}
               consFrom={consFrom}
@@ -1715,7 +1744,7 @@ function MinimalEventDetail({
               drinkLines={drinkLines}
               productsPurchasable={productsPurchasable}
               totalStr={totalStr}
-              cartCount={ticketCount + drinkCount}
+              cartCount={ticketCount + drinkCount + transportCount}
               canContinue={canContinue}
               onBack={back}
               onPay={continueClick}
@@ -1728,6 +1757,8 @@ function MinimalEventDetail({
 }
 
 function MinimalCover({
+  transportPicker,
+  transportCount,
   appearance,
   data,
   ticketsFrom,
@@ -1749,6 +1780,8 @@ function MinimalCover({
   initialPurchaseTravelY,
   onDrawerTravelY,
 }: {
+  transportPicker: ReactNode
+  transportCount: number
   appearance: EventAppearance
   data: PublicEventDetailResponse
   ticketsFrom: Date | string | null
@@ -1773,6 +1806,13 @@ function MinimalCover({
   const hero = data.event.imageUrl ?? null
   const [drawerOpen, setDrawerOpen] = useState(initialDrawerOpen)
   const [ticketsReady, setTicketsReady] = useState(initialDrawerOpen)
+  const [choosingTransport, setChoosingTransport] = useState(false)
+  const hasTransports = (data.transports?.length ?? 0) > 0
+  const next = () => {
+    if (!primaryEnabled) return
+    if (hasTransports && !choosingTransport) setChoosingTransport(true)
+    else onPrimary()
+  }
   const [mapExpanded, setMapExpanded] = useState(false)
   // La isla vuelve a pastilla recién cuando el mapa terminó de plegarse. Si cambiara de forma antes,
   // el mapa quedaría más angosto y el alto de la isla caería de golpe: el drawer, que está debajo y
@@ -1998,7 +2038,7 @@ function MinimalCover({
               className="shrink-0"
             >
               <h2 className="text-[clamp(1.65rem,7vw,2.25rem)] font-bold tracking-[-0.02em] text-white">
-                Elegí tus entradas
+                {choosingTransport ? "¿Querés sumar transporte?" : "Elegí tus entradas"}
               </h2>
             </motion.header>
           )}
@@ -2026,7 +2066,7 @@ function MinimalCover({
                   </p>
                 ) : null}
 
-                <ul className="min-h-0 flex-1 space-y-3.5 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {choosingTransport ? <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:none]"><button type="button" onClick={() => setChoosingTransport(false)} className="mb-4 inline-flex items-center gap-1 text-sm text-white/60"><ChevronLeft className="size-4" />Volver a entradas</button>{transportPicker}</div> : <ul className="min-h-0 flex-1 space-y-3.5 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   {data.ticketTypes.map((t, i) => {
                     const count = ticketQtys[t.id] ?? 0
                     const disabled = !t.availableForPurchase || !saleOpen
@@ -2050,7 +2090,7 @@ function MinimalCover({
                       </motion.li>
                     )
                   })}
-                </ul>
+                </ul>}
               </motion.div>
             ) : null}
           </AnimatePresence>
@@ -2073,9 +2113,9 @@ function MinimalCover({
               <MinimalCheckoutRow
                 totalStr={totalStr}
                 cartCount={cartCount}
-                label={primaryLabel}
+                label={hasTransports && !choosingTransport ? "Continuar" : choosingTransport && transportCount === 0 ? "Seguir sin transporte" : primaryLabel}
                 enabled={primaryEnabled}
-                onClick={onPrimary}
+                onClick={next}
               />
             </motion.div>
           )}
@@ -2086,6 +2126,7 @@ function MinimalCover({
 }
 
 function MinimalStoreStep({
+  transportSummary,
   appearance,
   data,
   consFrom,
@@ -2102,6 +2143,7 @@ function MinimalStoreStep({
   onBack,
   onPay,
 }: {
+  transportSummary: ReactNode
   appearance: EventAppearance
   data: PublicEventDetailResponse
   consFrom: Date | string | null
@@ -2173,6 +2215,7 @@ function MinimalStoreStep({
                   setDrinkQty={setDrinkQty}
                   drinks={drinks}
                 />
+                {transportSummary}
               </motion.div>
             ) : shelf === "glass" ? (
               <motion.div

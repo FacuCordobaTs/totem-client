@@ -48,7 +48,23 @@ export type PublicProductCategory = {
   sortOrder: number
 }
 
+export type PublicTransport = {
+  id: string
+  name: string
+  address: string
+  latitude: string
+  longitude: string
+  price: string
+}
+
+export type PurchasedTransport = Omit<PublicTransport, "id"> & {
+  id: string
+  transportId: string
+  quantity: number
+}
+
 export type PublicEventDetailResponse = {
+  transports?: PublicTransport[]
   productora: {
     id: string
     name: string
@@ -199,6 +215,7 @@ export type ConsumptionsCheckoutResponse = {
  * la misma, sólo que las acciones que necesitan una venta no están disponibles.
  */
 export type ReceiptApiResponse = {
+  transports?: PurchasedTransport[]
   receiptToken: string | null
   /** Nombre completo de la persona que hizo la compra. */
   customerName: string

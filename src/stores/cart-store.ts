@@ -23,6 +23,7 @@ export type CartSnapshot = {
   productoraName: string
   ticketLines: CartTicketLine[]
   drinkLines: CartDrinkLine[]
+  transportLines?: { transportId: string; quantity: number; unitPrice: string; name: string; address: string }[]
 }
 
 type CartState = {
@@ -39,6 +40,9 @@ export function computeCartTotalDecimal(cart: CartSnapshot): Decimal {
     t = t.add(new Decimal(line.unitPrice).mul(line.quantity))
   }
   for (const line of cart.drinkLines) {
+    t = t.add(new Decimal(line.unitPrice).mul(line.quantity))
+  }
+  for (const line of cart.transportLines ?? []) {
     t = t.add(new Decimal(line.unitPrice).mul(line.quantity))
   }
   return t
