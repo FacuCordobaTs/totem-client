@@ -75,7 +75,7 @@ export function QrPage() {
         )
         const ticket = receipt.tickets.find((item) => item.qrHash === hash)
         if (!disposed) {
-          setTicketUsed(ticket?.status === "USED")
+          setTicketUsed(ticket?.status === "USED" || receipt.transports?.some((pass) => pass.qrHash === hash && pass.status === "USED") === true)
           setAdmissionWindow(ticket ? formatAdmissionWindow(ticket.ticketType) : null)
         }
       } catch {

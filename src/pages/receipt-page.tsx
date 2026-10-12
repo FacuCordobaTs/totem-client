@@ -995,10 +995,10 @@ export function ReceiptPage() {
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block text-[15px] font-semibold tracking-tight text-white">
-                          Pasales entradas a tus amigos
+                          Compartí entradas y pasajes
                         </span>
                         <span className="mt-0.5 block text-[13px] leading-snug text-white/50">
-                          Podés pasar hasta {shareableTickets} entradas: mandás un link y cada uno reclama la suya.
+                          Podés compartir hasta {shareableTickets} boletos con un link.
                         </span>
                       </span>
                       <ArrowRight className="size-4 shrink-0 text-white/30 transition-transform group-hover:translate-x-0.5 group-hover:text-white/70" aria-hidden />
@@ -1007,8 +1007,8 @@ export function ReceiptPage() {
                   <nav className="flex flex-col gap-3" aria-label="Tu cuenta para el evento">
                     <NavigationCard
                       icon={<Ticket className="size-5" aria-hidden />}
-                      title="Tus entradas"
-                      detail={`${data.tickets.length}`}
+                      title="Tus entradas y transporte"
+                      detail={`${data.tickets.length + (data.transports?.length ?? 0)}`}
                       onClick={() => setActiveView("tickets")}
                     />
                     <NavigationCard
@@ -1027,7 +1027,7 @@ export function ReceiptPage() {
                 </>
               ) : activeView === "tickets" ? (
                 <>
-                  <SectionHeader title="Tus entradas" onBack={() => setActiveView("home")} />
+                  <SectionHeader title="Tus entradas y transporte" onBack={() => setActiveView("home")} />
                   {/* Compartir con amigos: un link para el grupo y cada uno reclama la suya. */}
                   {data.shares && shareCredentials ? (
                     <TicketSharePanel
@@ -1077,17 +1077,19 @@ export function ReceiptPage() {
                         )
                       })}
                     </div>
-                  ) : (
+                  ) : (data.transports?.length ?? 0) === 0 ? (
                     <p className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-6 py-8 text-center text-sm text-white/50">
                       {data.sale
                         ? "No hay entradas asociadas a esta compra."
                         : "No hay entradas para este evento."}
                     </p>
-                  )}
+                  ) : null}
                   {(data.transports?.length ?? 0) > 0 && <section className="space-y-3">
                     <h2 className="text-xl font-bold">Tu transporte</h2>
                     {data.transports?.map((transport) => <div key={transport.id} className="space-y-3 rounded-2xl border border-black/10 bg-white p-4 text-zinc-950">
                       <div><p className="font-bold">{transport.quantity} × {transport.name}</p><p className="mt-1 text-sm text-black/60">{transport.address}</p><p className="mt-2 text-sm font-semibold">{formatMoneyArsExact(new Decimal(transport.price).mul(transport.quantity).toFixed(2))} · Pagado</p></div>
+                      <p className="text-sm font-semibold">{transport.buyerName} · {transport.status === "USED" ? "Ya subió" : "Pendiente de subir"}</p>
+                      <div className="flex justify-center"><QrBlock hash={transport.qrHash} active={transport.status === "PENDING"} returnTo={ticketsReturnTo} ticketName={`Colectivo · ${transport.name}`} ticketPrice={formatMoneyArsExact(transport.price)} /></div>
                       <TransportMap transport={transport} showDirections={false} />
                     </div>)}
                   </section>}

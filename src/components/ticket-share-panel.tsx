@@ -60,8 +60,8 @@ function shareUrl(token: string): string {
   return `${window.location.origin}/t/${encodeURIComponent(token)}`
 }
 
-function shareIntro(eventName: string): string {
-  return `Te pasé una entrada para ${eventName} 🎟️\nReclamala con tus datos desde acá:`
+function shareIntro(eventName: string, kind?: string, includesTransport?: boolean): string {
+  return `Te pasé ${kind === "transport" ? "un pasaje de colectivo" : includesTransport ? "una entrada con transporte" : "una entrada"} para ${eventName} 🎟️\nReclamala con tus datos desde acá:`
 }
 
 const canNativeShare = () => typeof navigator !== "undefined" && typeof navigator.share === "function"
@@ -147,7 +147,6 @@ export function TicketSharePanel({
     }
   }
 
-  const eligibleTotal = shares.eligible.reduce((sum, type) => sum + type.available, 0)
 
   if (!shares.canShare && activeLinks.length === 0) return null
 
@@ -155,7 +154,7 @@ export function TicketSharePanel({
     <>
       {shares.canShare ? (
         <section
-          aria-label="Compartir entradas"
+          aria-label="Compartir entradas y pasajes"
           className="flex items-center gap-4 rounded-2xl border border-white/[0.09] bg-white/[0.045] p-4"
         >
           <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white/[0.08] text-white/80">
@@ -163,10 +162,10 @@ export function TicketSharePanel({
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-[15px] font-semibold tracking-tight text-white">
-              {eligibleTotal > 1 ? "Pasales entradas a tus amigos" : "Pasale tu entrada a un amigo"}
+              Compartí con tus amigos
             </p>
             <p className="mt-0.5 text-[13px] leading-snug text-white/45">
-              Mandás un link y cada uno reclama la suya con sus datos.
+              Mandás un link y cada amigo recibe su QR.
             </p>
           </div>
           <Button
@@ -187,7 +186,7 @@ export function TicketSharePanel({
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="truncate text-[15px] font-semibold text-white">
-                Link · {plural(link.total, "entrada", "entradas")} {link.ticketTypeName}
+                Link · {plural(link.total, "boleto", "boletos")} {link.ticketTypeName}
               </p>
               <p className="mt-1 text-[13px] tabular-nums text-white/45">
                 {link.claimed} de {link.total} {link.total === 1 ? "reclamada" : "reclamadas"}
@@ -234,7 +233,7 @@ export function TicketSharePanel({
           {confirmCancel === link.id ? (
             <div className="mt-4 rounded-xl bg-white/[0.05] p-3">
               <p className="text-[13px] leading-snug text-white/65">
-                {plural(link.pending, "entrada sin reclamar vuelve", "entradas sin reclamar vuelven")}{" "}
+                {plural(link.pending, "boleto sin reclamar vuelve", "boletos sin reclamar vuelven")}{" "}
                 a ser tuya{link.pending === 1 ? "" : "s"}. Lo que ya reclamaron queda de ellos.
               </p>
               <div className="mt-3 flex gap-2">
@@ -327,10 +326,10 @@ function ShareSheet({
     <AppleSheet
       open={open}
       onOpenChange={onOpenChange}
-      title={link ? "Tu link está listo" : "Compartir entradas"}
+      title={link ? "Tu link está listo" : "Compartir entradas y pasajes"}
       description={
         link
-          ? "Mandalo al grupo: cada amigo reclama una entrada con sus datos."
+          ? "Mandalo al grupo: cada amigo reclama su boleto con sus datos."
           : "Elegí cuántas pasás. Recibís un único link para mandar al grupo."
       }
     >
@@ -358,19 +357,21 @@ function CreateLink({
 }) {
   const defaultQuantity = (available: number) => (available >= 2 ? available - 1 : available)
   const first = shares.eligible[0]
+  const [includeTransport, setIncludeTransport] = useState(false)
   const [typeId, setTypeId] = useState(first?.ticketTypeId ?? "")
   const [quantity, setQuantity] = useState(first ? defaultQuantity(first.available) : 1)
   const [busy, setBusy] = useState(false)
 
   const selected = shares.eligible.find((type) => type.ticketTypeId === typeId) ?? first
   if (!selected) return null
-  const max = selected.available
+  const max = includeTransport ? Math.min(selected.available, selected.transportAvailable ?? 0) : selected.available
   const left = max - quantity
 
   const chooseType = (id: string) => {
     const type = shares.eligible.find((item) => item.ticketTypeId === id)
     if (!type) return
     setTypeId(id)
+    setIncludeTransport(false)
     setQuantity(defaultQuantity(type.available))
   }
 
@@ -381,7 +382,7 @@ function CreateLink({
       const response = await publicApiFetch<TicketShareCreateResponse>("/public/ticket-shares", {
         method: "POST",
         headers: JSON_HEADERS,
-        body: JSON.stringify({ ...credentials, ticketTypeId: selected.ticketTypeId, quantity }),
+        body: JSON.stringify({ ...credentials, ...(selected.transportId ? { transportId: selected.transportId } : { ticketTypeId: selected.ticketTypeId, includeTransport }), quantity }),
       })
       await onCreated(response.share)
     } catch (e) {
@@ -395,8 +396,8 @@ function CreateLink({
     <div className="flex flex-col gap-7">
       {shares.eligible.length > 1 ? (
         <div className="flex flex-col gap-3">
-          <p className="text-xs font-semibold uppercase tracking-wider text-white/45">Tipo de entrada</p>
-          <div className="flex flex-col gap-2" role="radiogroup" aria-label="Tipo de entrada">
+          <p className="text-xs font-semibold uppercase tracking-wider text-white/45">Entrada o pasaje</p>
+          <div className="flex flex-col gap-2" role="radiogroup" aria-label="Entrada o pasaje">
             {shares.eligible.map((type) => {
               const active = type.ticketTypeId === selected.ticketTypeId
               return (
@@ -424,13 +425,14 @@ function CreateLink({
       ) : (
         <p className="text-sm text-white/55">
           <span className="font-semibold text-white">{selected.ticketTypeName}</span> ·{" "}
-          {plural(max, "entrada disponible", "entradas disponibles")}
+          {plural(max, "boleto disponible", "boletos disponibles")}
         </p>
       )}
 
+      {!selected.transportId && (selected.transportAvailable ?? 0) > 0 && <label className="flex items-start gap-3 rounded-xl bg-white/5 p-4 text-sm text-white/80"><input type="checkbox" checked={includeTransport} onChange={(e) => { setIncludeTransport(e.target.checked); setQuantity((n) => Math.max(1, Math.min(n, e.target.checked ? Math.min(selected.available, selected.transportAvailable ?? 0) : selected.available))) }} className="mt-1" /><span>Incluir el pasaje de colectivo de cada entrada.<span className="mt-1 block text-xs text-white/45">Si compartís el pasaje solo, tu entrada sigue siendo tuya.</span></span></label>}
       <div className="flex flex-col gap-3">
         <p className="text-xs font-semibold uppercase tracking-wider text-white/45">
-          ¿Cuántas entradas pasás?
+          ¿Cuántos compartís?
         </p>
         <div className="flex items-center justify-center gap-6 py-1">
           <button
@@ -460,23 +462,22 @@ function CreateLink({
         </div>
         <p className="text-center text-[13px] text-white/45">
           {left > 0
-            ? `Te ${left === 1 ? "queda" : "quedan"} ${plural(left, "entrada", "entradas")} para vos.`
-            : "Vas a pasar todas tus entradas de este tipo."}
+            ? `Te ${left === 1 ? "queda" : "quedan"} ${plural(left, "boleto", "boletos")} para vos.`
+            : "Vas a compartir todos los boletos de esta opción."}
         </p>
       </div>
 
       <div className="flex flex-col gap-3">
         <Button
           type="button"
-          disabled={busy}
+          disabled={busy || quantity > max || max < 1}
           onClick={() => void create()}
           className="h-14 w-full rounded-2xl bg-white font-semibold text-black transition-all hover:bg-zinc-200"
         >
           {busy ? <Loader2 className="size-5 animate-spin" aria-hidden /> : "Crear link"}
         </Button>
         <p className="text-center text-xs leading-relaxed text-white/35">
-          Cada amigo completa su nombre, DNI y celular, y la entrada queda a su nombre: en la puerta
-          entra con su DNI. Podés cancelar el link cuando quieras.
+          Cada amigo completa sus datos y recibe su QR. El boleto queda a su nombre. Podés cancelar el link cuando quieras.
         </p>
       </div>
     </div>
@@ -510,13 +511,13 @@ function LinkReady({ link, eventName }: { link: TicketShareLink; eventName: stri
   }, [showQr, url])
 
   const openWhatsApp = () => {
-    const text = `${shareIntro(eventName)}\n${url}`
+    const text = `${shareIntro(eventName, link.kind, link.includesTransport)}\n${url}`
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer")
   }
 
   const nativeShare = async () => {
     try {
-      await navigator.share({ title: eventName, text: shareIntro(eventName), url })
+      await navigator.share({ title: eventName, text: shareIntro(eventName, link.kind, link.includesTransport), url })
     } catch (e) {
       // Cerrar el menú del teléfono no es un error.
       if (!(e instanceof DOMException && e.name === "AbortError")) {
@@ -536,7 +537,7 @@ function LinkReady({ link, eventName }: { link: TicketShareLink; eventName: stri
       <div className="flex items-center justify-between gap-3 rounded-xl bg-white/[0.06] px-4 py-3">
         <div className="min-w-0">
           <p className="text-[13px] font-semibold text-white">
-            {plural(link.total, "entrada", "entradas")} {link.ticketTypeName}
+            {plural(link.total, "boleto", "boletos")} {link.ticketTypeName}
           </p>
           <p className="mt-0.5 text-xs tabular-nums text-white/45">
             {link.claimed} de {link.total} {link.total === 1 ? "reclamada" : "reclamadas"}
@@ -604,7 +605,7 @@ function LinkReady({ link, eventName }: { link: TicketShareLink; eventName: stri
       </div>
 
       <p className="text-center text-xs leading-relaxed text-white/35">
-        Cada persona puede reclamar una sola entrada. Las que nadie reclame siguen siendo tuyas y
+        Cada persona puede reclamar un boleto por link. Los que nadie reclame siguen siendo tuyos y
         podés cancelar el link cuando quieras.
       </p>
     </div>

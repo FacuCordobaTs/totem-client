@@ -15,6 +15,7 @@ import { TicketSharePage } from "@/pages/ticket-share-page"
 import { EventLinkHintPage } from "@/pages/event-link-hint-page"
 import { EventAccessPage } from "@/pages/event-access-page"
 import { CustomerProfilePage } from "@/pages/customer-profile-page"
+import { TransportDriverPage } from "@/pages/transport-driver-page"
 import { AppShell } from "@/components/app-shell"
 
 function NightRoot({ children }: { children: ReactNode }) {
@@ -30,6 +31,7 @@ function NightRoot({ children }: { children: ReactNode }) {
 }
 
 const router = createBrowserRouter([
+  { path: "/transporte/:token", element: <NightRoot><TransportDriverPage /></NightRoot> },
   {
     path: "/",
     element: (

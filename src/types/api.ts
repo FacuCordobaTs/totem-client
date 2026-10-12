@@ -58,9 +58,19 @@ export type PublicTransport = {
 }
 
 export type PurchasedTransport = Omit<PublicTransport, "id"> & {
+  qrHash: string
+  status: TicketStatus
+  boardedAt: string | null
+  buyerName: string
   id: string
   transportId: string
   quantity: number
+}
+
+export type TransportManifestResponse = {
+  event: { id: string; name: string; date: string }
+  transport: { id: string; name: string; address: string; latitude: string; longitude: string }
+  passengers: { id: string; name: string; dni: string | null; phone: string | null; quantity: number; status: TicketStatus; boardedAt: string | null }[]
 }
 
 export type PublicEventDetailResponse = {
@@ -274,6 +284,8 @@ export type ReceiptApiResponse = {
 export type TicketShareStatus = "ACTIVE" | "COMPLETED" | "CANCELLED"
 
 export type TicketShareLink = {
+  kind?: "ticket" | "transport"
+  includesTransport?: boolean
   id: string
   token: string
   ticketTypeName: string
@@ -288,20 +300,25 @@ export type TicketShareLink = {
 }
 
 export type TicketSharesInfo = {
+  canIncludeTransport?: boolean
   /** Hay al menos una entrada para compartir y el evento sigue abierto. */
   canShare: boolean
   /** Lo que se puede poner en un link nuevo, por tipo de entrada. */
-  eligible: Array<{ ticketTypeId: string; ticketTypeName: string; available: number }>
+  eligible: Array<{ ticketTypeId: string; ticketTypeName: string; available: number; transportAvailable?: number; transportId?: string; kind?: "transport" }>
   links: TicketShareLink[]
 }
 
 /** `POST /public/ticket-shares` — el link recién armado. */
+
 export type TicketShareCreateResponse = { share: TicketShareLink }
 
 export type TicketSharePreviewState = "AVAILABLE" | "SOLD_OUT" | "CANCELLED" | "EVENT_CLOSED"
 
 /** `GET /public/ticket-shares/:token` — lo que ve el amigo antes de reclamar. */
 export type TicketSharePreviewResponse = {
+  kind?: "ticket" | "transport"
+  includesTransport?: boolean
+  transport?: Pick<PublicTransport, "name" | "address" | "latitude" | "longitude">
   state: TicketSharePreviewState
   /** Nombre de pila de quien armó el link. */
   hostName: string
@@ -321,7 +338,10 @@ export type TicketSharePreviewResponse = {
 }
 
 /** `POST /public/ticket-shares/:token/claim` — la entrada ya es del amigo, con QR nuevo. */
+
 export type TicketShareClaimResponse = {
+  kind?: "ticket" | "transport"
+  transport?: PurchasedTransport | null
   ticket: {
     id: string
     qrHash: string

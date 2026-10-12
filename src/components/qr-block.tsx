@@ -4,7 +4,7 @@ import QRCode from "qrcode"
 import { Maximize2 } from "lucide-react"
 
 /**
- * El QR de una entrada o consumición, con el atajo a pantalla completa.
+ * El QR de una entrada, pasaje o consumición, con el atajo a pantalla completa.
  *
  * `returnTo` es a dónde vuelve el botón "listo" de esa pantalla: lo usan tanto el comprobante
  * (`/receipt/:token?view=tickets`) como la vista de evento (`/mi-cuenta/:token/evento/:id`).
@@ -52,7 +52,7 @@ export function QrBlock({
     return (
       <div className="flex size-24 items-center justify-center rounded-lg border border-dashed border-zinc-300 bg-zinc-100">
         <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-zinc-400">
-          Usada
+          Usado
         </span>
       </div>
     )
@@ -68,7 +68,7 @@ export function QrBlock({
         <Maximize2 className="size-3" aria-hidden />
       </Link>
       {src ? (
-        <img src={src} alt="Código QR de entrada" className="size-24 rounded-lg" width={96} height={96} />
+        <img src={src} alt="Código QR" className="size-24 rounded-lg" width={96} height={96} />
       ) : (
         <div className="flex size-24 items-center justify-center text-sm text-zinc-400">…</div>
       )}

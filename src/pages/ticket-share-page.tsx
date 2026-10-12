@@ -2,6 +2,8 @@ import { useEffect, useState, type FormEvent, type ReactNode } from "react"
 import { useNavigate, useParams } from "react-router"
 import QRCode from "qrcode"
 import { ArrowRight, CalendarDays, Check, Loader2, MapPin, Ticket } from "lucide-react"
+import { TransportMap } from "@/components/transport-picker"
+import { TransportPassQr } from "@/components/transport-pass-qr"
 import { Button } from "@/components/ui/button"
 import { ApiError, publicApiFetch } from "@/lib/api"
 import { formatEventDate } from "@/lib/format"
@@ -216,10 +218,10 @@ function TicketShareView({ token }: { token: string }) {
             <Check className="size-5" aria-hidden />
           </span>
           <h2 className="mt-4 text-xl font-bold tracking-tight text-white">
-            Ya reclamaste tu entrada, {stored.firstName}
+            Ya reclamaste tu boleto, {stored.firstName}
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-white/50">
-            Entrá a tu cuenta para ver el QR. En la puerta también entrás con tu DNI.
+            Entrá a tu cuenta para ver tu QR.
           </p>
           <Button
             type="button"
@@ -232,7 +234,7 @@ function TicketShareView({ token }: { token: string }) {
             }
             className="mt-6 h-14 w-full rounded-2xl bg-white font-semibold text-black hover:bg-zinc-200"
           >
-            <Ticket className="size-4" aria-hidden /> Ver mi entrada
+            <Ticket className="size-4" aria-hidden /> Ver mi boleto
           </Button>
         </section>
         <button
@@ -240,7 +242,7 @@ function TicketShareView({ token }: { token: string }) {
           onClick={() => setForOther(true)}
           className="mt-5 w-full text-center text-xs font-medium text-white/35 underline underline-offset-4 hover:text-white/60"
         >
-          Reclamar una entrada para otra persona
+          Reclamar para otra persona
         </button>
       </Shell>
     )
@@ -249,14 +251,14 @@ function TicketShareView({ token }: { token: string }) {
   if (preview.state !== "AVAILABLE") {
     const message: Record<Exclude<TicketSharePreviewState, "AVAILABLE">, [string, string]> = {
       SOLD_OUT: [
-        "Ya se reclamaron todas las entradas",
+        "Ya se reclamaron todos los boletos",
         `Pedile a ${hostName} que te pase otro link si todavía te falta la tuya.`,
       ],
       CANCELLED: [
         `${hostName} canceló este link`,
-        "Pedile que te mande uno nuevo para reclamar tu entrada.",
+        "Pedile que te mande un link nuevo.",
       ],
-      EVENT_CLOSED: ["Este evento ya finalizó", "Ya no se pueden reclamar entradas."],
+      EVENT_CLOSED: ["Este evento ya finalizó", "Ya no se pueden reclamar boletos."],
     }
     const [title, body] = message[preview.state]
     return (
@@ -277,7 +279,7 @@ function TicketShareView({ token }: { token: string }) {
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-[15px] font-semibold tracking-tight text-white">
-            {hostName} te pasó una entrada
+            {hostName} te pasó {preview.kind === "transport" ? "un pasaje de colectivo" : preview.includesTransport ? "una entrada con transporte" : "una entrada"}
           </p>
           <p className="mt-0.5 truncate text-[13px] text-white/50">{ticketType.name}</p>
           {admission ? <p className="mt-1 text-xs leading-snug text-amber-300/80">{admission}</p> : null}
@@ -289,11 +291,12 @@ function TicketShareView({ token }: { token: string }) {
         ) : null}
       </section>
 
+      {preview.transport && <section className="mt-4 space-y-3 rounded-2xl bg-white p-4 text-zinc-950"><p className="text-sm">{preview.transport.address}</p><TransportMap transport={preview.transport} showDirections={false} /></section>}
       <form onSubmit={(e) => void submit(e)} noValidate className="mt-8 flex flex-col gap-6">
         <div>
-          <h2 className="text-lg font-bold tracking-tight text-white">Reclamá tu entrada</h2>
+          <h2 className="text-lg font-bold tracking-tight text-white">{preview.kind === "transport" ? "Reclamá tu pasaje" : "Reclamá tu entrada"}</h2>
           <p className="mt-1 text-[13px] leading-relaxed text-white/45">
-            Completá tus datos: la entrada queda a tu nombre y en la puerta entrás con tu DNI.
+            Completá tus datos y recibí tu QR a tu nombre.
           </p>
         </div>
 
@@ -371,10 +374,10 @@ function TicketShareView({ token }: { token: string }) {
             disabled={busy}
             className="h-14 w-full rounded-2xl bg-white font-semibold text-black transition-all hover:bg-zinc-200 disabled:shadow-none"
           >
-            {busy ? <Loader2 className="size-5 animate-spin" aria-hidden /> : "Reclamar mi entrada"}
+            {busy ? <Loader2 className="size-5 animate-spin" aria-hidden /> : preview.kind === "transport" ? "Reclamar mi pasaje" : "Reclamar mi entrada"}
           </Button>
           <p className="mt-4 text-center text-xs leading-relaxed text-white/30">
-            Tus datos quedan asociados a la entrada y a tu cuenta: con ella podés comprar consumos
+            Tus datos quedan asociados a tu boleto y a tu cuenta: podés comprar consumos
             del evento.
           </p>
         </div>
@@ -542,12 +545,11 @@ function ClaimedView({
       <div className="flex flex-col items-center text-center">
         <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-300">
           <Check className="size-3.5" aria-hidden />
-          Entrada reclamada
+          {claimed.kind === "transport" ? "Pasaje reclamado" : "Entrada reclamada"}
         </span>
         <h1 className="mt-5 text-3xl font-bold tracking-[-0.03em] text-white">¡Listo, {firstName}!</h1>
         <p className="mt-2 max-w-xs text-[15px] leading-relaxed text-white/50">
-          La entrada quedó a tu nombre. Mostrá este QR en la puerta o, si no tenés el celular, alcanza
-          con tu DNI.
+          {claimed.kind === "transport" ? "El pasaje quedó a tu nombre. Mostrá este QR al subir al colectivo." : "La entrada quedó a tu nombre. Mostrá este QR en la puerta o tu DNI."}
         </p>
       </div>
 
@@ -562,7 +564,7 @@ function ClaimedView({
         </div>
         <div className="flex items-center justify-center px-6 py-5">
           {qr ? (
-            <img src={qr} alt="Código QR de tu entrada" className="aspect-square w-full max-w-[15rem]" width={240} height={240} />
+            <img src={qr} alt="Código QR de tu boleto" className="aspect-square w-full max-w-[15rem]" width={240} height={240} />
           ) : (
             <div className="flex aspect-square w-full max-w-[15rem] items-center justify-center text-zinc-400">
               <Loader2 className="size-5 animate-spin" aria-hidden />
@@ -579,6 +581,7 @@ function ClaimedView({
         </div>
       </article>
 
+      {claimed.transport && <section className="mt-5 space-y-3 rounded-2xl bg-white p-4 text-zinc-950"><h2 className="font-bold">Colectivo · {claimed.transport.name}</h2><p className="text-sm">{claimed.transport.address}</p>{claimed.kind !== "transport" && <TransportPassQr hash={claimed.transport.qrHash} />}<TransportMap transport={claimed.transport} showDirections={false} /></section>}
       <Button
         type="button"
         onClick={onContinue}
