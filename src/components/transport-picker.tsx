@@ -1,11 +1,13 @@
 import { AnimatePresence, motion } from "motion/react"
-import { Bus, Check, Minus, Plus, Navigation } from "lucide-react"
+import { Bus, Minus, Plus, Navigation } from "lucide-react"
 import type { PublicTransport } from "@/types/api"
 import { formatMoneyArsExact } from "@/lib/format"
 
 export function TransportMap({
-  transport
+  transport,
+  showDirections = true
 }: {
+  showDirections?: boolean
   transport: Pick<
     PublicTransport,
     "name" | "address" | "latitude" | "longitude"
@@ -21,7 +23,7 @@ export function TransportMap({
         referrerPolicy="no-referrer-when-downgrade"
         className="h-44 w-full rounded-xl border-0"
       />
-      <a
+      {showDirections && <a
         href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(point)}`}
         target="_blank"
         rel="noopener noreferrer"
@@ -29,7 +31,7 @@ export function TransportMap({
       >
         <Navigation className="size-4" />
         Cómo llegar al punto de salida
-      </a>
+      </a>}
     </div>
   )
 }
@@ -51,43 +53,55 @@ export function TransportPicker({
   )
   return (
     <div className="space-y-4">
-      <p className="text-sm leading-relaxed text-white/60">
-        Elegí desde dónde salir. Podés sumar hasta un pasaje por entrada o
-        continuar sin transporte.
-      </p>
       {transports.map((transport) => {
         const quantity = quantities[transport.id] ?? 0
         return (
           <motion.div
             layout
             key={transport.id}
-            className={`overflow-hidden rounded-2xl border ${quantity ? "border-white/30 bg-white/10" : "border-white/10 bg-white/5"}`}
+            className={`overflow-hidden rounded-2xl transition-colors ${quantity ? "bg-white/[0.08]" : "bg-white/[0.04]"}`}
           >
-            <button
-              type="button"
-              aria-pressed={quantity > 0}
-              onClick={() =>
-                onQuantity(
-                  transport.id,
-                  quantity ? 0 : selected < maxSeats ? 1 : 0
-                )
-              }
-              className="flex w-full items-start gap-3 p-4 text-left"
-            >
-              <Bus className="mt-1 size-5 shrink-0 text-white/65" />
-              <span className="min-w-0 flex-1">
-                <span className="block text-base font-semibold">
-                  {transport.name}
+            <div className="flex w-full items-stretch">
+              <div className="flex w-14 shrink-0 items-center justify-center bg-white/[0.03]">
+                <Bus className="size-6 text-white/60" strokeWidth={1.75} aria-hidden />
+              </div>
+              <motion.button
+                type="button"
+                disabled={selected >= maxSeats}
+                onClick={() => onQuantity(transport.id, quantity + 1)}
+                whileTap={selected >= maxSeats ? undefined : { scale: 0.985 }}
+                aria-label={`Sumar un pasaje de ${transport.name}`}
+                className="flex min-w-0 flex-1 items-center gap-3 px-4 py-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-white/30"
+              >
+                {quantity > 0 && <span className="flex shrink-0 items-center gap-1"><span className="text-[20px] font-bold leading-none tabular-nums text-white" aria-live="polite">{quantity}</span><span className="text-[13px] font-semibold text-white/35">x</span></span>}
+                <span className="flex min-w-0 flex-1 flex-col justify-center">
+                  <span className="whitespace-normal text-[16px] font-bold leading-tight tracking-tight text-white [overflow-wrap:anywhere]">{transport.name}</span>
+                  <span className="mt-1 whitespace-normal text-sm text-white/60">{transport.address}</span>
+                  <span className="mt-1 text-[14px] font-semibold tabular-nums text-white/60">{formatMoneyArsExact(transport.price)} por persona</span>
                 </span>
-                <span className="mt-1 block whitespace-normal text-sm text-white/60">
-                  {transport.address}
-                </span>
-                <span className="mt-2 block text-sm font-semibold">
-                  {formatMoneyArsExact(transport.price)} por persona
-                </span>
-              </span>
-              {quantity > 0 && <Check className="size-5 shrink-0" />}
-            </button>
+              </motion.button>
+              <div className="flex w-12 shrink-0 flex-col justify-center border-l border-white/10">
+                <motion.button
+                  type="button"
+                  disabled={selected >= maxSeats}
+                  onClick={() => onQuantity(transport.id, quantity + 1)}
+                  whileTap={selected >= maxSeats ? undefined : { scale: 0.96 }}
+                  aria-label={`Sumar un pasaje de ${transport.name}`}
+                  className="flex min-h-11 flex-1 items-center justify-center text-white outline-none transition-colors hover:bg-white/[0.05] focus-visible:ring-2 focus-visible:ring-white/30 disabled:opacity-25"
+                >
+                  <Plus className="size-6" strokeWidth={2.5} aria-hidden />
+                </motion.button>
+                {quantity > 0 && <motion.button
+                  type="button"
+                  onClick={() => onQuantity(transport.id, quantity - 1)}
+                  whileTap={{ scale: 0.96 }}
+                  aria-label={`Quitar un pasaje de ${transport.name}`}
+                  className="flex min-h-11 flex-1 items-center justify-center border-t border-white/10 text-white/60 outline-none transition-colors hover:bg-white/[0.05] hover:text-white/90 focus-visible:ring-2 focus-visible:ring-white/25"
+                >
+                  <Minus className="size-5" aria-hidden />
+                </motion.button>}
+              </div>
+            </div>
             <AnimatePresence initial={false}>
               {quantity > 0 && (
                 <motion.div
@@ -97,32 +111,7 @@ export function TransportPicker({
                   className="overflow-hidden"
                 >
                   <div className="space-y-4 px-4 pb-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-sm text-white/70">Pasajes</span>
-                      <div className="flex items-center gap-3">
-                        <button
-                          type="button"
-                          aria-label={`Quitar un pasaje de ${transport.name}`}
-                          onClick={() => onQuantity(transport.id, quantity - 1)}
-                          className="grid size-10 place-items-center rounded-full bg-white/10"
-                        >
-                          <Minus className="size-4" />
-                        </button>
-                        <span className="min-w-4 text-center font-semibold tabular-nums">
-                          {quantity}
-                        </span>
-                        <button
-                          type="button"
-                          aria-label={`Sumar un pasaje de ${transport.name}`}
-                          disabled={selected >= maxSeats}
-                          onClick={() => onQuantity(transport.id, quantity + 1)}
-                          className="grid size-10 place-items-center rounded-full bg-white/10 disabled:opacity-25"
-                        >
-                          <Plus className="size-4" />
-                        </button>
-                      </div>
-                    </div>
-                    <TransportMap transport={transport} />
+                    <TransportMap transport={transport} showDirections={false} />
                   </div>
                 </motion.div>
               )}
