@@ -201,10 +201,9 @@ export default function PerroNegroPage() {
 
       <main>
         <Hero heroRef={heroRef} ready={introDone} ctaLabel={coverCtaLabel} ctaDisabled={coverCtaDisabled} onCta={startBuy} />
-        <Manifesto />
         <section ref={ticketsRef} id="entradas" className="pn-tickets" aria-labelledby="pn-tickets-title">
           <div className="pn-wrap">
-            <SectionKicker index="02">acceso</SectionKicker>
+            <SectionKicker index="01">acceso</SectionKicker>
             <h2 id="pn-tickets-title" className="pn-display pn-display--xl">
               <BrushWord>entradas</BrushWord>
             </h2>
@@ -264,6 +263,7 @@ export default function PerroNegroPage() {
           <ScrollHint />
         </section>
 
+        <Manifesto />
         <LogoReveal />
         <RedRoom eventDate={data?.event.date ?? null} />
         <Venue
@@ -549,7 +549,7 @@ function Manifesto() {
   return (
     <section className="pn-manifesto" aria-label="La noche">
       <div className="pn-wrap">
-        <SectionKicker index="01">la noche</SectionKicker>
+        <SectionKicker index="02">la noche</SectionKicker>
         <Dots />
         <ul className="pn-manifesto__list">
           {MANIFESTO.map((line, i) => (
