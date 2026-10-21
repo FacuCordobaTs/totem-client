@@ -3,5 +3,7 @@ main = "event-subdomains.ts"
 compatibility_date = "2026-10-01"
 workers_dev = false
 
-# Set CLIENT_PAGES_ORIGIN in the Worker dashboard (https://YOUR-CLIENT.pages.dev).
+[vars]
+CLIENT_PAGES_ORIGIN = "https://totem-client.pages.dev"
+
 # Add the route *.crow.ar/* and no-Worker exclusions as described in docs/EVENT_SUBDOMAINS.md.
