@@ -1,3 +1,5 @@
+import { getEventSite } from "@/event-sites/registry"
+import { eventSlugFromHostname } from "@/lib/event-domain"
 import { Fragment, useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams, useSearchParams } from "react-router"
 import {
@@ -99,6 +101,9 @@ export function CheckoutPage() {
   // Tarea 2.2 — el "Volver" navega a la página del evento por slug (la ruta
   // `/e/:eventId` no existe). Se resuelve al montar con `GET /public/events/:id`.
   const [eventSlug, setEventSlug] = useState<string | null>(null)
+  const eventReturnPath = eventSlug && !getEventSite(eventSlugFromHostname(window.location.hostname))
+    ? `/${encodeURIComponent(eventSlug)}`
+    : "/"
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethods | null>(null)
   const [ticketTypes, setTicketTypes] = useState<PublicEventDetailResponse["ticketTypes"]>([])
   // Tarea 6.2 — Saldo del cliente en este evento ("0.00" si no tiene): "Saldo disponible"
@@ -147,7 +152,7 @@ export function CheckoutPage() {
     // Volver desde el checkout restaura la parte de consumos del evento.
     setEventRestoreFlag(eventSlug)
     const promoterQuery = promoterId ? `?promotor=${encodeURIComponent(promoterId)}` : ""
-    navigate(eventSlug ? `/${eventSlug}${promoterQuery}` : "/")
+    navigate(`${eventReturnPath}${promoterQuery}`)
   }
 
   const handleBack = () => {
@@ -276,7 +281,7 @@ export function CheckoutPage() {
   if (!snapshot && !result) {
     setEventRestoreFlag(eventSlug)
     const promoterQuery = promoterId ? `?promotor=${encodeURIComponent(promoterId)}` : ""
-    navigate(eventSlug ? `/${eventSlug}${promoterQuery}` : "/", { replace: true })
+    navigate(`${eventReturnPath}${promoterQuery}`, { replace: true })
     return null
   }
 

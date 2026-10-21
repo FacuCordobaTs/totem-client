@@ -1,0 +1,23 @@
+/* Scope page styles so checkout and the other Crow screens keep their own appearance. */
+.dripeo-site {
+  --dripeo-accent: #d8ff36;
+  min-height: 100svh;
+  background: #151515;
+  color: var(--dripeo-accent);
+  font-family: Arial, Helvetica, sans-serif;
+  display: flex;
+  flex-direction: column;
+  padding: clamp(20px, 4vw, 64px);
+}
+.dripeo-site a { color: inherit; text-decoration: none; }
+.dripeo-header, .dripeo-footer { display: flex; justify-content: space-between; align-items: center; gap: 20px; }
+.dripeo-header { font-size: 14px; }
+.dripeo-header > a:first-child { font-weight: 900; font-size: 22px; }
+.dripeo-hero { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: 80px 0; }
+.dripeo-eyebrow { text-transform: uppercase; letter-spacing: .2em; font-size: 12px; }
+.dripeo-hero h1 { font-size: clamp(64px, 18vw, 260px); font-weight: 900; letter-spacing: -.085em; line-height: .95; margin: 24px 0; }
+.dripeo-hero h1 span { display: block; }
+.dripeo-description { font-size: clamp(18px, 3vw, 28px); color: #e1e1d8; margin-bottom: 32px; }
+.dripeo-site .dripeo-cta { display: inline-flex; align-items: center; justify-content: space-between; gap: 40px; padding: 20px 24px; background: var(--dripeo-accent); color: #151515; font-weight: 700; border-radius: 4px; }
+.dripeo-site a:focus-visible { outline: 3px solid currentColor; outline-offset: 5px; }
+.dripeo-footer { padding-top: 24px; border-top: 1px solid #d8ff3640; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; }

@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, type ReactNode } from "react"
+import { StrictMode, Suspense, useEffect, type ReactNode } from "react"
 import { createRoot } from "react-dom/client"
 import { Toaster } from "sonner"
 import "./index.css"
@@ -18,6 +18,22 @@ import { CustomerProfilePage } from "@/pages/customer-profile-page"
 import { TransportDriverPage } from "@/pages/transport-driver-page"
 import { AppShell } from "@/components/app-shell"
 
+import { getEventSite } from "@/event-sites/registry"
+import { eventSlugFromHostname } from "@/lib/event-domain"
+
+const domainSlug = eventSlugFromHostname(window.location.hostname)
+const eventSite = getEventSite(domainSlug)
+
+function EventSiteHome() {
+  if (!eventSite) {
+    return <NightRoot>{domainSlug
+      ? <main className="flex min-h-dvh items-center justify-center p-6"><h1>Esta página todavía no está publicada.</h1></main>
+      : <EventLinkHintPage />}</NightRoot>
+  }
+  const Page = eventSite.Page
+  return <Suspense fallback={<div role="status">Cargando página…</div>}><Page /></Suspense>
+}
+
 function NightRoot({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.documentElement.classList.add("dark")
@@ -31,14 +47,14 @@ function NightRoot({ children }: { children: ReactNode }) {
 }
 
 const router = createBrowserRouter([
+  ...(eventSite ? [
+    { path: "/acceso", element: <NightRoot><EventAccessPage eventSlug={eventSite.eventIdentifier} /></NightRoot> },
+    { path: "/entradas", element: <NightRoot><EventDetailPage eventSlug={eventSite.eventIdentifier} /></NightRoot> },
+  ] : []),
   { path: "/transporte/:token", element: <NightRoot><TransportDriverPage /></NightRoot> },
   {
     path: "/",
-    element: (
-      <NightRoot>
-        <EventLinkHintPage />
-      </NightRoot>
-    ),
+    element: <EventSiteHome />,
   },
   {
     path: "/mi-cuenta/:token",

@@ -98,8 +98,9 @@ function useWindowOpen(iso: Date | string | null | undefined) {
   return { open: now >= t0, msLeft: Math.max(0, t0 - now) }
 }
 
-export function EventDetailPage() {
-  const { slug } = useParams<{ slug: string }>()
+export function EventDetailPage({ eventSlug }: { eventSlug?: string } = {}) {
+  const { slug: routeSlug } = useParams<{ slug: string }>()
+  const slug = eventSlug ?? routeSlug
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const setCart = useCartStore((s) => s.setCart)
@@ -126,7 +127,6 @@ export function EventDetailPage() {
 
   const load = useCallback(() => {
     console.log("load")
-    console.log(slug)
     if (!slug) return
     publicApiFetch<PublicEventDetailResponse>(`/public/events/${slug}`)
       .then((r) => {

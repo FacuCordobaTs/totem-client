@@ -37,8 +37,9 @@ function eventDestination(token: string, eventId: string, receiptToken: string |
   return `/mi-cuenta/${encodeURIComponent(token)}/evento/${encodeURIComponent(eventId)}`
 }
 
-export function EventAccessPage() {
-  const { slug } = useParams<{ slug: string }>()
+export function EventAccessPage({ eventSlug }: { eventSlug?: string } = {}) {
+  const { slug: routeSlug } = useParams<{ slug: string }>()
+  const slug = eventSlug ?? routeSlug
   const navigate = useNavigate()
   const token = useSessionStore((state) => state.token)
   const customerName = useSessionStore((state) => state.customerName)
