@@ -1,4 +1,5 @@
 import { eventSlugFromHostname } from "../src/lib/event-domain"
+import { eventSiteMeta, type EventSiteMeta } from "../src/event-sites/meta"
 
 interface Env { CLIENT_PAGES_ORIGIN: string }
 
@@ -6,7 +7,8 @@ interface Env { CLIENT_PAGES_ORIGIN: string }
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const incoming = new URL(request.url)
-    if (!eventSlugFromHostname(incoming.hostname)) {
+    const slug = eventSlugFromHostname(incoming.hostname)
+    if (!slug) {
       // Infrastructure hosts have their own origin; configure explicit route exclusions too.
       return fetch(request)
     }
@@ -40,6 +42,42 @@ export default {
       }
     }
     result.headers.delete("set-cookie")
+    const meta = Object.hasOwn(eventSiteMeta, slug) ? eventSiteMeta[slug] : null
+    if (meta && result.ok && result.headers.get("content-type")?.includes("text/html")) {
+      return withSiteMeta(result, meta, incoming.origin)
+    }
     return result
   },
+}
+
+const escapeAttr = (value: string) =>
+  value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+
+/** Título, ícono y vista previa del link propios de la página, en el HTML que leen los crawlers. */
+function withSiteMeta(response: Response, meta: EventSiteMeta, origin: string): Response {
+  const image = new URL(meta.image, origin).toString()
+  const tags = [
+    `<meta name="description" content="${escapeAttr(meta.description)}" />`,
+    `<meta property="og:type" content="website" />`,
+    `<meta property="og:url" content="${escapeAttr(origin + "/")}" />`,
+    `<meta property="og:title" content="${escapeAttr(meta.title)}" />`,
+    `<meta property="og:description" content="${escapeAttr(meta.description)}" />`,
+    `<meta property="og:image" content="${escapeAttr(image)}" />`,
+    `<meta property="og:image:width" content="1200" />`,
+    `<meta property="og:image:height" content="630" />`,
+    `<meta name="twitter:card" content="summary_large_image" />`,
+    `<meta name="twitter:title" content="${escapeAttr(meta.title)}" />`,
+    `<meta name="twitter:description" content="${escapeAttr(meta.description)}" />`,
+    `<meta name="twitter:image" content="${escapeAttr(image)}" />`,
+    meta.appleTouchIcon ? `<link rel="apple-touch-icon" href="${escapeAttr(meta.appleTouchIcon)}" />` : "",
+    meta.themeColor ? `<meta name="theme-color" content="${escapeAttr(meta.themeColor)}" />` : "",
+  ].join("")
+  const rewritten = new HTMLRewriter()
+    .on("title", { element: (el) => { el.setInnerContent(meta.title) } })
+    .on('link[rel="icon"]', { element: (el) => { el.setAttribute("href", meta.icon) } })
+    .on("head", { element: (el) => { el.append(tags, { html: true }) } })
+    .transform(response)
+  const headers = new Headers(rewritten.headers)
+  headers.delete("content-length")
+  return new Response(rewritten.body, { status: rewritten.status, statusText: rewritten.statusText, headers })
 }

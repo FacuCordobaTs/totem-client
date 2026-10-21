@@ -56,3 +56,18 @@ test("infrastructure requests pass to their existing origin", async () => {
   }) as typeof fetch
   expect(await (await worker.fetch(new Request("https://api.crow.ar/public/events/dripeo"), env)).text()).toBe("api")
 })
+
+test("registered event sites get their own title, icon and link preview", async () => {
+  globalThis.fetch = (async () => new Response(
+    '<html><head><link rel="icon" type="image/png" href="/logo.png" /><title>Crow</title></head><body></body></html>',
+    { headers: { "Content-Type": "text/html; charset=utf-8" } },
+  )) as typeof fetch
+  const html = await (await worker.fetch(new Request("https://perronegro3110.crow.ar/"), env)).text()
+  expect(html).toContain("<title>Perro Negro · 31/10 · Night Club</title>")
+  expect(html).toContain('href="/sites/perronegro3110/icon.png"')
+  expect(html).toContain('<meta property="og:image" content="https://perronegro3110.crow.ar/sites/perronegro3110/og.jpg" />')
+  expect(html).not.toContain("/logo.png")
+
+  const plain = await (await worker.fetch(new Request("https://dripeo.crow.ar/"), env)).text()
+  expect(plain).toContain("<title>Crow</title>")
+})
