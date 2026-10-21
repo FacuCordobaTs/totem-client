@@ -6,6 +6,7 @@ import {
   useReducedMotion,
   useScroll,
   useTransform,
+  animate,
   transform,
   type MotionValue,
   type Transition,
@@ -22,7 +23,6 @@ import {
 } from "@/lib/use-event-purchase"
 import logoUrl from "./assets/logo.png"
 import dogHowlUrl from "./assets/dog-howl.webp"
-import dobermansUrl from "./assets/dobermans.webp"
 import type { PublicDrinkProductItem } from "@/types/api"
 import "./style.css"
 
@@ -130,7 +130,10 @@ export default function PerroNegroPage() {
     else ticketsNext()
   }
 
-  const scrollToTickets = () => ticketsRef.current?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" })
+  const scrollToTickets = () => {
+    const el = ticketsRef.current
+    if (el) slowScrollTo(el.getBoundingClientRect().top + window.scrollY, !!reduceMotion)
+  }
 
   const startBuy = () => {
     if (coverCtaDisabled) return
@@ -197,7 +200,7 @@ export default function PerroNegroPage() {
       </header>
 
       <main>
-        <Hero heroRef={heroRef} ready={introDone} ctaLabel={coverCtaLabel} ctaDisabled={coverCtaDisabled} onCta={startBuy} />
+        <Hero heroRef={heroRef} ready={introDone} ctaLabel={coverCtaLabel} ctaDisabled={coverCtaDisabled} onCta={startBuy} reduceMotion={!!reduceMotion} />
         <Manifesto />
         <LogoReveal />
         <RedRoom eventDate={data?.event.date ?? null} />
@@ -206,7 +209,6 @@ export default function PerroNegroPage() {
           location={data?.event.location ?? null}
           transports={data?.transports ?? []}
         />
-        <BroSection />
 
         <section ref={ticketsRef} id="entradas" className="pn-tickets" aria-labelledby="pn-tickets-title">
           <div className="pn-wrap">
@@ -369,6 +371,34 @@ export default function PerroNegroPage() {
 }
 
 /**
+ * Scroll lento hasta `targetY`: recorre la página para que las animaciones atadas al scroll se vean.
+ * Cualquier gesto del usuario (rueda, toque, tecla) lo corta y le devuelve el control.
+ */
+function slowScrollTo(targetY: number, instant: boolean) {
+  const from = window.scrollY
+  const distance = Math.abs(targetY - from)
+  if (instant || distance < 4) {
+    window.scrollTo(0, targetY)
+    return
+  }
+  const html = document.documentElement
+  const previousBehavior = html.style.scrollBehavior
+  html.style.scrollBehavior = "auto"
+  const controls = animate(from, targetY, {
+    duration: Math.min(6.5, Math.max(1.1, distance / 1300)),
+    ease: [0.65, 0, 0.35, 1],
+    onUpdate: (y) => window.scrollTo(0, y),
+  })
+  const stop = () => controls.stop()
+  const events = ["wheel", "touchstart", "keydown", "mousedown"] as const
+  for (const e of events) window.addEventListener(e, stop, { passive: true, once: true })
+  controls.finished.finally(() => {
+    html.style.scrollBehavior = previousBehavior
+    for (const e of events) window.removeEventListener(e, stop)
+  })
+}
+
+/**
  * Mapeo de progreso de scroll a un valor. Pasa por una función para que motion no lo delegue a un
  * ScrollTimeline nativo, que con `offset` de un target calcula mal el rango en Chrome.
  */
@@ -432,17 +462,20 @@ function Hero({
   ctaLabel,
   ctaDisabled,
   onCta,
+  reduceMotion,
 }: {
   heroRef: React.RefObject<HTMLElement | null>
   ready: boolean
   ctaLabel: string
   ctaDisabled: boolean
   onCta: () => void
+  reduceMotion: boolean
 }) {
   const { scrollYProgress } = useScroll({ target: heroRef, offset: ["start start", "end start"] })
   const titleY = useRange(scrollYProgress, [0, 1], ["0%", "-35%"])
   const logoRotate = useRange(scrollYProgress, [0, 1], [-8, 14])
   const logoY = useRange(scrollYProgress, [0, 1], ["0%", "40%"])
+  const cueOpacity = useRange(scrollYProgress, [0, 0.12], [1, 0])
 
   const show = (delay: number) => ({
     initial: { opacity: 0, y: 28, filter: "blur(10px)" },
@@ -475,15 +508,30 @@ function Hero({
           </button>
         </motion.div>
       </div>
-      <motion.span
-        className="pn-scrollcue"
-        aria-hidden
-        initial={{ opacity: 0 }}
-        animate={ready ? { opacity: 1 } : undefined}
-        transition={{ delay: 1.4, duration: 0.6 }}
+      <motion.div
+        className="pn-cue-wrap"
+        initial={{ opacity: 0, scale: 0.6 }}
+        animate={ready ? { opacity: 1, scale: 1 } : undefined}
+        transition={{ delay: 1.3, duration: 0.8, ease: EASE }}
       >
-        scroll
-      </motion.span>
+        <motion.button
+          type="button"
+          className="pn-cue"
+          style={{ opacity: cueOpacity }}
+          onClick={() => slowScrollTo(window.scrollY + window.innerHeight * 0.9, reduceMotion)}
+          aria-label="Bajar para ver más"
+        >
+          <svg className="pn-cue__ring" viewBox="0 0 100 100" aria-hidden>
+            <defs>
+              <path id="pn-cue-circle" d="M50,50 m-37,0 a37,37 0 1,1 74,0 a37,37 0 1,1 -74,0" />
+            </defs>
+            <text>
+              <textPath href="#pn-cue-circle">deslizá · hay más · deslizá · hay más ·</textPath>
+            </text>
+          </svg>
+          <span className="pn-cue__arrow" aria-hidden>↓</span>
+        </motion.button>
+      </motion.div>
     </section>
   )
 }
@@ -713,33 +761,6 @@ function Venue({
             <p className="pn-fineprint">lo sumás al comprar tu entrada.</p>
           </div>
         ) : null}
-      </div>
-    </section>
-  )
-}
-
-/* ───────────────────────────── tu bro ───────────────────────────── */
-
-function BroSection() {
-  const ref = useRef<HTMLElement | null>(null)
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] })
-  const rotate = useRange(scrollYProgress, [0, 1], [-9, 5])
-  const y = useRange(scrollYProgress, [0, 1], [80, -80])
-  return (
-    <section ref={ref} className="pn-bro" aria-label="Traé a tu bro">
-      <div className="pn-wrap pn-bro__grid">
-        <motion.figure className="pn-polaroid" style={{ rotate, y }}>
-          <img src={dobermansUrl} alt="Dos dóbermans posando frente a una casa en llamas: tu bro y vos." loading="lazy" decoding="async" />
-          <figcaption>perro negro · 2026</figcaption>
-        </motion.figure>
-        <div className="pn-bro__copy">
-          <Reveal>
-            <p className="pn-display pn-display--lg pn-ink">traé a tu bro.</p>
-          </Reveal>
-          <Reveal delay={0.12}>
-            <p className="pn-italic">lo que pasa en perro negro, queda en perro negro.</p>
-          </Reveal>
-        </div>
       </div>
     </section>
   )

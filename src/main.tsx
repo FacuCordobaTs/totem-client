@@ -23,6 +23,8 @@ import { eventSlugFromHostname } from "@/lib/event-domain"
 
 const domainSlug = eventSlugFromHostname(window.location.hostname)
 const eventSite = getEventSite(domainSlug)
+const siteBackground = eventSite?.loadingBackground ?? "#000"
+if (eventSite && window.location.pathname === "/") document.documentElement.style.backgroundColor = siteBackground
 
 function EventSiteHome() {
   if (!eventSite) {
@@ -31,7 +33,11 @@ function EventSiteHome() {
       : <EventLinkHintPage />}</NightRoot>
   }
   const Page = eventSite.Page
-  return <Suspense fallback={<div role="status">Cargando página…</div>}><Page /></Suspense>
+  return (
+    <Suspense fallback={<div role="status" aria-label="Cargando página" style={{ minHeight: "100dvh", background: siteBackground }} />}>
+      <Page />
+    </Suspense>
+  )
 }
 
 function NightRoot({ children }: { children: ReactNode }) {

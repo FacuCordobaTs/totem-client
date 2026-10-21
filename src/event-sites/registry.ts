@@ -4,6 +4,8 @@ interface EventSite {
   /** Slug OR database event ID. Independent of the subdomain and page design. */
   eventIdentifier: string
   Page: LazyExoticComponent<ComponentType>
+  /** Color de fondo mientras descarga la página, para que no se vea un flash blanco. */
+  loadingBackground?: string
 }
 
 /** Register pages here in code. No admin configuration controls this registry. */
@@ -15,6 +17,7 @@ const eventSites: Record<string, EventSite> = {
   perronegro3110: {
     eventIdentifier: "perro-negro-31-10",
     Page: lazy(() => import("./perronegro3110/page")),
+    loadingBackground: "#d81a0f",
   },
 }
 
