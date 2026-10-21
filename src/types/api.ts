@@ -172,6 +172,8 @@ export type CourtesyInvitationResponse = {
   /** Resumen de los tragos de regalo (la invitación muestra qué incluye antes de canjear). */
   drinks: Array<{ productId: string; productName: string; quantity: number }>
   ticketId: string | null
+  /** Entradas que entrega el canje (promo 2x1 = 2). */
+  ticketCount?: number
   drinkConsumptions: CourtesyDrinkQr[] | null
 }
 
@@ -187,6 +189,8 @@ export type CourtesyRedeemResponse = {
     buyerName: string
   }
   qrDataUrl: string
+  /** Entradas adicionales de la promo (2x1 = 1 extra), cada una con su QR. */
+  extraTickets?: { id: string; qrHash: string; status: TicketStatus; qrDataUrl: string }[]
   /** Tragos de regalo emitidos: una fila por unidad canjeable, con su QR (PENDING). */
   drinks: CourtesyDrinkQr[]
 }

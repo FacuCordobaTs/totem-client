@@ -164,6 +164,11 @@ function InvitationCard({
             <Ticket className="size-3.5" aria-hidden />
             {ticketTypeName}
           </span>
+          {(invitation.ticketCount ?? 1) > 1 ? (
+            <p className="mt-2 text-[13px] text-white/50">
+              Incluye {invitation.ticketCount} entradas, cada una con su QR.
+            </p>
+          ) : null}
 
           <div className="mt-10 w-full rounded-3xl border border-white/[0.08] bg-[#1C1C1E] p-7">
             <p className="font-serif text-[26px] leading-tight text-[#F4F1EA]">
@@ -228,7 +233,7 @@ function InvitationCard({
           </Button>
 
           <p className="mt-5 text-[13px] leading-relaxed text-white/40">
-            Se genera tu entrada con un QR para mostrar en el ingreso.
+            Se genera tu entrada con un QR para mostrar en el ingreso (una por persona si la invitación incluye más de una).
           </p>
         </div>
       </div>
@@ -247,7 +252,6 @@ function RedeemedView({
   redeemed: CourtesyRedeemResponse
 }) {
   const groups = groupDrinkQrs(redeemed.drinks)
-  const ticketActive = redeemed.ticket.status === "PENDING"
 
   return (
     <div className="flex flex-1 flex-col px-6 py-12">
@@ -267,27 +271,35 @@ function RedeemedView({
           </div>
         </div>
 
-        <section className="flex w-full flex-col items-center gap-4">
-          <div className="text-center">
-            <p className="font-medium text-white">{invitation.ticketTypeName}</p>
-            <p className="mt-1.5 text-sm text-white/45">
-              {ticketActive ? "Mostrá este código en el ingreso" : "Entrada utilizada"}
-            </p>
-          </div>
-          <img
-            src={redeemed.qrDataUrl}
-            alt={`Entrada ${invitation.ticketTypeName}`}
-            className="size-56 rounded-2xl"
-            width={224}
-            height={224}
-          />
-          <Link
-            to={`/qr/${encodeURIComponent(redeemed.ticket.qrHash)}`}
-            className="text-[13px] text-white/45 underline decoration-white/15 underline-offset-4 hover:text-white"
-          >
-            Pantalla completa
-          </Link>
-        </section>
+        {[
+          { key: redeemed.ticket.id, qrHash: redeemed.ticket.qrHash, status: redeemed.ticket.status, qrDataUrl: redeemed.qrDataUrl },
+          ...(redeemed.extraTickets ?? []).map((t) => ({ key: t.id, qrHash: t.qrHash, status: t.status, qrDataUrl: t.qrDataUrl })),
+        ].map((t, i, all) => (
+          <section key={t.key} className="flex w-full flex-col items-center gap-4">
+            <div className="text-center">
+              <p className="font-medium text-white">
+                {invitation.ticketTypeName}
+                {all.length > 1 ? ` · Entrada ${i + 1} de ${all.length}` : ""}
+              </p>
+              <p className="mt-1.5 text-sm text-white/45">
+                {t.status === "PENDING" ? "Mostrá este código en el ingreso" : "Entrada utilizada"}
+              </p>
+            </div>
+            <img
+              src={t.qrDataUrl}
+              alt={`Entrada ${invitation.ticketTypeName} ${i + 1}`}
+              className="size-56 rounded-2xl"
+              width={224}
+              height={224}
+            />
+            <Link
+              to={`/qr/${encodeURIComponent(t.qrHash)}`}
+              className="text-[13px] text-white/45 underline decoration-white/15 underline-offset-4 hover:text-white"
+            >
+              Pantalla completa
+            </Link>
+          </section>
+        ))}
 
         {groups.length > 0 ? (
           <section className="flex w-full flex-col items-center gap-8">
