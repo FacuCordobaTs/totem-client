@@ -233,36 +233,34 @@
   align-items: flex-end;
 }
 .pn-hero__foot .pn-display--sm { margin-top: 0.15em; }
-/* Indicador de scroll: sello rojo con texto girando y flecha que rebota. */
-.pn-cue-wrap {
-  position: absolute;
-  right: var(--pn-gutter);
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 2;
+/* Indicador discreto de scroll, al pie de las entradas. */
+.pn-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: clamp(72px, 12vh, 140px);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  opacity: 0.55;
 }
-.pn-cue {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: clamp(104px, 11vw, 150px);
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: var(--pn-red) !important;
-  color: var(--pn-ink) !important;
-  transition: transform 0.4s var(--pn-ease);
+.pn-hint__line {
+  display: block;
+  width: 1px;
+  height: 48px;
+  background: currentColor;
+  transform-origin: top;
+  animation: pn-cue 2.2s var(--pn-ease) infinite;
 }
-.pn-cue:hover { transform: scale(1.06); }
-.pn-cue__ring { position: absolute; inset: 0; width: 100%; height: 100%; animation: pn-spin 12s linear infinite; }
-.pn-cue__ring text { font-size: 10.5px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; fill: currentColor; }
-.pn-cue__arrow { font-size: clamp(26px, 3vw, 38px); font-weight: 900; line-height: 1; animation: pn-bounce 1.6s var(--pn-ease) infinite; }
-@keyframes pn-spin { to { transform: rotate(360deg); } }
-@keyframes pn-bounce {
-  0%, 100% { transform: translateY(-6px); }
-  50% { transform: translateY(8px); }
+@keyframes pn-cue {
+  0% { transform: scaleY(0); transform-origin: top; }
+  50% { transform: scaleY(1); transform-origin: top; }
+  51% { transform: scaleY(1); transform-origin: bottom; }
+  100% { transform: scaleY(0); transform-origin: bottom; }
 }
 @media (max-width: 640px) {
-  .pn-cue-wrap { top: auto; bottom: calc(max(28px, env(safe-area-inset-bottom)) + 150px); transform: none; }
   .pn-hero__actions, .pn-hero__actions .pn-btn { width: 100%; }
 }
 
@@ -405,7 +403,7 @@
 
 /* ── entradas ── */
 .pn-tickets {
-  padding: clamp(120px, 20vh, 240px) 0 clamp(140px, 24vh, 280px);
+  padding: clamp(96px, 16vh, 200px) 0 clamp(48px, 8vh, 96px);
   scroll-margin-top: 0;
   border-top: 2px solid var(--pn-ink);
 }
@@ -577,5 +575,5 @@
 .pn-footer__logo { display: block; width: 112%; margin: clamp(48px, 10vw, 120px) 0 0 -6%; filter: invert(18%) sepia(95%) saturate(5200%) hue-rotate(356deg) brightness(92%) contrast(105%); }
 
 @media (prefers-reduced-motion: reduce) {
-  .pn-grain, .pn-marquee__track, .pn-cue__ring, .pn-cue__arrow { animation: none; }
+  .pn-grain, .pn-marquee__track, .pn-hint__line { animation: none; }
 }

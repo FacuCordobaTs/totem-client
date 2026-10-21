@@ -200,19 +200,11 @@ export default function PerroNegroPage() {
       </header>
 
       <main>
-        <Hero heroRef={heroRef} ready={introDone} ctaLabel={coverCtaLabel} ctaDisabled={coverCtaDisabled} onCta={startBuy} reduceMotion={!!reduceMotion} />
+        <Hero heroRef={heroRef} ready={introDone} ctaLabel={coverCtaLabel} ctaDisabled={coverCtaDisabled} onCta={startBuy} />
         <Manifesto />
-        <LogoReveal />
-        <RedRoom eventDate={data?.event.date ?? null} />
-        <Venue
-          venue={data?.event.venue ?? null}
-          location={data?.event.location ?? null}
-          transports={data?.transports ?? []}
-        />
-
         <section ref={ticketsRef} id="entradas" className="pn-tickets" aria-labelledby="pn-tickets-title">
           <div className="pn-wrap">
-            <SectionKicker index="05">acceso</SectionKicker>
+            <SectionKicker index="02">acceso</SectionKicker>
             <h2 id="pn-tickets-title" className="pn-display pn-display--xl">
               <BrushWord>entradas</BrushWord>
             </h2>
@@ -269,7 +261,16 @@ export default function PerroNegroPage() {
               </>
             )}
           </div>
+          <ScrollHint />
         </section>
+
+        <LogoReveal />
+        <RedRoom eventDate={data?.event.date ?? null} />
+        <Venue
+          venue={data?.event.venue ?? null}
+          location={data?.event.location ?? null}
+          transports={data?.transports ?? []}
+        />
 
         <Footer productora={data?.productora.name ?? null} />
       </main>
@@ -462,20 +463,17 @@ function Hero({
   ctaLabel,
   ctaDisabled,
   onCta,
-  reduceMotion,
 }: {
   heroRef: React.RefObject<HTMLElement | null>
   ready: boolean
   ctaLabel: string
   ctaDisabled: boolean
   onCta: () => void
-  reduceMotion: boolean
 }) {
   const { scrollYProgress } = useScroll({ target: heroRef, offset: ["start start", "end start"] })
   const titleY = useRange(scrollYProgress, [0, 1], ["0%", "-35%"])
   const logoRotate = useRange(scrollYProgress, [0, 1], [-8, 14])
   const logoY = useRange(scrollYProgress, [0, 1], ["0%", "40%"])
-  const cueOpacity = useRange(scrollYProgress, [0, 0.12], [1, 0])
 
   const show = (delay: number) => ({
     initial: { opacity: 0, y: 28, filter: "blur(10px)" },
@@ -508,31 +506,24 @@ function Hero({
           </button>
         </motion.div>
       </div>
-      <motion.div
-        className="pn-cue-wrap"
-        initial={{ opacity: 0, scale: 0.6 }}
-        animate={ready ? { opacity: 1, scale: 1 } : undefined}
-        transition={{ delay: 1.3, duration: 0.8, ease: EASE }}
-      >
-        <motion.button
-          type="button"
-          className="pn-cue"
-          style={{ opacity: cueOpacity }}
-          onClick={() => slowScrollTo(window.scrollY + window.innerHeight * 0.9, reduceMotion)}
-          aria-label="Bajar para ver más"
-        >
-          <svg className="pn-cue__ring" viewBox="0 0 100 100" aria-hidden>
-            <defs>
-              <path id="pn-cue-circle" d="M50,50 m-37,0 a37,37 0 1,1 74,0 a37,37 0 1,1 -74,0" />
-            </defs>
-            <text>
-              <textPath href="#pn-cue-circle">deslizá · hay más · deslizá · hay más ·</textPath>
-            </text>
-          </svg>
-          <span className="pn-cue__arrow" aria-hidden>↓</span>
-        </motion.button>
-      </motion.div>
     </section>
+  )
+}
+
+/** Aviso discreto de que la página sigue debajo de las entradas. */
+function ScrollHint() {
+  return (
+    <motion.div
+      className="pn-hint"
+      aria-hidden
+      initial={{ opacity: 0 }}
+      whileInView={{ opacity: 1 }}
+      viewport={{ once: true }}
+      transition={{ delay: 0.4, duration: 1 }}
+    >
+      <span>deslizá</span>
+      <span className="pn-hint__line" />
+    </motion.div>
   )
 }
 
@@ -654,7 +645,7 @@ function RedRoom({ eventDate }: { eventDate: string | Date | null }) {
       </div>
 
       <div className="pn-wrap pn-red__count">
-        <SectionKicker index="02" tone="ink">faltan</SectionKicker>
+        <SectionKicker index="03" tone="ink">faltan</SectionKicker>
         {parts == null ? (
           <p className="pn-count pn-count--loading">··:··:··</p>
         ) : left === 0 ? (
@@ -712,7 +703,7 @@ function Venue({
   return (
     <section className="pn-venue" aria-labelledby="pn-venue-title">
       <div className="pn-wrap">
-        <SectionKicker index="03">dónde</SectionKicker>
+        <SectionKicker index="04">dónde</SectionKicker>
         <Reveal>
           <h2 id="pn-venue-title" className="pn-display pn-display--xl pn-ink">{venue?.trim() || "qualy multiespacio"}</h2>
         </Reveal>
@@ -741,7 +732,7 @@ function Venue({
 
         {transports.length > 0 ? (
           <div className="pn-buses">
-            <SectionKicker index="04">colectivos</SectionKicker>
+            <SectionKicker index="05">colectivos</SectionKicker>
             <ul>
               {transports.map((t, i) => (
                 <motion.li
