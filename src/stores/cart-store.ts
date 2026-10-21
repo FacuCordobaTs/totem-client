@@ -25,7 +25,7 @@ export function ticketPaidUnits(
 }
 
 export function ticketPromoLabel(promo: { promoBuy?: number | null; promoPay?: number | null }): string | null {
-  return ticketPaidUnits(promo, promo.promoBuy ?? 0) < (promo.promoBuy ?? 0) ? `${promo.promoBuy}x${promo.promoPay}` : null
+  return ticketPaidUnits(promo, promo.promoBuy ?? 0) < (promo.promoBuy ?? 0) ? `${promo.promoBuy}x${promo.promoPay} (llevás ${promo.promoBuy}, pagás ${promo.promoPay})` : null
 }
 
 export function ticketLineSubtotal(line: CartTicketLine): Decimal {

@@ -10,6 +10,7 @@ import type {
 import {
   computeCartTotalString,
   useCartStore,
+  ticketPromoLabel,
   type CartDrinkLine,
   type CartTicketLine,
 } from "@/stores/cart-store"
@@ -143,16 +144,26 @@ export function useEventPurchase(eventSlug?: string) {
     return out
   }, [data, ticketQtys])
 
+  // Con promo "llevás X, pagás Y" cada click suma/quita un pack de X entradas.
+  const ticketStep = (ticketTypeId: string) => {
+    const t = data?.ticketTypes.find((x) => x.id === ticketTypeId)
+    return t && ticketPromoLabel(t) ? (t.promoBuy as number) : 1
+  }
+
   const bumpTicket = (ticketTypeId: string) => {
-    setTicketQtys((prev) => ({
-      ...prev,
-      [ticketTypeId]: Math.min(99, (prev[ticketTypeId] ?? 0) + 1),
-    }))
+    const t = data?.ticketTypes.find((x) => x.id === ticketTypeId)
+    const step = ticketStep(ticketTypeId)
+    setTicketQtys((prev) => {
+      const cap = Math.min(99, t?.remaining ?? 99)
+      const next = Math.min(cap, (prev[ticketTypeId] ?? 0) + step)
+      return next <= 0 ? prev : { ...prev, [ticketTypeId]: next }
+    })
   }
 
   const trimTicket = (ticketTypeId: string) => {
+    const step = ticketStep(ticketTypeId)
     setTicketQtys((prev) => {
-      const next = (prev[ticketTypeId] ?? 0) - 1
+      const next = (prev[ticketTypeId] ?? 0) - step
       const copy = { ...prev }
       if (next <= 0) delete copy[ticketTypeId]
       else copy[ticketTypeId] = next
