@@ -12,6 +12,10 @@ const eventSites: Record<string, EventSite> = {
     eventIdentifier: "dripeo",
     Page: lazy(() => import("./dripeo/page")),
   },
+  perronegro3110: {
+    eventIdentifier: "perro-negro-31-10",
+    Page: lazy(() => import("./perronegro3110/page")),
+  },
 }
 
 export function getEventSite(subdomain: string | null): EventSite | null {
