@@ -9,6 +9,27 @@ export type CartTicketLine = {
   quantity: number
   /** Precio unitario autoritativo del último fetch del evento (string decimal). */
   unitPrice: string
+  /** Promo "llevás X, pagás Y" del tipo (2x1 = 2/1); el backend revalida el total. */
+  promoBuy?: number | null
+  promoPay?: number | null
+}
+
+/** Unidades que se cobran por `quantity` entradas con la promo del tipo. */
+export function ticketPaidUnits(
+  promo: { promoBuy?: number | null; promoPay?: number | null },
+  quantity: number
+): number {
+  const { promoBuy, promoPay } = promo
+  if (!promoBuy || !promoPay || promoBuy < 2 || promoPay < 1 || promoPay >= promoBuy) return quantity
+  return Math.floor(quantity / promoBuy) * promoPay + (quantity % promoBuy)
+}
+
+export function ticketPromoLabel(promo: { promoBuy?: number | null; promoPay?: number | null }): string | null {
+  return ticketPaidUnits(promo, promo.promoBuy ?? 0) < (promo.promoBuy ?? 0) ? `${promo.promoBuy}x${promo.promoPay}` : null
+}
+
+export function ticketLineSubtotal(line: CartTicketLine): Decimal {
+  return new Decimal(line.unitPrice).mul(ticketPaidUnits(line, line.quantity))
 }
 
 export type CartDrinkLine = {
@@ -37,7 +58,7 @@ type CartState = {
 export function computeCartTotalDecimal(cart: CartSnapshot): Decimal {
   let t = new Decimal(0)
   for (const line of cart.ticketLines) {
-    t = t.add(new Decimal(line.unitPrice).mul(line.quantity))
+    t = t.add(ticketLineSubtotal(line))
   }
   for (const line of cart.drinkLines) {
     t = t.add(new Decimal(line.unitPrice).mul(line.quantity))

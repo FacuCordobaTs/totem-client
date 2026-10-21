@@ -138,7 +138,7 @@ export function useEventPurchase(eventSlug?: string) {
     for (const t of data.ticketTypes) {
       const q = ticketQtys[t.id] ?? 0
       if (q <= 0) continue
-      out.push({ ticketTypeId: t.id, quantity: q, unitPrice: t.price })
+      out.push({ ticketTypeId: t.id, quantity: q, unitPrice: t.price, promoBuy: t.promoBuy, promoPay: t.promoPay })
     }
     return out
   }, [data, ticketQtys])

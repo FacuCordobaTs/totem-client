@@ -21,7 +21,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { EventMap } from "@/components/event-map"
 import { TransportPicker } from "@/components/transport-picker"
-import type { CartDrinkLine, CartTicketLine } from "@/stores/cart-store"
+import { ticketLineSubtotal, ticketPromoLabel, type CartDrinkLine, type CartTicketLine } from "@/stores/cart-store"
 import {
   groupProductsByCategory,
   productSaleType,
@@ -539,7 +539,7 @@ function TicketStep({
             return (
               <li key={t.id}>
                 <TicketPickRow
-                  name={t.name}
+                  name={ticketPromoLabel(t) ? `${t.name} · ${ticketPromoLabel(t)}` : t.name}
                   admissionWindow={formatAdmissionWindow(t)}
                   priceStr={formatMoneyArsExact(t.price)}
                   count={count}
@@ -1184,7 +1184,7 @@ function StoreCartPanel({
             {ticketLines.map((line) => {
               const t = data.ticketTypes.find((x) => x.id === line.ticketTypeId)
               const name = t?.name ?? "Entrada"
-              const sub = new Decimal(line.unitPrice).mul(line.quantity).toFixed(2)
+              const sub = ticketLineSubtotal(line).toFixed(2)
               return (
                 <li key={line.ticketTypeId}>
                   <motion.div
@@ -1819,7 +1819,7 @@ function MinimalCover({
                       >
                         <MinimalTicketRow
                           appearance={appearance}
-                          name={t.name}
+                          name={ticketPromoLabel(t) ? `${t.name} · ${ticketPromoLabel(t)}` : t.name}
                           admissionWindow={formatAdmissionWindowShort(t)}
                           priceStr={formatMoneyArsExact(t.price)}
                           count={count}

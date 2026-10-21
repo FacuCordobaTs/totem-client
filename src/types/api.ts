@@ -25,6 +25,8 @@ export type PublicTicketTypeItem = {
   name: string
   price: string
   stockLimit: number | null
+  promoBuy?: number | null
+  promoPay?: number | null
   sold: number
   remaining: number | null
   availableForPurchase: boolean
