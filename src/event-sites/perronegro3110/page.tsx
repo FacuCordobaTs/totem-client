@@ -214,7 +214,9 @@ export default function PerroNegroPage() {
               <p className="pn-note">cargando entradas…</p>
             ) : (
               <>
-                {ticketsFrom != null && !ticketsWindow.open ? (
+                {ticketsWindow.closed ? (
+                  <p className="pn-note">la venta de entradas ya cerró.</p>
+                ) : ticketsFrom != null && !ticketsWindow.open ? (
                   <p className="pn-note">
                     venta desde el {formatEventDate(ticketsFrom)} · en{" "}
                     <strong className="pn-tabular">{formatCountdown(ticketsWindow.msLeft)}</strong>

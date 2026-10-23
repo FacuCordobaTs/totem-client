@@ -67,16 +67,24 @@ function consumeRestoreFlag(slug: string | undefined): boolean {
   }
 }
 
-export function useWindowOpen(iso: Date | string | null | undefined) {
+/**
+ * Ventana de venta: abre en `iso` y, si hay `closesIso`, cierra en ese instante (`closed`).
+ * `open` es falso antes de abrir y también una vez cerrada.
+ */
+export function useWindowOpen(
+  iso: Date | string | null | undefined,
+  closesIso?: Date | string | null
+) {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
-    if (iso == null) return
+    if (iso == null && closesIso == null) return
     const t = window.setInterval(() => setNow(Date.now()), 1000)
     return () => window.clearInterval(t)
-  }, [iso])
-  if (iso == null) return { open: true, msLeft: 0 }
+  }, [iso, closesIso])
+  const closed = closesIso != null && now >= new Date(closesIso).getTime()
+  if (iso == null) return { open: !closed, msLeft: 0, closed }
   const t0 = new Date(iso).getTime()
-  return { open: now >= t0, msLeft: Math.max(0, t0 - now) }
+  return { open: now >= t0 && !closed, msLeft: Math.max(0, t0 - now), closed }
 }
 
 export function useEventPurchase(eventSlug?: string) {
@@ -102,7 +110,7 @@ export function useEventPurchase(eventSlug?: string) {
 
   const ticketsFrom = data?.event.ticketsAvailableFrom ?? null
   const consFrom = data?.event.consumptionsAvailableFrom ?? null
-  const ticketsWindow = useWindowOpen(ticketsFrom)
+  const ticketsWindow = useWindowOpen(ticketsFrom, data?.event.ticketsSalesClosedAt ?? null)
   const consWindow = useWindowOpen(consFrom)
 
   const load = useCallback(() => {

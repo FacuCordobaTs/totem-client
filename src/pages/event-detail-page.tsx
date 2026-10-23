@@ -495,7 +495,7 @@ function TicketStep({
 }: {
   data: PublicEventDetailResponse
   ticketsFrom: Date | string | null
-  ticketsWindow: { open: boolean; msLeft: number }
+  ticketsWindow: { open: boolean; msLeft: number; closed: boolean }
   ticketQtys: Record<string, number>
   bumpTicket: (id: string) => void
   trimTicket: (id: string) => void
@@ -510,7 +510,11 @@ function TicketStep({
         <h2 className="text-xl font-extrabold tracking-tight text-white sm:text-[22px]">
           Entradas
         </h2>
-        {ticketsFrom != null && !saleOpen ? (
+        {ticketsWindow.closed ? (
+          <p className="text-sm leading-relaxed text-white/60">
+            La venta de entradas ya cerró.
+          </p>
+        ) : ticketsFrom != null && !saleOpen ? (
           <p className="text-sm leading-relaxed text-white/60">
             Venta desde el {formatEventDate(ticketsFrom)} · en{" "}
             <span className="tabular-nums text-white/90">
@@ -1339,7 +1343,7 @@ function MinimalEventDetail({
   data: PublicEventDetailResponse
   ticketsFrom: Date | string | null
   consFrom: Date | string | null
-  ticketsWindow: { open: boolean; msLeft: number }
+  ticketsWindow: { open: boolean; msLeft: number; closed: boolean }
   consWindow: { open: boolean; msLeft: number }
   ticketQtys: Record<string, number>
   bumpTicket: (id: string) => void
@@ -1525,7 +1529,7 @@ function MinimalCover({
   appearance: EventAppearance
   data: PublicEventDetailResponse
   ticketsFrom: Date | string | null
-  ticketsWindow: { open: boolean; msLeft: number }
+  ticketsWindow: { open: boolean; msLeft: number; closed: boolean }
   ticketQtys: Record<string, number>
   bumpTicket: (id: string) => void
   trimTicket: (id: string) => void
@@ -1793,7 +1797,11 @@ function MinimalCover({
                 transition={{ duration: 0.32, delay: 0.05 }}
                 className="flex h-full min-h-0 flex-col pt-5"
               >
-                {ticketsFrom != null && !saleOpen ? (
+                {ticketsWindow.closed ? (
+                  <p className="mb-4 shrink-0 rounded-2xl bg-white/[0.05] px-4 py-3 text-[13px] text-white/55">
+                    La venta de entradas ya cerró.
+                  </p>
+                ) : ticketsFrom != null && !saleOpen ? (
                   <p className="mb-4 shrink-0 rounded-2xl bg-white/[0.05] px-4 py-3 text-[13px] text-white/55">
                     Venta desde el {formatEventDate(ticketsFrom)} · en{" "}
                     <span className="font-semibold tabular-nums text-white">

@@ -100,6 +100,7 @@ export type PublicEventDetailResponse = {
     /** MINIMAL = diseño clásico (default), GLASS = diseño glassmorphism. */
     designType?: "GLASS" | "MINIMAL"
     ticketsAvailableFrom: Date | string | null
+    ticketsSalesClosedAt?: Date | string | null
     consumptionsAvailableFrom: Date | string | null
   }
   ticketTypes: PublicTicketTypeItem[]
