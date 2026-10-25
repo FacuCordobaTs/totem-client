@@ -258,7 +258,7 @@ function TicketShareView({ token }: { token: string }) {
         `${hostName} canceló este link`,
         "Pedile que te mande un link nuevo.",
       ],
-      EVENT_CLOSED: ["Este evento ya finalizó", "Ya no se pueden reclamar boletos."],
+      EVENT_CLOSED: ["Este evento no está disponible", "Pedile a quien te compartió el link que revise el evento."],
     }
     const [title, body] = message[preview.state]
     return (

@@ -392,11 +392,6 @@ export function EventAccessPage({ eventSlug }: { eventSlug?: string } = {}) {
         ) : null}
         <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-[#0B0B0C] via-black/60 to-black/25" />
         <div className="relative">
-          {event.status === "closed" ? (
-            <span className="mb-4 inline-block rounded-full border border-white/15 bg-black/30 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-white/65 backdrop-blur-md">
-              Evento finalizado
-            </span>
-          ) : null}
           {productora.name ? (
             <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/45">{productora.name}</p>
           ) : null}

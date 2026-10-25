@@ -74,10 +74,7 @@ export function CustomerProfilePage() {
             {event.imageUrl ? <img src={event.imageUrl} alt="" className="absolute inset-0 size-full object-cover opacity-45 transition-transform duration-500 group-hover:scale-[1.03]" /> : null}
             <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-black via-black/65 to-black/10" />
             <div className="relative flex h-full min-h-44 flex-col">
-              <div className="flex items-start justify-between gap-4">
-                <span className="rounded-full border border-white/15 bg-black/25 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-white/65 backdrop-blur-md">
-                  {event.status === "live" ? "En vivo" : event.status === "closed" ? "Finalizado" : "Próximo"}
-                </span>
+              <div className="flex items-start justify-end gap-4">
                 <ArrowRight className="size-5 text-white/50 transition-transform group-hover:translate-x-1 group-hover:text-white" aria-hidden />
               </div>
               <div className="mt-auto">
