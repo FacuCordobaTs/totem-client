@@ -1,0 +1,6 @@
+# Enlaces compartidos de eventos con página propia. Pages conserva el query string
+# (promotor, promoter, utm_*, etc.) al no definir uno en el destino.
+# Usar rutas exactas: no redirigir /acceso, checkout, comprobantes ni otros eventos.
+# 302 permite volver a la tienda de Crow sin una redirección permanente en caché.
+/perro-negro-31-10 https://perronegro3110.crow.ar/ 302
+/perro-negro-31-10/ https://perronegro3110.crow.ar/ 302
