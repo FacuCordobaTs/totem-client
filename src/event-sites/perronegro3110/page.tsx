@@ -474,8 +474,6 @@ function Hero({
 }) {
   const { scrollYProgress } = useScroll({ target: heroRef, offset: ["start start", "end start"] })
   const titleY = useRange(scrollYProgress, [0, 1], ["0%", "-35%"])
-  const logoRotate = useRange(scrollYProgress, [0, 1], [-8, 14])
-  const logoY = useRange(scrollYProgress, [0, 1], ["0%", "40%"])
 
   const show = (delay: number) => ({
     initial: { opacity: 0, y: 28, filter: "blur(10px)" },
@@ -485,16 +483,10 @@ function Hero({
 
   return (
     <section ref={heroRef} className="pn-hero" aria-labelledby="pn-hero-title">
-      <motion.div className="pn-hero__ghost" style={{ rotate: logoRotate, y: logoY }} aria-hidden>
-        <img src={logoUrl} alt="" />
-      </motion.div>
-
       <motion.div className="pn-hero__title" style={{ y: titleY }}>
-        <motion.p className="pn-display pn-display--md pn-ink" {...show(0.05)}>2026©</motion.p>
         <h1 id="pn-hero-title" className="pn-display pn-display--hero">
           <BrushWord play={ready} delay={0.35}>perro negro</BrushWord>
         </h1>
-        <motion.p className="pn-script-sub" {...show(0.6)}>night club</motion.p>
       </motion.div>
 
       <div className="pn-hero__foot">
@@ -573,35 +565,14 @@ function Manifesto() {
   )
 }
 
-/* ───────────────────────────── logo → foto ───────────────────────────── */
+/* ───────────────────────────── foto ───────────────────────────── */
 
 function LogoReveal() {
-  const ref = useRef<HTMLElement | null>(null)
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] })
-  const maskScale = useRange(scrollYProgress, [0, 0.55], [0.85, 1.25])
-  const maskRotate = useRange(scrollYProgress, [0, 0.55], [-6, 0])
-  const maskOpacity = useRange(scrollYProgress, [0.45, 0.62], [1, 0])
-  const photoInset = useRange(scrollYProgress, [0.35, 0.75], [1, 0])
-  const photoClip = useTransform(photoInset, (k) => `inset(${42 * k}% ${38 * k}% ${42 * k}% ${38 * k}%)`)
-  const photoScale = useRange(scrollYProgress, [0.35, 1], [1.35, 1])
-  const captionOpacity = useRange(scrollYProgress, [0.75, 0.9], [0, 1])
-  const captionY = useRange(scrollYProgress, [0.75, 0.9], [40, 0])
-
   return (
-    <section ref={ref} className="pn-reveal" aria-label="Perro Negro">
-      <div className="pn-reveal__sticky">
-        <motion.div
-          className="pn-reveal__mask"
-          style={{ scale: maskScale, rotate: maskRotate, opacity: maskOpacity, WebkitMaskImage: `url(${logoUrl})`, maskImage: `url(${logoUrl})`, backgroundImage: `url(${dogHowlUrl})` }}
-          role="img"
-          aria-label="Logo de Perro Negro con la foto de un dóberman"
-        />
-        <motion.div className="pn-reveal__photo" style={{ clipPath: photoClip }}>
-          <motion.img src={dogHowlUrl} alt="Dóberman aullando. 31 de octubre de 2026." style={{ scale: photoScale }} loading="lazy" decoding="async" />
-        </motion.div>
-        <motion.p className="pn-reveal__caption" style={{ opacity: captionOpacity, y: captionY }}>
-          que se escuche hasta afuera.
-        </motion.p>
+    <section className="pn-reveal" aria-label="Perro Negro">
+      <div className="pn-reveal__photo">
+        <img src={dogHowlUrl} alt="Dóberman aullando. 31 de octubre de 2026." loading="lazy" decoding="async" />
+        <p className="pn-reveal__caption">que se escuche hasta afuera.</p>
       </div>
     </section>
   )
@@ -707,7 +678,9 @@ function Venue({
       <div className="pn-wrap">
         <SectionKicker index="04">dónde</SectionKicker>
         <Reveal>
-          <h2 id="pn-venue-title" className="pn-display pn-display--xl pn-ink">{venue?.trim() || "qualy multiespacio"}</h2>
+          <h2 id="pn-venue-title" className="pn-display pn-display--xl">
+            <BrushWord>{venue?.trim() || "qualy multiespacio"}</BrushWord>
+          </h2>
         </Reveal>
         {location ? (
           <Reveal delay={0.1}>
@@ -1162,8 +1135,8 @@ function Footer({ productora }: { productora: string | null }) {
         alt=""
         aria-hidden
         className="pn-footer__logo"
-        initial={{ y: "40%" }}
-        whileInView={{ y: "12%" }}
+        initial={{ opacity: 0, y: 24 }}
+        whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         transition={{ duration: 1.2, ease: EASE }}
       />
