@@ -572,7 +572,6 @@ function LogoReveal() {
     <section className="pn-reveal" aria-label="Perro Negro">
       <div className="pn-reveal__photo">
         <img src={dogHowlUrl} alt="Dóberman aullando. 31 de octubre de 2026." loading="lazy" decoding="async" />
-        <p className="pn-reveal__caption">que se escuche hasta afuera.</p>
       </div>
     </section>
   )

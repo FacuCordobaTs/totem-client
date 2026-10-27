@@ -277,18 +277,6 @@
 .pn-reveal { position: relative; display: flex; justify-content: center; background: var(--pn-ink); }
 .pn-reveal__photo { position: relative; width: min(100%, 80svh); background: var(--pn-ink); }
 .pn-reveal__photo img { display: block; width: 100%; height: auto; filter: grayscale(1) contrast(1.08); }
-.pn-reveal__caption {
-  position: absolute;
-  left: var(--pn-gutter);
-  bottom: max(112px, calc(env(safe-area-inset-bottom) + 96px));
-  margin: 0;
-  color: var(--pn-paper);
-  font-style: italic;
-  font-size: clamp(1.2rem, 3.6vw, 2.2rem);
-  letter-spacing: -0.02em;
-  mix-blend-mode: difference;
-}
-
 /* ── sala roja ── */
 .pn-red {
   position: relative;
