@@ -19,6 +19,7 @@ export type PublicEventsResponse = {
 }
 
 export type PublicTicketTypeItem = {
+  isActive?: boolean
   validFrom: string | null
   validUntil: string | null
   id: string

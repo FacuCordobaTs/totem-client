@@ -543,7 +543,7 @@ function TicketStep({
             return (
               <li key={t.id}>
                 <TicketPickRow
-                  name={ticketPromoLabel(t) ? `${t.name} · ${ticketPromoLabel(t)}` : t.name}
+                  name={t.isActive === false ? `${t.name} · Venta desactivada` : ticketPromoLabel(t) ? `${t.name} · ${ticketPromoLabel(t)}` : t.name}
                   admissionWindow={formatAdmissionWindow(t)}
                   priceStr={formatMoneyArsExact(t.price)}
                   count={count}
@@ -1827,7 +1827,7 @@ function MinimalCover({
                       >
                         <MinimalTicketRow
                           appearance={appearance}
-                          name={ticketPromoLabel(t) ? `${t.name} · ${ticketPromoLabel(t)}` : t.name}
+                          name={t.isActive === false ? `${t.name} · Venta desactivada` : ticketPromoLabel(t) ? `${t.name} · ${ticketPromoLabel(t)}` : t.name}
                           admissionWindow={formatAdmissionWindowShort(t)}
                           priceStr={formatMoneyArsExact(t.price)}
                           count={count}
