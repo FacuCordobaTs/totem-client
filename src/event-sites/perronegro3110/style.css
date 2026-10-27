@@ -274,13 +274,13 @@
 }
 
 /* ── foto ── */
-.pn-reveal { position: relative; background: var(--pn-ink); }
-.pn-reveal__photo { position: relative; height: 100svh; overflow: hidden; }
-.pn-reveal__photo img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: 50% 45%; filter: grayscale(1) contrast(1.08); }
+.pn-reveal { position: relative; display: flex; justify-content: center; background: var(--pn-ink); }
+.pn-reveal__photo { position: relative; width: min(100%, 80svh); background: var(--pn-ink); }
+.pn-reveal__photo img { display: block; width: 100%; height: auto; filter: grayscale(1) contrast(1.08); }
 .pn-reveal__caption {
   position: absolute;
   left: var(--pn-gutter);
-  bottom: max(36px, env(safe-area-inset-bottom));
+  bottom: max(112px, calc(env(safe-area-inset-bottom) + 96px));
   margin: 0;
   color: var(--pn-paper);
   font-style: italic;
