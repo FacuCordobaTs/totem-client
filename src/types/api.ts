@@ -33,7 +33,8 @@ export type PublicTicketTypeItem = {
   availableForPurchase: boolean
 }
 
-export type PublicProductSaleType = "BOTTLE" | "GLASS"
+/** GLASS = trago, BOTTLE = botellas, UNIT = por unidad, NONE = sin control de stock. */
+export type PublicProductSaleType = "BOTTLE" | "GLASS" | "UNIT" | "NONE"
 
 export type PublicDrinkProductItem = {
   id: string
