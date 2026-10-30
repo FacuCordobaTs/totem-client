@@ -7,7 +7,7 @@ export default function DripeoPage() {
     <main className="dripeo-site">
       <header className="dripeo-header">
         <a href="/" aria-label="Dripeo — inicio">DRIPEO®</a>
-        <Link to="/acceso">Mis entradas ↗</Link>
+        <Link to="/acceso/ingresar">Mis entradas ↗</Link>
       </header>
       <section className="dripeo-hero" aria-labelledby="dripeo-title">
         <p className="dripeo-eyebrow">La noche tiene nombre.</p>

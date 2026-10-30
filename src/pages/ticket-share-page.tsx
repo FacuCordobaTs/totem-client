@@ -229,7 +229,7 @@ function TicketShareView({ token }: { token: string }) {
               navigate(
                 stored.sessionToken
                   ? `/mi-cuenta/${encodeURIComponent(stored.sessionToken)}/evento/${encodeURIComponent(stored.eventId)}`
-                  : `/${encodeURIComponent(stored.eventSlug ?? stored.eventId)}/acceso`
+                  : `/${encodeURIComponent(stored.eventSlug ?? stored.eventId)}/acceso/ingresar`
               )
             }
             className="mt-6 h-14 w-full rounded-2xl bg-white font-semibold text-black hover:bg-zinc-200"
@@ -359,7 +359,7 @@ function TicketShareView({ token }: { token: string }) {
             {formError.code === "ALREADY_CLAIMED" ? (
               <button
                 type="button"
-                onClick={() => navigate(`/${encodeURIComponent(event.slug ?? event.id)}/acceso`)}
+                onClick={() => navigate(`/${encodeURIComponent(event.slug ?? event.id)}/acceso/ingresar`)}
                 className="mt-2 block font-semibold text-white underline underline-offset-4"
               >
                 Ingresar a mi cuenta
@@ -399,7 +399,7 @@ function goToAccount(
     return
   }
   // El DNI viaja en el estado de la navegación y no en la URL: no queda en el historial ni en logs.
-  navigate(`/${encodeURIComponent(claimed.event.slug ?? claimed.event.id)}/acceso`, {
+  navigate(`/${encodeURIComponent(claimed.event.slug ?? claimed.event.id)}/acceso/ingresar`, {
     state: { identifier: dni },
   })
 }

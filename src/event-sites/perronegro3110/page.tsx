@@ -47,7 +47,6 @@ export default function PerroNegroPage() {
     data,
     error,
     restoreSession,
-    wantsConsumosStore,
     ticketQtys,
     drinks,
     minimalStep,
@@ -76,7 +75,7 @@ export default function PerroNegroPage() {
     anythingPurchasable,
   } = purchase
   const reduceMotion = useReducedMotion()
-  const [introDone, setIntroDone] = useState(() => restoreSession || wantsConsumosStore || !!reduceMotion)
+  const [introDone, setIntroDone] = useState(() => restoreSession || !!reduceMotion)
   const [choosingTransport, setChoosingTransport] = useState(false)
   const ticketsRef = useRef<HTMLElement | null>(null)
   const heroRef = useRef<HTMLElement | null>(null)
@@ -197,7 +196,7 @@ export default function PerroNegroPage() {
 
       <header className="pn-topbar">
         <a href="/" className="pn-topbar__mark" aria-label="Perro Negro — inicio">2026©</a>
-        <Link to="/acceso" className="pn-topbar__link">mis entradas <span aria-hidden>↗</span></Link>
+        <Link to="/acceso/ingresar" className="pn-topbar__link">mis entradas <span aria-hidden>↗</span></Link>
       </header>
 
       <main>
@@ -1127,7 +1126,7 @@ function Footer({ productora }: { productora: string | null }) {
   return (
     <footer className="pn-footer">
       <div className="pn-wrap pn-footer__row">
-        <Link to="/acceso" className="pn-link pn-link--paper">mis entradas <span aria-hidden>↗</span></Link>
+        <Link to="/acceso/ingresar" className="pn-link pn-link--paper">mis entradas <span aria-hidden>↗</span></Link>
         <span>{productora ? `${productora.toLowerCase()} · ` : ""}tickets por crow</span>
       </div>
       <motion.img

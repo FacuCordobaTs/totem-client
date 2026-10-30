@@ -392,7 +392,7 @@ export type EventAccessReason =
   | "WHATSAPP_UNAVAILABLE"
   | "SEND_FAILED"
 
-/** `GET /public/events/:id/access` — lo justo para la pantalla de acceso (`/{slug}/acceso`). */
+/** `GET /public/events/:id/access` — lo justo para la pantalla de ingreso (`/{slug}/acceso/ingresar`). */
 export type EventAccessResponse = {
   event: {
     id: string

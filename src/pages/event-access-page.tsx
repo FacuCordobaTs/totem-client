@@ -14,9 +14,11 @@ import type {
 } from "@/types/api"
 
 /**
- * Acceso del cliente por evento (`crow.ar/{slug}/acceso`): el flyer y un botón para entrar con DNI
- * o celular. El código llega por WhatsApp y, al verificarlo, el cliente cae en el mismo perfil que
- * abre el link del mail — pero con la sesión guardada, así puede volver sin buscar nada.
+ * Ingreso del cliente por evento (`crow.ar/{slug}/acceso/ingresar`): el flyer y un botón para
+ * entrar con DNI o celular. El código llega por WhatsApp y, al verificarlo, el cliente cae en el
+ * mismo perfil que abre el link del mail — pero con la sesión guardada, así puede volver sin
+ * buscar nada. El link de acceso principal (`/{slug}/acceso`) es la pantalla de comprobante en
+ * modo invitado; esta se abre desde "Mis entradas".
  *
  * El paso `details` cubre los dos motivos por los que el backend pide un dato más antes de mandar
  * el código: `NEEDS_PHONE` (ficha sin celular) y `NEEDS_REGISTRATION` (alta rápida, que además
@@ -347,11 +349,6 @@ export function EventAccessPage({ eventSlug }: { eventSlug?: string } = {}) {
     </AppleSheet>
   )
 
-  // La tienda vive en `/{slug}`; en un subdominio con página propia, en `/entradas` (esa ruta
-  // siempre monta la tienda del evento, aunque el diseño propio no venda en su portada).
-  const storePath = eventSlug ? "/entradas" : `/${encodeURIComponent(slug ?? "")}`
-  const goToStore = () => navigate(`${storePath}?tienda=consumos`)
-
   if (!data) {
     if (!loadError) {
       return (
@@ -369,25 +366,18 @@ export function EventAccessPage({ eventSlug }: { eventSlug?: string } = {}) {
         </main>
       )
     }
-    // Falla de red o del servidor: la tienda y el ingreso no dependen de esto.
+    // Falla de red o del servidor: el ingreso no depende de esto, el slug alcanza para pedir el código.
     return (
       <main className="mx-auto flex min-h-dvh max-w-lg flex-col items-center justify-center bg-[#0B0B0C] px-6 text-center">
         <h1 className="text-2xl font-bold text-white">No pudimos cargar el evento</h1>
-        <p className="mt-3 text-sm leading-relaxed text-white/50">{loadError.message} Podés comprar consumos o ingresar con tu DNI o tu celular.</p>
+        <p className="mt-3 text-sm leading-relaxed text-white/50">{loadError.message} Podés ingresar igual con tu DNI o tu celular.</p>
         <Button
           type="button"
-          onClick={goToStore}
+          onClick={() => setOpen(true)}
           className="mt-7 h-14 w-full rounded-2xl bg-white font-semibold text-black"
         >
-          Comprar consumos <ArrowRight className="size-4" aria-hidden />
+          Ingresar <ArrowRight className="size-4" aria-hidden />
         </Button>
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="mt-4 w-full text-center text-sm font-semibold text-white/75 underline underline-offset-4 hover:text-white"
-        >
-          Ya tengo entradas · Ingresar
-        </button>
         {sheet}
       </main>
     )
@@ -434,18 +424,11 @@ export function EventAccessPage({ eventSlug }: { eventSlug?: string } = {}) {
             </Button>
             <button
               type="button"
-              onClick={goToStore}
-              className="mt-4 w-full text-center text-sm font-semibold text-white/75 underline underline-offset-4 hover:text-white"
-            >
-              Comprar consumos
-            </button>
-            <button
-              type="button"
               onClick={() => {
                 clearSession()
                 setOpen(true)
               }}
-              className="mt-3 w-full text-center text-xs font-medium text-white/35 underline underline-offset-4 hover:text-white/60"
+              className="mt-4 w-full text-center text-xs font-medium text-white/35 underline underline-offset-4 hover:text-white/60"
             >
               Ingresar con otro dato
             </button>
@@ -454,20 +437,13 @@ export function EventAccessPage({ eventSlug }: { eventSlug?: string } = {}) {
           <>
             <Button
               type="button"
-              onClick={goToStore}
+              onClick={() => setOpen(true)}
               className="h-14 w-full rounded-2xl bg-white font-semibold text-black"
             >
-              Comprar consumos <ArrowRight className="size-4" aria-hidden />
+              Ingresar <ArrowRight className="size-4" aria-hidden />
             </Button>
-            <button
-              type="button"
-              onClick={() => setOpen(true)}
-              className="mt-4 w-full text-center text-sm font-semibold text-white/75 underline underline-offset-4 hover:text-white"
-            >
-              Ya tengo entradas · Ingresar
-            </button>
             <p className="mt-4 text-center text-xs leading-relaxed text-white/30">
-              Sumá consumos sin registrarte. Antes de pagar te pedimos nombre y DNI.
+              Entrá con tu DNI o tu celular. Te enviamos un código por WhatsApp.
             </p>
           </>
         )}

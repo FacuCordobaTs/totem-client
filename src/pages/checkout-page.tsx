@@ -65,6 +65,10 @@ function clearEventProgress(eventId: string | undefined, slug: string | null) {
       localStorage.removeItem(`crow_event_progress_${slug}`)
       sessionStorage.removeItem(`crow_restore_progress_${slug}`)
     }
+    // El carrito del link de acceso invitado se guarda por slug del evento.
+    for (const key of [`crow_guest_cart_${eventId ?? ""}`, `crow_guest_cart_${slug ?? ""}`]) {
+      if (key !== "crow_guest_cart_") sessionStorage.removeItem(key)
+    }
   } catch { /* noop */ }
 }
 
@@ -95,9 +99,18 @@ export function CheckoutPage() {
   // Tarea 2.2 — el "Volver" navega a la página del evento por slug (la ruta
   // `/e/:eventId` no existe). Se resuelve al montar con `GET /public/events/:id`.
   const [eventSlug, setEventSlug] = useState<string | null>(null)
-  const eventReturnPath = eventSlug && !getEventSite(eventSlugFromHostname(window.location.hostname))
-    ? `/${encodeURIComponent(eventSlug)}`
-    : "/"
+  // `volver` lo manda el link de acceso: el checkout regresa al comprobante invitado, no a la
+  // tienda de entradas. Sólo se aceptan rutas internas.
+  const requestedReturnTo = searchParams.get("volver")
+  const safeReturnTo =
+    requestedReturnTo && requestedReturnTo.startsWith("/") && !requestedReturnTo.startsWith("//")
+      ? requestedReturnTo
+      : null
+  const eventReturnPath =
+    safeReturnTo ??
+    (eventSlug && !getEventSite(eventSlugFromHostname(window.location.hostname))
+      ? `/${encodeURIComponent(eventSlug)}`
+      : "/")
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethods | null>(null)
   const [ticketTypes, setTicketTypes] = useState<PublicEventDetailResponse["ticketTypes"]>([])
   // Tarea 6.2 — Saldo del cliente en este evento ("0.00" si no tiene): "Saldo disponible"
@@ -140,8 +153,9 @@ export function CheckoutPage() {
   const contactValid = name.trim().length >= 2 && dniValid
 
   const goToEventPage = () => {
-    // Volver desde el checkout restaura la parte de consumos del evento.
-    setEventRestoreFlag(eventSlug)
+    // Volver desde el checkout restaura la parte de consumos del evento (salvo que el link de
+    // acceso haya pedido volver a su propio comprobante).
+    if (!safeReturnTo) setEventRestoreFlag(eventSlug)
     const promoterQuery = promoterId ? `?promotor=${encodeURIComponent(promoterId)}` : ""
     navigate(`${eventReturnPath}${promoterQuery}`)
   }
@@ -273,7 +287,7 @@ export function CheckoutPage() {
 
   if (!hydrated) return null
   if (!snapshot && !result) {
-    setEventRestoreFlag(eventSlug)
+    if (!safeReturnTo) setEventRestoreFlag(eventSlug)
     const promoterQuery = promoterId ? `?promotor=${encodeURIComponent(promoterId)}` : ""
     navigate(`${eventReturnPath}${promoterQuery}`, { replace: true })
     return null
@@ -603,9 +617,9 @@ function MethodStep({
       </div>
 
       <div className="flex items-center justify-between gap-4 text-sm">
-        <p className="min-w-0 truncate text-white/55">
-          Comprando como <span className="font-semibold text-white">{buyerName}</span>
-          <span className="text-white/35"> · DNI {buyerDni}</span>
+        <p className="min-w-0 text-white/55">
+          Comprando como <span className="whitespace-nowrap font-semibold text-white">{buyerName}</span>
+          <span className="whitespace-nowrap text-white/35"> · DNI {buyerDni}</span>
         </p>
         <button
           type="button"

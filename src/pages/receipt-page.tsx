@@ -47,6 +47,9 @@ import {
   TicketSharePanel,
   type ShareCredentials,
 } from "@/components/ticket-share-panel"
+import { useCartStore } from "@/stores/cart-store"
+import { useBuyerStore } from "@/stores/buyer-store"
+import { useSessionStore } from "@/stores/session-store"
 
 const MP_CHECKOUT_LAUNCHED_KEY = "mpCheckoutLaunched"
 const ADDON_PURCHASE_KEY = "addonPurchaseForReceipt"
@@ -212,7 +215,7 @@ function ProductShelfRow({
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[11] px-3 pt-3 pr-12">
         <p className="text-[15px] font-semibold leading-tight text-white sm:text-base">{name}</p>
       </div>
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[11] px-3 pb-3 pr-12">
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[11] px-3 pb-3">
         <p className="text-base font-bold tabular-nums text-white/85 sm:text-lg">{priceStr}</p>
       </div>
 
@@ -254,7 +257,7 @@ function ProductShelfRow({
             initial={{ opacity: 0, scale: 0.7 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.7 }}
-            className="pointer-events-none absolute bottom-2.5 right-2.5 z-20 flex size-7 items-center justify-center rounded-full bg-white text-black"
+            className="pointer-events-none absolute right-2.5 top-2.5 z-20 flex size-7 items-center justify-center rounded-full bg-white text-black"
           >
             <Plus className="size-3.5" strokeWidth={2.5} aria-hidden />
           </motion.span>
@@ -413,40 +416,81 @@ function NavigationCard({
 //
 // Es **una sola pantalla** para las dos credenciales del cliente:
 //   - `/receipt/:receiptToken`  → el link del mail, anclado a una compra;
-//   - `/mi-cuenta/:token/evento/:eventId` → la sesión de `/{slug}/acceso`, anclada al cliente y al
-//     evento, que puede no tener ninguna compra.
+//   - `/mi-cuenta/:token/evento/:eventId` → la sesión de `/{slug}/acceso/ingresar`, anclada al
+//     cliente y al evento, que puede no tener ninguna compra.
 // El diseño, los tres tabs y los textos son los mismos siempre. Comprar consumos y cargar saldo
 // funcionan con las dos anclas: con compra se cuelgan de su `receiptToken` y, sin compra, de la
 // sesión de acceso (el backend resuelve al cliente por el token). Lo que sigue necesitando una
 // venta es el retiro en barra, porque una orden se arma sobre consumiciones ya compradas.
+//
+// La tercera entrada es la del link de acceso sin login (`/{slug}/acceso`): la misma pantalla en
+// modo invitado, abierta directo en la tienda de consumos. Al pagar, el drawer global pide nombre
+// y DNI y el checkout registra la compra contra esa identidad.
 // ──────────────────────────────────────────────────────────────────────────────
-export function ReceiptPage() {
+export function ReceiptPage({
+  guestEventSlug,
+  guestLoginPath,
+}: {
+  /** Evento de la página propia del subdominio (`/acceso`), donde no hay `:slug` en la URL. */
+  guestEventSlug?: string
+  /** A dónde va "Mis entradas" en modo invitado (`/acceso/ingresar` o `/{slug}/acceso/ingresar`). */
+  guestLoginPath?: string
+} = {}) {
   const {
     receiptToken: routeReceiptToken,
     token: profileToken,
     eventId,
-  } = useParams<{ receiptToken?: string; token?: string; eventId?: string }>()
+    slug: routeSlug,
+  } = useParams<{ receiptToken?: string; token?: string; eventId?: string; slug?: string }>()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
 
   // Modo evento: la credencial es la sesión del cliente, no un comprobante.
   const eventMode = !routeReceiptToken && Boolean(profileToken && eventId)
+  // Modo invitado: el link de acceso del evento, sin credencial. Muestra la tienda de consumos.
+  const guestSlug = guestEventSlug ?? routeSlug
+  const guestMode = Boolean(guestSlug) && !routeReceiptToken && !profileToken
+  const guestLoginTo = guestLoginPath ?? `/${encodeURIComponent(routeSlug ?? "")}/acceso/ingresar`
+  // La selección del invitado sobrevive a la ida al checkout y a la vuelta ("Volver").
+  const guestCartKey = guestMode ? `crow_guest_cart_${guestSlug}` : null
+  const sessionToken = useSessionStore((state) => state.token)
+  const setCart = useCartStore((state) => state.setCart)
+  const requestIdentity = useBuyerStore((state) => state.requestIdentity)
 
   const [data, setData] = useState<ReceiptApiResponse | null>(null)
+  const [loadFailed, setLoadFailed] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
   const hadPendingPaymentRef = useRef(false)
 
   const [addonProducts, setAddonProducts] = useState<PublicDrinkProductItem[] | null>(null)
   const [addonCategories, setAddonCategories] = useState<PublicProductCategory[]>([])
-  const [addonDrinks, setAddonDrinks] = useState<Record<string, number>>({})
+  const [addonDrinks, setAddonDrinks] = useState<Record<string, number>>(() => {
+    if (!guestCartKey) return {}
+    try {
+      const raw = sessionStorage.getItem(guestCartKey)
+      return raw ? (JSON.parse(raw) as Record<string, number>) : {}
+    } catch {
+      return {}
+    }
+  })
   const [addonSubmitting, setAddonSubmitting] = useState(false)
   const [addonPolling, setAddonPolling] = useState(false)
+  const guestDetailRef = useRef<PublicEventDetailResponse | null>(null)
   const consumptionsCountRef = useRef(0)
 
+  useEffect(() => {
+    if (!guestCartKey) return
+    try {
+      sessionStorage.setItem(guestCartKey, JSON.stringify(addonDrinks))
+    } catch {
+      /* noop */
+    }
+  }, [guestCartKey, addonDrinks])
+
   const [activeView, setActiveView] = useState<ReceiptView>(() =>
-    searchParams.get("view") === "tickets" ? "tickets" : "home"
+    guestMode ? "shop" : searchParams.get("view") === "tickets" ? "tickets" : "home"
   )
-  const [shelf, setShelf] = useState<ShelfKind>("glass")
+  const [shelf, setShelf] = useState<ShelfKind | null>(null)
   const [pickupMode, setPickupMode] = useState(false)
   const [pickupSelection, setPickupSelection] = useState<Record<string, number>>({})
   const [pickupSubmitting, setPickupSubmitting] = useState(false)
@@ -512,6 +556,34 @@ export function ReceiptPage() {
 
   const load = useCallback(async () => {
     try {
+      if (guestMode && guestSlug) {
+        // Sin credencial: la página se arma con el catálogo público del evento. Los tabs de
+        // entradas/consumos/saldo quedan vacíos; la tienda de consumos es la que se usa.
+        const r = await publicApiFetch<PublicEventDetailResponse>(
+          `/public/events/${encodeURIComponent(guestSlug)}`
+        )
+        guestDetailRef.current = r
+        setData({
+          receiptToken: null,
+          customerName: "",
+          balance: { amount: "0.00" },
+          sale: null,
+          event: {
+            id: r.event.id,
+            name: r.event.name,
+            date: r.event.date,
+            venue: r.event.venue,
+            location: r.event.location,
+          },
+          productora: { name: r.productora.name },
+          tickets: [],
+          consumptions: [],
+          pickups: [],
+          transports: [],
+        })
+        setLoadFailed(false)
+        return
+      }
       const d = routeReceiptToken
         ? await publicApiFetch<ReceiptApiResponse>(
             `/public/receipts/${encodeURIComponent(routeReceiptToken)}`
@@ -522,10 +594,12 @@ export function ReceiptPage() {
             )
           : null
       setData(d)
+      setLoadFailed(false)
     } catch {
       setData(null)
+      setLoadFailed(true)
     }
-  }, [routeReceiptToken, profileToken, eventId])
+  }, [routeReceiptToken, profileToken, eventId, guestMode, guestSlug])
 
   useEffect(() => {
     void load()
@@ -625,6 +699,14 @@ export function ReceiptPage() {
   // evento en `event-detail-page`).
   useEffect(() => {
     if (!showPaidContent || !data?.event?.id) return
+    const guestDetail = guestMode ? guestDetailRef.current : null
+    if (guestDetail) {
+      const opensAt = guestDetail.event.consumptionsAvailableFrom
+      const consumptionsOpen = opensAt == null || Date.now() >= new Date(opensAt).getTime()
+      setAddonProducts(consumptionsOpen ? guestDetail.drinkProducts : [])
+      setAddonCategories(consumptionsOpen ? (guestDetail.productCategories ?? []) : [])
+      return
+    }
     publicApiFetch<PublicEventDetailResponse>(`/public/events/${data.event.id}`)
       .then((r) => {
         const opensAt = r.event.consumptionsAvailableFrom
@@ -636,7 +718,7 @@ export function ReceiptPage() {
         setAddonProducts([])
         setAddonCategories([])
       })
-  }, [showPaidContent, data?.event?.id])
+  }, [showPaidContent, data?.event?.id, guestMode])
 
   useEffect(() => {
     if (!data?.sale?.paid || !receiptToken) return
@@ -730,8 +812,8 @@ export function ReceiptPage() {
       .toFixed(2)
   }, [addonDrinkLines, addonProducts])
 
-  // Sin ninguna de las dos credenciales no hay pantalla que mostrar.
-  if (!routeReceiptToken && !eventMode) return null
+  // Sin comprobante, sesión de evento o link de acceso invitado no hay pantalla que mostrar.
+  if (!routeReceiptToken && !eventMode && !guestMode) return null
 
   const addonUnitCount = addonDrinkLines.reduce((a, l) => a + l.quantity, 0)
 
@@ -814,7 +896,7 @@ export function ReceiptPage() {
   const handleAddonCheckout = async () => {
     if (!addonDrinkLines.length || addonSubmitting) return
     // Dos anclas para la misma compra: el comprobante de una compra anterior y, sin ninguna
-    // compra todavía (adentro del evento, entrando por `/{slug}/acceso`), el evento de la sesión.
+    // compra todavía (adentro del evento, entrando por `/{slug}/acceso/ingresar`), el evento de la sesión.
     const endpoint = receiptToken
       ? `/public/receipts/${receiptToken}/consumptions-checkout`
       : profileToken && eventId
@@ -923,9 +1005,41 @@ export function ReceiptPage() {
     })
   }
 
+  // Modo invitado: la compra sale por el checkout público y vuelve al comprobante real de la
+  // venta. El drawer global pide nombre y DNI y el backend registra al cliente por DNI.
+  const handleGuestCheckout = () => {
+    if (!data?.event?.id || !addonProducts || addonUnitCount === 0) return
+    const drinkLines = addonDrinkLines.flatMap((line) => {
+      const product = addonProducts.find((p) => p.id === line.productId)
+      return product ? [{ ...line, unitPrice: product.price }] : []
+    })
+    if (drinkLines.length === 0) return
+    setCart({
+      eventId: data.event.id,
+      eventName: data.event.name,
+      productoraName: data.productora.name,
+      ticketLines: [],
+      drinkLines,
+    })
+    // `volver` hace que el botón "Volver" del checkout regrese a esta misma pantalla con la
+    // selección intacta, no a la tienda de entradas.
+    const returnTo = window.location.pathname
+    requestIdentity(`/checkout/${data.event.id}?volver=${encodeURIComponent(returnTo)}`)
+  }
+
   const onShopView = activeView === "shop" && consumosAvailable
+  // Si el evento sólo vende botellas, la tienda abre ahí y no en una copa vacía.
+  const activeShelf: ShelfKind =
+    shelf ??
+    (addonProducts && addonProducts.length > 0 && !addonProducts.some((p) => productSaleType(p) === "GLASS")
+      ? "bottle"
+      : "glass")
   const showFooter = onShopView && addonUnitCount > 0
   const showBuyMoreFooter = activeView === "consumos" && (consumosAvailable || pickupMode)
+  const guestAccountTo =
+    guestMode && sessionToken && data?.event?.id
+      ? `/mi-cuenta/${encodeURIComponent(sessionToken)}/evento/${encodeURIComponent(data.event.id)}`
+      : guestLoginTo
 
   // Tarea 6.2 — Con saldo, el addon ofrece pagar con saldo (sin tarjeta ni transferencia).
   const addonBalanceAvailable = parseFloat(data?.balance?.amount ?? "0") > 0
@@ -941,18 +1055,27 @@ export function ReceiptPage() {
         {data ? (
           <div className="flex justify-end">
             <Link
-              to={`/mi-cuenta/${encodeURIComponent(accountToken ?? "")}`}
+              to={guestMode ? guestAccountTo : `/mi-cuenta/${encodeURIComponent(accountToken ?? "")}`}
               className="flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium text-white/35 transition-colors hover:bg-white/[0.06] hover:text-white/65"
             >
-              <UserRound className="size-3.5" aria-hidden />
-              Mis eventos
+              {guestMode ? <Ticket className="size-3.5" aria-hidden /> : <UserRound className="size-3.5" aria-hidden />}
+              {guestMode ? "Mis entradas" : "Mis eventos"}
             </Link>
           </div>
         ) : null}
         {!data ? (
-          <div className="flex items-center justify-center py-24 text-white/40">
-            <Loader2 className="size-6 animate-spin" aria-hidden />
-          </div>
+          guestMode && loadFailed ? (
+            <div className="flex flex-col items-center gap-3 py-24 text-center">
+              <p className="text-lg font-semibold tracking-tight text-white">Este evento no está disponible</p>
+              <p className="max-w-[280px] text-sm leading-relaxed text-white/50">
+                Revisá que el link esté completo o pedíselo a quien te lo compartió.
+              </p>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center py-24 text-white/40">
+              <Loader2 className="size-6 animate-spin" aria-hidden />
+            </div>
+          )
         ) : !showPaidContent ? (
           <div className="flex flex-col gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-6 py-8 text-center">
             <p className="text-lg font-semibold tracking-tight text-white">Pago pendiente</p>
@@ -1231,21 +1354,43 @@ export function ReceiptPage() {
                 </>
               ) : (
                 <>
-                  <SectionHeader title="Comprar consumos" onBack={() => setActiveView("consumos")} />
-                  <section className="flex items-center justify-between gap-4 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-5 py-4">
-                    <div>
-                      <p className="text-lg font-bold text-white">{formatMoneyArsExact(data.balance.amount)}</p>
+                  {guestMode ? (
+                    <header className="space-y-3 pb-2">
+                      <p className="text-sm font-medium text-white/45">{data.event.name}</p>
+                      <h1 className="text-3xl font-bold tracking-[-0.03em] text-white">Elegí tus consumos</h1>
+                      <p className="max-w-sm text-[15px] leading-relaxed text-white/50">
+                        Sumá lo que quieras y pagá al final. Sólo te pedimos nombre y DNI para registrarte.
+                      </p>
+                    </header>
+                  ) : (
+                    <>
+                      <SectionHeader title="Comprar consumos" onBack={() => setActiveView("consumos")} />
+                      <section className="flex items-center justify-between gap-4 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-5 py-4">
+                        <div>
+                          <p className="text-lg font-bold text-white">{formatMoneyArsExact(data.balance.amount)}</p>
+                        </div>
+                        <Button type="button" variant="secondary" className="rounded-xl" onClick={() => setDepositOpen(true)}>Cargar</Button>
+                      </section>
+                    </>
+                  )}
+                  {guestMode && addonProducts === null ? (
+                    <div className="flex items-center justify-center py-20 text-white/40">
+                      <Loader2 className="size-6 animate-spin" aria-hidden />
                     </div>
-                    <Button type="button" variant="secondary" className="rounded-xl" onClick={() => setDepositOpen(true)}>Cargar</Button>
-                  </section>
-                  <ConsumosTabContent
-                    addonProducts={addonProducts ?? []}
-                    addonCategories={addonCategories}
-                    addonDrinks={addonDrinks}
-                    shelf={shelf}
-                    onAdd={bumpAddon}
-                    onRemove={trimAddon}
-                  />
+                  ) : guestMode && addonProducts !== null && addonProducts.length === 0 ? (
+                    <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-10 text-center text-sm text-white/45">
+                      Todavía no hay consumos a la venta para este evento.
+                    </div>
+                  ) : (
+                    <ConsumosTabContent
+                      addonProducts={addonProducts ?? []}
+                      addonCategories={addonCategories}
+                      addonDrinks={addonDrinks}
+                      shelf={activeShelf}
+                      onAdd={bumpAddon}
+                      onRemove={trimAddon}
+                    />
+                  )}
                 </>
               )}
             </motion.div>
@@ -1295,7 +1440,7 @@ export function ReceiptPage() {
             exit={{ opacity: 0, x: 24 }}
             transition={EASE_OUT}
           >
-            <ShelfRail shelf={shelf} onShelf={setShelf} cartCount={addonUnitCount} />
+            <ShelfRail shelf={activeShelf} onShelf={setShelf} cartCount={addonUnitCount} />
           </motion.div>
         ) : null}
       </AnimatePresence>
@@ -1312,8 +1457,9 @@ export function ReceiptPage() {
             className="fixed bottom-0 left-0 right-0 z-40 bg-black/40 px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 backdrop-blur-lg supports-[backdrop-filter]:bg-black/40 sm:px-8"
           >
             <div className="mx-auto flex w-full max-w-lg flex-col gap-3">
-              {/* Tarea 6.2 — Método del addon: Mercado Pago o saldo disponible. */}
-              {addonBalanceAvailable ? (
+              {/* Tarea 6.2 — Método del addon: Mercado Pago o saldo disponible. En modo invitado
+                  el checkout público elige el método en el paso siguiente. */}
+              {!guestMode && addonBalanceAvailable ? (
                 <div
                   className="flex rounded-xl bg-white/[0.06] p-1"
                   role="radiogroup"
@@ -1362,9 +1508,14 @@ export function ReceiptPage() {
               <Button
                 className="h-14 w-full rounded-2xl bg-white font-semibold text-black transition-all disabled:shadow-none"
                 disabled={addonSubmitting || addonUnitCount === 0}
-                onClick={() => void handleAddonCheckout()}
+                onClick={() => {
+                  if (guestMode) handleGuestCheckout()
+                  else void handleAddonCheckout()
+                }}
               >
-                {addonSubmitting ? (
+                {guestMode ? (
+                  <>Continuar al pago <ArrowRight className="size-4" aria-hidden /></>
+                ) : addonSubmitting ? (
                   <Loader2 className="size-6 animate-spin" aria-hidden />
                 ) : addonMethod === "SALDO" ? (
                   "Pagar con saldo"

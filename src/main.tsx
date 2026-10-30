@@ -57,7 +57,10 @@ function NightRoot({ children }: { children: ReactNode }) {
 
 const router = createBrowserRouter([
   ...(eventSite ? [
-    { path: "/acceso", element: <NightRoot><EventAccessPage eventSlug={eventSite.eventIdentifier} /></NightRoot> },
+    // `/acceso` abre la misma pantalla de comprobante, sin login, con la tienda de consumos.
+    { path: "/acceso", element: <NightRoot><ReceiptPage guestEventSlug={eventSite.eventIdentifier} guestLoginPath="/acceso/ingresar" /></NightRoot> },
+    // El ingreso con DNI/celular para ver las entradas queda como acción secundaria.
+    { path: "/acceso/ingresar", element: <NightRoot><EventAccessPage eventSlug={eventSite.eventIdentifier} /></NightRoot> },
     { path: "/entradas", element: <NightRoot><EventDetailPage eventSlug={eventSite.eventIdentifier} /></NightRoot> },
   ] : []),
   { path: "/transporte/:token", element: <NightRoot><TransportDriverPage /></NightRoot> },
@@ -73,7 +76,7 @@ const router = createBrowserRouter([
       </NightRoot>
     ),
   },
-  // El evento del cliente que entró por `/{slug}/acceso`: es el mismo comprobante
+  // El evento del cliente que entró por `/{slug}/acceso/ingresar`: es el mismo comprobante
   // (`ReceiptPage`), que sirve las dos credenciales y los mismos tres tabs. Adentro del evento la
   // pantalla es siempre esta, haya comprado o no.
   {
@@ -84,10 +87,18 @@ const router = createBrowserRouter([
       </NightRoot>
     ),
   },
-  // Acceso del cliente por evento (`crow.ar/{slug}/acceso`): el flyer y el ingreso con DNI/celular.
-  // Va antes de `/:slug`, que matchea un solo segmento y no compite con esta ruta.
+  // Acceso del cliente por evento (`crow.ar/{slug}/acceso`): la misma pantalla de comprobante sin
+  // login, abierta en la tienda de consumos. El ingreso con DNI/celular vive en `/ingresar`.
   {
     path: "/:slug/acceso",
+    element: (
+      <NightRoot>
+        <ReceiptPage />
+      </NightRoot>
+    ),
+  },
+  {
+    path: "/:slug/acceso/ingresar",
     element: (
       <NightRoot>
         <EventAccessPage />

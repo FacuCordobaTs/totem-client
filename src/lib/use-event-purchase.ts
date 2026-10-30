@@ -97,8 +97,6 @@ export function useEventPurchase(eventSlug?: string) {
   // `promotor` viaja en el enlace que comparte cada promotor. También soportamos
   // `promoter` para no romper links que se hayan armado antes del nombre en español.
   const promoterId = searchParams.get("promotor") ?? searchParams.get("promoter") ?? undefined
-  // El link de acceso (`/{slug}/acceso`) manda acá para armar el carrito de consumos sin cuenta.
-  const wantsConsumosStore = searchParams.get("tienda") === "consumos"
 
   const [data, setData] = useState<PublicEventDetailResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -122,17 +120,6 @@ export function useEventPurchase(eventSlug?: string) {
       .then((r) => {
         const saved = restoreSession ? readSavedProgress(slug) : null
         setData(r)
-        if (wantsConsumosStore) {
-          // Llegó por "Comprar consumos" del link de acceso: abre la tienda directo, sin cuenta y
-          // sin restaurar una selección vieja.
-          setTicketQtys({})
-          setDrinks({})
-          setTransportQtys({})
-          setPurchaseOpen(true)
-          setCommerceSurface("store")
-          setMinimalStep("store")
-          return
-        }
         setTicketQtys(saved?.ticketQtys ?? {})
         setDrinks(saved?.drinks ?? {})
         setTransportQtys(saved?.transportQtys ?? {})
@@ -144,7 +131,7 @@ export function useEventPurchase(eventSlug?: string) {
         const detail = err instanceof ApiError ? err.message : err instanceof Error ? err.message : ""
         setError(detail ? `No pudimos cargar el evento. ${detail}` : "No pudimos cargar el evento.")
       })
-  }, [slug, restoreSession, wantsConsumosStore])
+  }, [slug, restoreSession])
 
   useEffect(() => {
     load()
@@ -310,7 +297,6 @@ export function useEventPurchase(eventSlug?: string) {
     data,
     error,
     restoreSession,
-    wantsConsumosStore,
     purchaseOpen,
     setPurchaseOpen,
     commerceSurface,
