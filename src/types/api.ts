@@ -220,7 +220,7 @@ export type ConsumptionsCheckoutResponse = {
   success: boolean
   /** MERCADOPAGO: link de Checkout Pro (flujo histórico). */
   url_pago?: string
-  /** SALDO: la venta quedó COMPLETED al instante; el client refresca el comprobante. */
+  /** La venta creada: con Mercado Pago queda pendiente y su retiro espera la acreditación. */
   receiptToken?: string
   balance?: string
   error?: string
@@ -254,6 +254,7 @@ export type ReceiptApiResponse = {
   event: {
     id: string
     name: string
+    slug?: string | null
     date: string
     venue: string | null
     location: string | null
@@ -279,6 +280,8 @@ export type ReceiptApiResponse = {
     status: PickupStatus
     createdAt: string | null
     deliveredAt: string | null
+    /** Unidades que reserva la orden. Ausente en un backend anterior. */
+    consumptionIds?: string[]
     items: PickupItem[]
   }>
   /** Compartir entradas con amigos. Ausente en un backend que todavía no lo soporta. */

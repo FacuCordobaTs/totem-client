@@ -14,6 +14,7 @@ import { InvitationPage } from "@/pages/invitation-page"
 import { TicketSharePage } from "@/pages/ticket-share-page"
 import { EventLinkHintPage } from "@/pages/event-link-hint-page"
 import { EventAccessPage } from "@/pages/event-access-page"
+import { AccessStorePage } from "@/pages/access-store-page"
 import { CustomerProfilePage } from "@/pages/customer-profile-page"
 import { TransportDriverPage } from "@/pages/transport-driver-page"
 import { AppShell } from "@/components/app-shell"
@@ -57,8 +58,8 @@ function NightRoot({ children }: { children: ReactNode }) {
 
 const router = createBrowserRouter([
   ...(eventSite ? [
-    // `/acceso` abre la misma pantalla de comprobante, sin login, con la tienda de consumos.
-    { path: "/acceso", element: <NightRoot><ReceiptPage guestEventSlug={eventSite.eventIdentifier} guestLoginPath="/acceso/ingresar" /></NightRoot> },
+    // `/acceso` abre la carta de consumos, sin login: se elige, se paga y se retira.
+    { path: "/acceso", element: <NightRoot><AccessStorePage eventIdentifier={eventSite.eventIdentifier} /></NightRoot> },
     // El ingreso con DNI/celular para ver las entradas queda como acción secundaria.
     { path: "/acceso/ingresar", element: <NightRoot><EventAccessPage eventSlug={eventSite.eventIdentifier} /></NightRoot> },
     { path: "/entradas", element: <NightRoot><EventDetailPage eventSlug={eventSite.eventIdentifier} /></NightRoot> },
@@ -87,13 +88,13 @@ const router = createBrowserRouter([
       </NightRoot>
     ),
   },
-  // Acceso del cliente por evento (`crow.ar/{slug}/acceso`): la misma pantalla de comprobante sin
-  // login, abierta en la tienda de consumos. El ingreso con DNI/celular vive en `/ingresar`.
+  // Acceso del cliente por evento (`crow.ar/{slug}/acceso`): carta de consumos sin login, directo a
+  // Mercado Pago y al retiro en barra. El ingreso con DNI/celular vive en `/ingresar`.
   {
     path: "/:slug/acceso",
     element: (
       <NightRoot>
-        <ReceiptPage />
+        <AccessStorePage />
       </NightRoot>
     ),
   },

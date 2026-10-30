@@ -17,8 +17,8 @@ import type {
  * Ingreso del cliente por evento (`crow.ar/{slug}/acceso/ingresar`): el flyer y un botón para
  * entrar con DNI o celular. El código llega por WhatsApp y, al verificarlo, el cliente cae en el
  * mismo perfil que abre el link del mail — pero con la sesión guardada, así puede volver sin
- * buscar nada. El link de acceso principal (`/{slug}/acceso`) es la pantalla de comprobante en
- * modo invitado; esta se abre desde "Mis entradas".
+ * buscar nada. El link de acceso principal (`/{slug}/acceso`) es la carta de consumos sin login;
+ * esta se abre desde "Mis entradas" en la página del evento.
  *
  * El paso `details` cubre los dos motivos por los que el backend pide un dato más antes de mandar
  * el código: `NEEDS_PHONE` (ficha sin celular) y `NEEDS_REGISTRATION` (alta rápida, que además

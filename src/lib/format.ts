@@ -20,6 +20,20 @@ export function formatMoneyArs(value: string | number): string {
   }).format(n)
 }
 
+/** Precio de carta: "$10.000", con centavos sólo cuando el precio los tiene. */
+export function formatMenuPrice(value: string | number): string {
+  const n = typeof value === "string" ? Number(value) : value
+  if (Number.isNaN(n)) return "$ —"
+  return new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: "ARS",
+    minimumFractionDigits: Number.isInteger(n) ? 0 : 2,
+    maximumFractionDigits: 2,
+  })
+    .format(n)
+    .replace(/\s/g, "")
+}
+
 /** Total exacto con centavos (checkout / comprobante). */
 export function formatMoneyArsExact(value: string | number): string {
   const n = typeof value === "string" ? Number(value) : value

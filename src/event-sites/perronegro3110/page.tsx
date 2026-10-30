@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 import { Link } from "react-router"
 import {
   AnimatePresence,
@@ -18,7 +18,6 @@ import { formatCountdown, formatEventDate, formatMoneyArsExact } from "@/lib/for
 import { formatAdmissionWindowShort } from "@/lib/ticket-admission"
 import {
   groupProductsByCategory,
-  productSaleType,
   useEventPurchase,
 } from "@/lib/use-event-purchase"
 import logoUrl from "./assets/logo.png"
@@ -34,7 +33,7 @@ const SHEET: Transition = { duration: 0.7, ease: EASE_INOUT }
 
 const MANIFESTO = ["djs en vivo", "sectores vip", "mesas", "estacionamiento", "nuevo concepto"]
 
-type Shelf = "glass" | "bottle" | "cart"
+type Shelf = "menu" | "cart"
 
 /**
  * Página propia de Perro Negro (perronegro3110.crow.ar). La lógica de compra es la misma que la
@@ -923,14 +922,11 @@ function Store({
 }) {
   const data = purchase.data!
   const products = data.drinkProducts
-  const glass = useMemo(() => products.filter((p) => productSaleType(p) === "GLASS"), [products])
-  const bottle = useMemo(() => products.filter((p) => productSaleType(p) === "BOTTLE"), [products])
-  const [shelf, setShelf] = useState<Shelf>(() => (glass.length > 0 ? "glass" : "bottle"))
+  const [shelf, setShelf] = useState<Shelf>("menu")
   const saleOpen = consOpen && purchase.productsPurchasable
 
   const tabs: { id: Shelf; label: string }[] = [
-    { id: "glass", label: "tragos" },
-    { id: "bottle", label: "botellas" },
+    { id: "menu", label: "carta" },
     { id: "cart", label: `tu bolsa${cartCount > 0 ? ` (${cartCount})` : ""}` },
   ]
 
@@ -972,8 +968,8 @@ function Store({
             <CartPanel purchase={purchase} drinks={drinks} setDrinkQty={setDrinkQty} transportLines={transportLines} />
           ) : (
             <ProductShelf
-              products={shelf === "glass" ? glass : bottle}
-              emptyLabel={shelf === "glass" ? "no hay productos tipo copa en este evento." : "no hay productos tipo botella en este evento."}
+              products={products}
+              emptyLabel="no hay consumos en este evento."
               purchase={purchase}
               drinks={drinks}
               setDrinkQty={setDrinkQty}

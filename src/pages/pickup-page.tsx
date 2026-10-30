@@ -1,21 +1,15 @@
 import { useCallback, useEffect, useState } from "react"
-import { Link, useNavigate, useParams, useSearchParams } from "react-router"
+import { useNavigate, useParams, useSearchParams } from "react-router"
 import QRCode from "qrcode"
-import { Check, Loader2 } from "lucide-react"
+import { ArrowLeft, Check, Loader2 } from "lucide-react"
+import { motion } from "motion/react"
+import { toast } from "sonner"
 import { publicApiFetch, publicWebSocketUrl } from "@/lib/api"
 import type { PickupApiResponse } from "@/types/api"
-import { Button } from "@/components/ui/button"
-
-const STATUS_LABEL: Record<PickupApiResponse["status"], string> = {
-  PENDING: "Listo para retirar",
-  DELIVERED: "Entregado",
-  CANCELLED: "Cancelado",
-}
 
 /**
- * QR de pedido (tarea 4.1 — visión §2.5): el código que se muestra en barra. Codifica el
- * token del pedido; el barman lo escanea, ve la lista en su pantalla y confirma la entrega.
- * Los tragos no retirados siguen disponibles en el comprobante.
+ * QR de la orden: lo que se muestra en la barra. Codifica el token del pedido; la barra lo escanea,
+ * ve la lista y confirma la entrega. La pantalla pasa sola a "Entregado" cuando eso ocurre.
  */
 export function PickupPage() {
   const { token } = useParams<{ token: string }>()
@@ -25,38 +19,38 @@ export function PickupPage() {
   const [data, setData] = useState<PickupApiResponse | null>(null)
   const [notFound, setNotFound] = useState(false)
   const [qrSrc, setQrSrc] = useState<string | null>(null)
+  const [cancelling, setCancelling] = useState(false)
 
   const load = useCallback(() => {
     if (!token) return
+    publicApiFetch<PickupApiResponse>(`/public/pickups/${encodeURIComponent(token)}`)
+      .then(setData)
+      .catch(() => setNotFound(true))
+  }, [token])
+
+  useEffect(() => load(), [load])
+
+  useEffect(() => {
+    if (!token) return
     let cancelled = false
-    publicApiFetch<PickupApiResponse>(`/public/pickups/${token}`)
-      .then((d) => {
-        if (cancelled) return
-        setData(d)
-        QRCode.toDataURL(token, {
-          // Mismo formato que el QR de las entradas: oscuro sobre claro, quiet zone de 4
-          // módulos y render a 37 módulos × 28 px para que el navegador no lo interpole.
-          width: 1036,
-          margin: 4,
-          errorCorrectionLevel: "M",
-          color: { dark: "#09090b", light: "#ffffff" },
-        })
-          .then((url) => {
-            if (!cancelled) setQrSrc(url)
-          })
-          .catch(() => {
-            if (!cancelled) setQrSrc(null)
-          })
+    QRCode.toDataURL(token, {
+      // Mismo formato que el QR de las entradas: oscuro sobre claro, quiet zone de 4
+      // módulos y render a 37 módulos × 28 px para que el navegador no lo interpole.
+      width: 1036,
+      margin: 4,
+      errorCorrectionLevel: "M",
+      color: { dark: "#09090b", light: "#ffffff" },
+    })
+      .then((url) => {
+        if (!cancelled) setQrSrc(url)
       })
       .catch(() => {
-        if (!cancelled) setNotFound(true)
+        if (!cancelled) setQrSrc(null)
       })
     return () => {
       cancelled = true
     }
   }, [token])
-
-  useEffect(() => load(), [load])
 
   useEffect(() => {
     if (!token) return
@@ -64,10 +58,8 @@ export function PickupPage() {
     let socket: WebSocket | null = null
     let retry: number | null = null
     const connect = () => {
-      socket = new WebSocket(
-        publicWebSocketUrl(`/ws/public/pickups/${encodeURIComponent(token)}`)
-      )
-      socket.onmessage = () => { load() }
+      socket = new WebSocket(publicWebSocketUrl(`/ws/public/pickups/${encodeURIComponent(token)}`))
+      socket.onmessage = () => load()
       socket.onclose = () => {
         if (!disposed) retry = window.setTimeout(connect, 3_000)
       }
@@ -80,99 +72,143 @@ export function PickupPage() {
     }
   }, [load, token])
 
+  const pending = data?.status === "PENDING"
+
+  // En la fila de la barra la pantalla no se puede apagar con el QR a la vista.
+  useEffect(() => {
+    if (!pending || !("wakeLock" in navigator)) return
+    let lock: WakeLockSentinel | null = null
+    let released = false
+    const acquire = () => {
+      if (document.visibilityState !== "visible") return
+      navigator.wakeLock
+        .request("screen")
+        .then((sentinel) => {
+          if (released) void sentinel.release()
+          else lock = sentinel
+        })
+        .catch(() => {
+          /* Sin permiso o sin batería: el QR sigue visible hasta que el sistema apague la pantalla. */
+        })
+    }
+    acquire()
+    document.addEventListener("visibilitychange", acquire)
+    return () => {
+      released = true
+      document.removeEventListener("visibilitychange", acquire)
+      void lock?.release()
+    }
+  }, [pending])
+
   const receiptToken = searchParams.get("receipt")
-  const delivered = data?.status === "DELIVERED"
+  const retirarPath = receiptToken ? `/receipt/${encodeURIComponent(receiptToken)}/retirar` : null
+
+  const goBack = () => {
+    if (retirarPath) navigate(retirarPath, { replace: true })
+    else navigate(-1)
+  }
+
+  const cancelOrder = async () => {
+    if (!token || cancelling) return
+    setCancelling(true)
+    try {
+      await publicApiFetch(`/public/pickups/${encodeURIComponent(token)}/cancel`, { method: "POST" })
+      goBack()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo cambiar la orden")
+      load()
+    } finally {
+      setCancelling(false)
+    }
+  }
 
   return (
-    <div className="flex min-h-dvh flex-col">
-      <header className="sticky top-0 z-10 border-b border-zinc-800/50 bg-black/70 px-6 py-4 backdrop-blur-xl">
-        <Button
-          variant="ghost"
-          className="-ml-2 rounded-xl px-3 text-sm text-[#8E8E93] hover:bg-white/5 hover:text-white"
+    <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <header className="flex min-h-14 items-center pt-[env(safe-area-inset-top)]">
+        <button
           type="button"
-          onClick={() => navigate(-1)}
+          onClick={goBack}
+          aria-label="Volver"
+          className="-ml-2 flex size-11 items-center justify-center rounded-full text-white outline-none focus-visible:ring-2 focus-visible:ring-white/40 active:bg-white/10"
         >
-          Cerrar
-        </Button>
+          <ArrowLeft className="size-6" aria-hidden />
+        </button>
       </header>
 
       {notFound ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 py-16 text-center">
-          <p className="text-lg font-semibold tracking-tight text-white">
-            Pedido no encontrado
-          </p>
-          <p className="max-w-[260px] text-sm leading-relaxed text-white/50">
-            Este código no corresponde a ningún pedido de retiro.
-          </p>
+        <div className="flex flex-1 flex-col justify-center gap-3 pb-16">
+          <h1 className="text-[2rem] font-black leading-[1.05] tracking-[-0.03em] text-white">
+            No encontramos esta orden
+          </h1>
+          <p className="text-[17px] leading-snug text-white/70">Volvé y generá el QR de nuevo.</p>
         </div>
       ) : !data ? (
-        <div className="flex flex-1 items-center justify-center text-white/40">
+        <div role="status" aria-label="Cargando" className="flex flex-1 items-center justify-center text-white/60">
           <Loader2 className="size-6 animate-spin" aria-hidden />
         </div>
+      ) : data.status === "DELIVERED" ? (
+        <div className="flex flex-1 flex-col justify-center gap-6 pb-16" aria-live="polite">
+          <motion.span
+            initial={{ scale: 0.6, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+            className="flex size-16 items-center justify-center rounded-full bg-emerald-400 text-black"
+          >
+            <Check className="size-9" strokeWidth={3} aria-hidden />
+          </motion.span>
+          <h1 className="text-[2rem] font-black leading-[1.05] tracking-[-0.03em] text-white">Entregado</h1>
+          <OrderItems items={data.items} />
+        </div>
+      ) : data.status === "CANCELLED" ? (
+        <div className="flex flex-1 flex-col justify-center gap-3 pb-16">
+          <h1 className="text-[2rem] font-black leading-[1.05] tracking-[-0.03em] text-white">
+            Esta orden ya no vale
+          </h1>
+          <p className="text-[17px] leading-snug text-white/70">
+            La cambiaste por otra. Tus productos siguen guardados.
+          </p>
+        </div>
       ) : (
-        <div className="flex flex-1 flex-col items-center justify-center gap-10 px-6 py-16">
-          <div className="flex flex-col items-center gap-2 text-center">
-            <span
-              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
-                delivered
-                  ? "bg-emerald-500/15 text-emerald-300"
-                  : data.status === "CANCELLED"
-                    ? "bg-red-500/15 text-red-300"
-                    : "bg-white/[0.08] text-white/80"
-              }`}
-            >
-              {delivered ? <Check className="size-3.5" aria-hidden /> : null}
-              {STATUS_LABEL[data.status]}
-            </span>
-            <p className="mt-3 max-w-xs text-center text-sm leading-relaxed text-[#8E8E93]">
-              {delivered
-                ? "Tu pedido fue entregado. ¡Que lo disfrutes!"
-                : "Mostrá este código en la barra: el barman ve tu pedido y te lo entrega."}
-            </p>
-          </div>
-
-          <div className="rounded-2xl bg-[#1C1C1E] p-6">
+        <div className="flex flex-1 flex-col gap-6 pt-2" aria-live="polite">
+          <h1 className="text-[2rem] font-black leading-none tracking-[-0.03em] text-white">
+            Mostrá este QR en la barra
+          </h1>
+          <div className="mx-auto w-full max-w-[22rem] overflow-hidden rounded-3xl bg-white">
             {qrSrc ? (
-              <img
-                src={qrSrc}
-                alt="Código de retiro"
-                className="w-full max-w-[min(88vw,320px)] rounded-xl"
-                width={320}
-                height={320}
-              />
+              <img src={qrSrc} alt="QR de tu orden de retiro" width={352} height={352} className="block aspect-square w-full" />
             ) : (
-              <div className="flex size-80 max-w-[88vw] items-center justify-center rounded-xl text-sm text-[#8E8E93]">
-                Generando…
+              <div className="flex aspect-square w-full items-center justify-center text-black/60">
+                <Loader2 className="size-6 animate-spin" aria-hidden />
               </div>
             )}
           </div>
-
-          <ul className="flex w-full max-w-xs flex-col gap-2">
-            {data.items.map((item) => (
-              <li
-                key={item.productId}
-                className="flex items-baseline justify-between gap-3 rounded-xl border border-white/[0.07] bg-white/[0.04] px-4 py-3"
-              >
-                <span className="font-semibold text-white">
-                  {item.quantity}× {item.productName}
-                </span>
-                <span className="text-xs tabular-nums text-white/45">
-                  {item.quantity === 1 ? "1 trago" : `${item.quantity} tragos`}
-                </span>
-              </li>
-            ))}
-          </ul>
-
-          {receiptToken ? (
-            <Link
-              to={`/receipt/${receiptToken}`}
-              className="text-[13px] text-white/45 underline decoration-white/15 underline-offset-4 hover:text-white"
-            >
-              Ver comprobante
-            </Link>
-          ) : null}
+          <OrderItems items={data.items} />
+          <button
+            type="button"
+            disabled={cancelling}
+            onClick={() => void cancelOrder()}
+            className="mt-auto flex h-12 w-full items-center justify-center text-[15px] font-semibold text-white/70 outline-none focus-visible:text-white disabled:opacity-50"
+          >
+            {cancelling ? <Loader2 className="size-5 animate-spin" aria-label="Cambiando la orden" /> : "Cambiar lo que retiro"}
+          </button>
         </div>
       )}
-    </div>
+    </main>
+  )
+}
+
+function OrderItems({ items }: { items: PickupApiResponse["items"] }) {
+  return (
+    <ul>
+      {items.map((item) => (
+        <li
+          key={item.productId}
+          className="flex items-baseline gap-3 border-b border-white/[0.09] py-3 text-[17px] font-semibold text-white last:border-b-0"
+        >
+          <span className="text-xl font-black tabular-nums">{item.quantity}</span>
+          {item.productName}
+        </li>
+      ))}
+    </ul>
   )
 }

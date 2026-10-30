@@ -8,7 +8,7 @@ import {
   ChevronLeft,
   Wine,
 } from "lucide-react"
-import { AnimatePresence, motion, useAnimationControls, type Transition } from "motion/react"
+import { AnimatePresence, motion, type Transition } from "motion/react"
 import Decimal from "decimal.js"
 import { formatAdmissionWindow, formatAdmissionWindowShort } from "@/lib/ticket-admission"
 import type { PublicEventDetailResponse } from "@/types/api"
@@ -19,15 +19,14 @@ import {
   formatMoneyArsExact,
 } from "@/lib/format"
 import { Button } from "@/components/ui/button"
+import { ConsumptionMenu } from "@/components/consumption-menu"
 import { EventMap } from "@/components/event-map"
 import { TransportPicker } from "@/components/transport-picker"
 import { ticketLineSubtotal, ticketPromoLabel, type CartDrinkLine, type CartTicketLine } from "@/stores/cart-store"
 import {
-  groupProductsByCategory,
   productSaleType,
   useEventPurchase,
   type MinimalStep,
-  type ProductCategoryGroup,
 } from "@/lib/use-event-purchase"
 
 const EASE_OUT: Transition = { duration: 0.32, ease: [0.22, 1, 0.36, 1] }
@@ -681,11 +680,45 @@ function TicketPickRow({
   )
 }
 
-type StoreShelf = "glass" | "bottle" | "cart"
-
-const STORE_SHELF_TRANSITION: Transition = {
-  duration: 0.42,
-  ease: [0.22, 1, 0.36, 1] as const,
+/**
+ * Barra de la tienda de consumos: volver y, como único cambio de vista, el pedido. La carta es un
+ * solo scroll por categorías; el pedido reúne además las entradas y el transporte de la compra.
+ */
+function StoreTopBar({
+  showCart,
+  cartCount,
+  onToggleCart,
+  onBack,
+}: {
+  showCart: boolean
+  cartCount: number
+  onToggleCart: () => void
+  onBack: () => void
+}) {
+  return (
+    <div className="flex min-h-14 shrink-0 items-center justify-between pt-[env(safe-area-inset-top)]">
+      <button
+        type="button"
+        onClick={onBack}
+        aria-label="Volver"
+        className="-ml-2 flex size-11 items-center justify-center rounded-full text-white outline-none focus-visible:ring-2 focus-visible:ring-white/40 active:bg-white/10"
+      >
+        <ChevronLeft className="size-6" strokeWidth={2} aria-hidden />
+      </button>
+      <button
+        type="button"
+        onClick={onToggleCart}
+        className="flex h-11 items-center gap-2 text-[15px] font-semibold text-white outline-none focus-visible:underline"
+      >
+        {showCart ? "Volver a la carta" : "Tu pedido"}
+        {!showCart && cartCount > 0 ? (
+          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1 text-xs font-black tabular-nums text-black">
+            {cartCount > 99 ? "99+" : cartCount}
+          </span>
+        ) : null}
+      </button>
+    </div>
+  )
 }
 
 function CategoryHeading({ children }: { children: ReactNode }) {
@@ -720,7 +753,8 @@ function ConsumosMarketplace({
 }) {
   const products = data.drinkProducts
   const saleOpen = consWindow.open
-  const [shelf, setShelf] = useState<StoreShelf | null>(null)
+  const [showCart, setShowCart] = useState(false)
+  const scrollRootRef = useRef<HTMLDivElement | null>(null)
 
   const drinkLines: CartDrinkLine[] = useMemo(() => {
     const out: CartDrinkLine[] = []
@@ -732,15 +766,6 @@ function ConsumosMarketplace({
     return out
   }, [data.drinkProducts, drinks])
 
-  const glassProducts = useMemo(
-    () => products.filter((p) => productSaleType(p) === "GLASS"),
-    [products]
-  )
-  const bottleProducts = useMemo(
-    () => products.filter((p) => productSaleType(p) === "BOTTLE"),
-    [products]
-  )
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 24 }}
@@ -748,411 +773,39 @@ function ConsumosMarketplace({
       transition={STORE_TRANSITION}
       className="relative flex min-h-0 flex-1 flex-col"
     >
-      <ConsumosShelfRail
-        shelf={shelf}
-        onShelf={setShelf}
-        cartUnitCount={cartUnitCount}
+      <StoreTopBar
+        showCart={showCart}
+        cartCount={cartUnitCount}
+        onToggleCart={() => setShowCart((current) => !current)}
         onBack={onBack}
       />
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pt-[5.5rem] pb-40 pr-14 sm:pr-[4.5rem] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <AnimatePresence mode="wait" initial={false}>
-            {shelf === null ? null : shelf === "cart" ? (
-              <motion.div
-                key="panel-cart"
-                role="tabpanel"
-                aria-labelledby="shelf-cart"
-                initial={{ opacity: 0, x: 36, filter: "blur(10px)" }}
-                animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
-                exit={{ opacity: 0, x: -28, filter: "blur(8px)" }}
-                transition={STORE_SHELF_TRANSITION}
-              >
-                <StoreCartPanel
-                  data={data}
-                  ticketLines={ticketLines}
-                  drinkLines={drinkLines}
-                  trimTicket={trimTicket}
-                  setDrinkQty={setDrinkQty}
-                  drinks={drinks}
-                />
-              </motion.div>
-            ) : shelf === "glass" ? (
-              <motion.div
-                key="panel-glass"
-                role="tabpanel"
-                aria-labelledby="shelf-glass"
-                initial={{ opacity: 0, x: -36, filter: "blur(10px)" }}
-                animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
-                exit={{ opacity: 0, x: 28, filter: "blur(8px)" }}
-                transition={STORE_SHELF_TRANSITION}
-              >
-                {glassProducts.length === 0 ? (
-                  <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-8 text-center text-sm text-white/50">
-                    No hay productos tipo copa en este evento.
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-5">
-                    {groupProductsByCategory(glassProducts, data.productCategories).map((group) => (
-                      <div key={group.id}>
-                        {group.name ? <CategoryHeading>{group.name}</CategoryHeading> : null}
-                        <ul className="grid grid-cols-2 gap-3">
-                          {group.products.map((p) => (
-                            <li key={p.id}>
-                              <ProductShelfRow
-                                name={p.name}
-                                imageUrl={p.imageUrl?.trim() || null}
-                                priceStr={formatMoneyArsExact(p.price)}
-                                disabled={!saleOpen}
-                                count={drinks[p.id] ?? 0}
-                                onAdd={() => {
-                                  const q = drinks[p.id] ?? 0
-                                  setDrinkQty(p.id, Math.min(99, q + 1))
-                                }}
-                                onRemove={() => {
-                                  const q = drinks[p.id] ?? 0
-                                  setDrinkQty(p.id, q - 1)
-                                }}
-                              />
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </motion.div>
-            ) : (
-              <motion.div
-                key="panel-bottle"
-                role="tabpanel"
-                aria-labelledby="shelf-bottle"
-                initial={{ opacity: 0, x: 36, filter: "blur(10px)" }}
-                animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
-                exit={{ opacity: 0, x: -28, filter: "blur(8px)" }}
-                transition={STORE_SHELF_TRANSITION}
-              >
-                {bottleProducts.length === 0 ? (
-                  <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-8 text-center text-sm text-white/50">
-                    No hay productos tipo botella en este evento.
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-5">
-                    {groupProductsByCategory(bottleProducts, data.productCategories).map((group) => (
-                      <div key={group.id}>
-                        {group.name ? <CategoryHeading>{group.name}</CategoryHeading> : null}
-                        <ul className="grid grid-cols-2 gap-3">
-                          {group.products.map((p) => (
-                            <li key={p.id}>
-                              <ProductShelfRow
-                                name={p.name}
-                                imageUrl={p.imageUrl?.trim() || null}
-                                priceStr={formatMoneyArsExact(p.price)}
-                                disabled={!saleOpen}
-                                count={drinks[p.id] ?? 0}
-                                onAdd={() => {
-                                  const q = drinks[p.id] ?? 0
-                                  setDrinkQty(p.id, Math.min(99, q + 1))
-                                }}
-                                onRemove={() => {
-                                  const q = drinks[p.id] ?? 0
-                                  setDrinkQty(p.id, q - 1)
-                                }}
-                              />
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-      </div>
-    </motion.div>
-  )
-}
-
-function ConsumosShelfRail({
-  shelf,
-  onShelf,
-  cartUnitCount,
-  onBack,
-}: {
-  shelf: StoreShelf | null
-  onShelf: (s: StoreShelf) => void
-  cartUnitCount: number
-  onBack: () => void
-}) {
-  return (
-    <>
-      <nav
-        className="pointer-events-auto fixed left-0 top-[max(1rem,env(safe-area-inset-top))] z-40 rounded-r-[1.15rem] border border-l-0 border-white/[0.12] bg-zinc-950/[0.96] py-1 pr-1 shadow-[14px_0_44px_-10px_rgba(0,0,0,0.88)] backdrop-blur-xl"
-        aria-label="Volver"
+      <div
+        ref={scrollRootRef}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-40 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        <ShelfRailButton
-          id="shelf-back"
-          label="Volver"
-          active={false}
-          onClick={() => onBack()}
-          dockEdge="left"
-        >
-          <ChevronLeft className="size-[1.35rem]" strokeWidth={2} aria-hidden />
-        </ShelfRailButton>
-      </nav>
-
-      <AnimatePresence initial={false}>
-        {shelf === null ? (
-          <motion.h2
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.24 }}
-            className="pointer-events-none fixed inset-x-0 top-[calc(50%-9rem)] z-40 px-6 text-center text-xl font-semibold leading-tight text-white"
-          >
-            <span className="block">Elegí qué consumos</span>
-            <span className="block">querés comprar</span>
-          </motion.h2>
-        ) : null}
-      </AnimatePresence>
-
-      <motion.nav
-        layout
-        initial={false}
-        animate={{ right: shelf === null ? "calc(50% - 6.5rem)" : 0 }}
-        transition={STORE_SHELF_TRANSITION}
-        className={`pointer-events-auto fixed top-1/2 z-40 flex -translate-y-1/2 flex-col gap-px border border-white/[0.12] bg-zinc-950/[0.96] py-1 pl-1 shadow-[-14px_0_44px_-10px_rgba(0,0,0,0.88)] backdrop-blur-xl ${
-          shelf === null ? "w-52 rounded-[1.15rem] pr-1" : "rounded-l-[1.15rem] border-r-0"
-        }`}
-        aria-label="Secciones"
-      >
-        <motion.div layout className="flex flex-col gap-px" transition={STORE_SHELF_TRANSITION}>
-          <ShelfRailButton
-            id="shelf-glass"
-            label="Tragos"
-            active={shelf === "glass"}
-            onClick={() => onShelf("glass")}
-            docked={shelf !== null}
-          >
-            <Wine className="size-[1.35rem]" strokeWidth={2} aria-hidden />
-          </ShelfRailButton>
-          <ShelfRailButton
-            id="shelf-bottle"
-            label="Botellas"
-            active={shelf === "bottle"}
-            onClick={() => onShelf("bottle")}
-            docked={shelf !== null}
-          >
-            <BottleWine className="size-[1.35rem]" strokeWidth={2} aria-hidden />
-          </ShelfRailButton>
-          <ShelfRailButton
-            id="shelf-cart"
-            label="Tus Tickets"
-            active={shelf === "cart"}
-            onClick={() => onShelf("cart")}
-            docked={shelf !== null}
-          >
-            <span className="relative inline-flex">
-              <Ticket className="size-[1.35rem]" strokeWidth={2} aria-hidden />
-              {cartUnitCount > 0 ? (
-                <span className="absolute -right-2 -top-2 flex min-h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold tabular-nums text-black shadow-sm">
-                  {cartUnitCount > 99 ? "99+" : cartUnitCount}
-                </span>
-              ) : null}
-            </span>
-          </ShelfRailButton>
-        </motion.div>
-      </motion.nav>
-    </>
-  )
-}
-
-function ShelfRailButton({
-  id,
-  label,
-  active,
-  onClick,
-  docked = true,
-  dockEdge = "right",
-  children,
-}: {
-  id: string
-  label: string
-  active: boolean
-  onClick: () => void
-  docked?: boolean
-  dockEdge?: "left" | "right"
-  children: ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      id={id}
-      aria-label={label}
-      aria-pressed={active}
-      onClick={onClick}
-      className={`relative flex h-[3.25rem] items-center outline-none transition-all focus-visible:ring-2 focus-visible:ring-white/35 ${docked ? `w-[3.25rem] justify-center ${dockEdge === "left" ? "rounded-r-xl" : "rounded-l-xl"}` : "w-full justify-start gap-3 rounded-xl px-4"} ${active
-        ? "bg-white text-black shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]"
-        : "text-white/72 hover:bg-white/[0.08] hover:text-white"
-        }`}
-    >
-      {children}
-      {!docked ? <span className="text-sm font-semibold">{label}</span> : null}
-    </button>
-  )
-}
-
-function ProductShelfRow({
-  appearance = "minimal",
-  name,
-  imageUrl,
-  priceStr,
-  disabled,
-  count,
-  onAdd,
-  onRemove,
-}: {
-  appearance?: EventAppearance
-  name: string
-  imageUrl?: string | null
-  priceStr: string
-  disabled: boolean
-  count: number
-  onAdd: () => void
-  onRemove: () => void
-}) {
-  const [tapTick, setTapTick] = useState(0)
-  const showPhoto = Boolean(imageUrl)
-
-  const triggerAdd = () => {
-    if (disabled) return
-    onAdd()
-    setTapTick((t) => t + 1)
-  }
-
-  return (
-      <motion.div
-        layout
-        className={`group relative aspect-[4/5] w-full overflow-hidden rounded-2xl border text-left ${
-          appearance === "glass"
-            ? "border-white/[0.14] bg-white/[0.1] shadow-xl shadow-black/30 backdrop-blur-xl"
-            : "border-white/[0.07] bg-zinc-950"
-        } ${disabled ? "opacity-45" : ""}`}
-      >
-        {showPhoto ? (
-        <img
-          src={imageUrl!}
-          alt={name}
-          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-[1.03]"
-          loading="lazy"
-          decoding="async"
-        />
+        {showCart ? (
+          <div className="pt-4">
+            <StoreCartPanel
+              data={data}
+              ticketLines={ticketLines}
+              drinkLines={drinkLines}
+              trimTicket={trimTicket}
+              setDrinkQty={setDrinkQty}
+              drinks={drinks}
+            />
+          </div>
         ) : (
-          <div className={`absolute inset-0 ${appearance === "glass" ? "bg-white/[0.07]" : "bg-[#141414]"}`} />
-        )}
-        {showPhoto ? (
-          <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/95" />
-        ) : null}
-        <motion.button
-          type="button"
-          disabled={disabled}
-          onClick={triggerAdd}
-          whileTap={disabled ? undefined : { scale: 0.985 }}
-          aria-label={`Agregar ${name}`}
-          className="absolute inset-0 z-10 rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/35 disabled:pointer-events-none"
-        />
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-[11] px-3 pt-3 pr-12">
-          <p className="text-[15px] font-semibold leading-tight text-white sm:text-base">{name}</p>
-        </div>
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[11] px-3 pb-3 pr-12">
-          <p className="text-base font-bold tabular-nums text-white/85 sm:text-lg">{priceStr}</p>
-        </div>
-
-        {tapTick > 0 ? (
-          <motion.div
-            key={`flash-${tapTick}`}
-            aria-hidden
-            initial={{ opacity: 0.9 }}
-            animate={{ opacity: 0 }}
-            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-            className="pointer-events-none absolute inset-0 z-30 rounded-2xl ring-[1.5px] ring-inset ring-white/55"
+          <ConsumptionMenu
+            products={products}
+            categories={data.productCategories}
+            quantities={drinks}
+            disabled={!saleOpen}
+            scrollRootRef={scrollRootRef}
+            onAdd={(id) => setDrinkQty(id, Math.min(99, (drinks[id] ?? 0) + 1))}
+            onRemove={(id) => setDrinkQty(id, (drinks[id] ?? 0) - 1)}
           />
-        ) : null}
-
-        <AnimatePresence initial={false}>
-          {count > 0 ? (
-            <motion.div
-              key="qty-controls"
-              initial={{ opacity: 0, scale: 0.55, y: -6 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.55, y: -4 }}
-              transition={{ type: "spring", stiffness: 500, damping: 28 }}
-              className="absolute right-2.5 top-2.5 z-20 flex items-center gap-1.5"
-            >
-              <button
-                type="button"
-                disabled={disabled}
-                onClick={onRemove}
-                aria-label={`Quitar ${name}`}
-                className="flex size-7 items-center justify-center rounded-full bg-black/75 text-white shadow-lg backdrop-blur-sm transition-colors hover:bg-black disabled:pointer-events-none"
-              >
-                <Minus className="size-3.5" strokeWidth={2.5} aria-hidden />
-              </button>
-              <QuantityBadge value={count} size="sm" />
-            </motion.div>
-          ) : (
-            <motion.span
-              key="add-indicator"
-              initial={{ opacity: 0, scale: 0.7 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.7 }}
-              className="pointer-events-none absolute bottom-2.5 right-2.5 z-20 flex size-7 items-center justify-center rounded-full bg-white text-black"
-            >
-              <Plus className="size-3.5" strokeWidth={2.5} aria-hidden />
-            </motion.span>
-          )}
-        </AnimatePresence>
-      </motion.div>
-  )
-}
-
-function QuantityBadge({ value, size = "md" }: { value: number; size?: "sm" | "md" }) {
-  const controls = useAnimationControls()
-  const prevValue = useRef(value)
-  const isSmall = size === "sm"
-
-  useEffect(() => {
-    if (prevValue.current !== value) {
-      controls.start({
-        scale: [1, 1.16, 1],
-        transition: { duration: 0.34, times: [0, 0.42, 1], ease: [0.22, 1, 0.36, 1] },
-      })
-      prevValue.current = value
-    }
-  }, [value, controls])
-
-  return (
-    <motion.div
-      animate={controls}
-      className={`flex items-center justify-center rounded-full bg-white shadow-[0_8px_22px_-8px_rgba(0,0,0,0.75)] ${
-        isSmall ? "h-6 min-w-[1.5rem] px-1.5" : "h-7 min-w-[1.75rem] px-2"
-      }`}
-    >
-      <div className="relative flex h-full items-center overflow-hidden">
-        <AnimatePresence mode="popLayout" initial={false}>
-          <motion.span
-            key={value}
-            initial={{ y: 12, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -12, opacity: 0 }}
-            transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-            className={`block tabular-nums font-bold leading-none text-black ${
-              isSmall ? "text-xs" : "text-sm"
-            }`}
-          >
-            {value}
-          </motion.span>
-        </AnimatePresence>
+        )}
       </div>
     </motion.div>
   )
@@ -1910,98 +1563,49 @@ function MinimalStoreStep({
 }) {
   const products = data.drinkProducts
   const saleOpen = consWindow.open
-  const glassProducts = useMemo(
-    () => products.filter((p) => productSaleType(p) === "GLASS"),
-    [products]
-  )
-  const bottleProducts = useMemo(
-    () => products.filter((p) => productSaleType(p) === "BOTTLE"),
-    [products]
-  )
-  const [shelf, setShelf] = useState<StoreShelf | null>(null)
+  const [showCart, setShowCart] = useState(false)
 
   return (
     <div className="relative flex min-h-dvh flex-col">
-      <div
-        aria-hidden
-        className={`pointer-events-none fixed inset-x-0 top-0 z-10 h-24 bg-gradient-to-b to-transparent ${appearance === "glass" ? "from-black/70" : "from-[#0a0a0a]"}`}
-      />
-      <MinimalShelfRail
-        appearance={appearance}
-        shelf={shelf}
-        onShelf={setShelf}
-        cartCount={cartCount}
-        onBack={onBack}
-      />
-
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-24 pb-40 pr-14 sm:px-6 sm:pr-[4.75rem] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div className="mx-auto w-full max-w-md">
-          {consFrom != null && !saleOpen ? (
-            <p className="mb-5 rounded-2xl bg-white/[0.05] px-4 py-3 text-[13px] text-white/55">
-              Disponible desde el {formatEventDate(consFrom)} · en{" "}
-              <span className="font-semibold tabular-nums text-white">
-                {formatCountdown(consWindow.msLeft)}
-              </span>
-            </p>
-          ) : null}
-
-          <AnimatePresence mode="wait" initial={false}>
-            {shelf === null ? null : shelf === "cart" ? (
-              <motion.div
-                key="m-cart"
-                initial={{ opacity: 0, x: 32 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -24 }}
-                transition={STORE_SHELF_TRANSITION}
-              >
-                <MinimalCartPanel
-                  appearance={appearance}
-                  data={data}
-                  ticketLines={ticketLines}
-                  drinkLines={drinkLines}
-                  trimTicket={trimTicket}
-                  setDrinkQty={setDrinkQty}
-                  drinks={drinks}
-                />
-                {transportSummary}
-              </motion.div>
-            ) : shelf === "glass" ? (
-              <motion.div
-                key="m-glass"
-                initial={{ opacity: 0, x: -32 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 24 }}
-                transition={STORE_SHELF_TRANSITION}
-              >
-                <MinimalProductShelf
-                  appearance={appearance}
-                  groups={groupProductsByCategory(glassProducts, data.productCategories)}
-                  emptyLabel="No hay productos tipo copa en este evento."
-                  drinks={drinks}
-                  setDrinkQty={setDrinkQty}
-                  saleOpen={saleOpen && productsPurchasable}
-                />
-              </motion.div>
-            ) : (
-              <motion.div
-                key="m-bottle"
-                initial={{ opacity: 0, x: 32 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -24 }}
-                transition={STORE_SHELF_TRANSITION}
-              >
-                <MinimalProductShelf
-                  appearance={appearance}
-                  groups={groupProductsByCategory(bottleProducts, data.productCategories)}
-                  emptyLabel="No hay productos tipo botella en este evento."
-                  drinks={drinks}
-                  setDrinkQty={setDrinkQty}
-                  saleOpen={saleOpen && productsPurchasable}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+      <div className="mx-auto w-full max-w-lg flex-1 px-4 pb-40">
+        <StoreTopBar
+          showCart={showCart}
+          cartCount={cartCount}
+          onToggleCart={() => setShowCart((current) => !current)}
+          onBack={onBack}
+        />
+        {consFrom != null && !saleOpen ? (
+          <p className="mb-2 rounded-2xl bg-white/[0.05] px-4 py-3 text-[13px] text-white/55">
+            Disponible desde el {formatEventDate(consFrom)} · en{" "}
+            <span className="font-semibold tabular-nums text-white">
+              {formatCountdown(consWindow.msLeft)}
+            </span>
+          </p>
+        ) : null}
+        {showCart ? (
+          <div className="pt-4">
+            <MinimalCartPanel
+              appearance={appearance}
+              data={data}
+              ticketLines={ticketLines}
+              drinkLines={drinkLines}
+              trimTicket={trimTicket}
+              setDrinkQty={setDrinkQty}
+              drinks={drinks}
+            />
+            {transportSummary}
+          </div>
+        ) : (
+          <ConsumptionMenu
+            products={products}
+            categories={data.productCategories}
+            quantities={drinks}
+            disabled={!saleOpen || !productsPurchasable}
+            navClassName={appearance === "glass" ? "bg-black/80 backdrop-blur-xl" : "bg-[#0a0a0a]"}
+            onAdd={(id) => setDrinkQty(id, Math.min(99, (drinks[id] ?? 0) + 1))}
+            onRemove={(id) => setDrinkQty(id, (drinks[id] ?? 0) - 1)}
+          />
+        )}
       </div>
 
       <MinimalBottomBar appearance={appearance}>
@@ -2014,94 +1618,6 @@ function MinimalStoreStep({
         />
       </MinimalBottomBar>
     </div>
-  )
-}
-
-function MinimalProductShelf({
-  appearance,
-  groups,
-  emptyLabel,
-  drinks,
-  setDrinkQty,
-  saleOpen,
-}: {
-  appearance: EventAppearance
-  groups: ProductCategoryGroup[]
-  emptyLabel: string
-  drinks: Record<string, number>
-  setDrinkQty: (productId: string, next: number) => void
-  saleOpen: boolean
-}) {
-  if (groups.length === 0) {
-    return (
-      <div className={`rounded-2xl px-4 py-8 text-center text-sm text-white/50 ${appearance === "glass" ? "border border-white/[0.1] bg-white/[0.08] backdrop-blur-xl" : "bg-white/[0.04]"}`}>
-        {emptyLabel}
-      </div>
-    )
-  }
-  return (
-    <div className="flex flex-col gap-6">
-      {groups.map((group) => (
-        <div key={group.id}>
-          {group.name ? <CategoryHeading>{group.name}</CategoryHeading> : null}
-          <ul className="grid grid-cols-2 gap-3">
-            {group.products.map((p) => (
-              <li key={p.id}>
-                <MinimalProductCard
-                  appearance={appearance}
-                  name={p.name}
-                  imageUrl={p.imageUrl?.trim() || null}
-                  priceStr={formatMoneyArsExact(p.price)}
-                  disabled={!saleOpen}
-                  count={drinks[p.id] ?? 0}
-                  onAdd={() => {
-                    const q = drinks[p.id] ?? 0
-                    setDrinkQty(p.id, Math.min(99, q + 1))
-                  }}
-                  onRemove={() => {
-                    const q = drinks[p.id] ?? 0
-                    setDrinkQty(p.id, q - 1)
-                  }}
-                />
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function MinimalProductCard({
-  appearance,
-  name,
-  imageUrl,
-  priceStr,
-  disabled,
-  count,
-  onAdd,
-  onRemove,
-}: {
-  appearance: EventAppearance
-  name: string
-  imageUrl?: string | null
-  priceStr: string
-  disabled: boolean
-  count: number
-  onAdd: () => void
-  onRemove: () => void
-}) {
-  return (
-    <ProductShelfRow
-      appearance={appearance}
-      name={name}
-      imageUrl={imageUrl}
-      priceStr={priceStr}
-      disabled={disabled}
-      count={count}
-      onAdd={onAdd}
-      onRemove={onRemove}
-    />
   )
 }
 
@@ -2225,109 +1741,6 @@ function MinimalCartRow({
         </button>
       </div>
     </motion.div>
-  )
-}
-
-function MinimalShelfRail({
-  appearance,
-  shelf,
-  onShelf,
-  cartCount,
-  onBack,
-}: {
-  appearance: EventAppearance
-  shelf: StoreShelf | null
-  onShelf: (s: StoreShelf) => void
-  cartCount: number
-  onBack: () => void
-}) {
-  return (
-    <>
-      <nav
-        className={`fixed left-0 top-[max(1rem,env(safe-area-inset-top))] z-40 rounded-r-2xl py-1 pr-1 shadow-[14px_0_44px_-16px_rgba(0,0,0,0.9)] ${appearance === "glass" ? "border border-l-0 border-white/[0.12] bg-black/35 backdrop-blur-2xl" : "bg-neutral-900"}`}
-        aria-label="Volver"
-      >
-        <MinimalShelfButton label="Volver" active={false} dockEdge="left" onClick={onBack}>
-          <ChevronLeft className="size-[1.35rem]" strokeWidth={2} aria-hidden />
-        </MinimalShelfButton>
-      </nav>
-
-      <AnimatePresence initial={false}>
-        {shelf === null ? (
-          <motion.h2
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.24 }}
-            className="pointer-events-none fixed inset-x-0 top-[calc(50%-9rem)] z-40 px-6 text-center text-xl font-semibold leading-tight text-white"
-          >
-            <span className="block">Elegí qué consumos</span>
-            <span className="block">querés comprar</span>
-          </motion.h2>
-        ) : null}
-      </AnimatePresence>
-
-      <motion.nav
-        layout
-        initial={false}
-        animate={{ right: shelf === null ? "calc(50% - 6.5rem)" : 0 }}
-        transition={STORE_SHELF_TRANSITION}
-        className={`fixed top-1/2 z-40 flex -translate-y-1/2 flex-col gap-px py-1 pl-1 shadow-[-14px_0_44px_-16px_rgba(0,0,0,0.9)] ${
-          appearance === "glass" ? "border border-r-0 border-white/[0.12] bg-black/35 backdrop-blur-2xl" : "bg-neutral-900"
-        } ${
-          shelf === null ? `w-52 rounded-2xl pr-1 ${appearance === "glass" ? "border-r" : ""}` : "rounded-l-2xl"
-        }`}
-        aria-label="Secciones"
-      >
-        <MinimalShelfButton label="Tragos" active={shelf === "glass"} docked={shelf !== null} onClick={() => onShelf("glass")}>
-          <Wine className="size-[1.35rem]" strokeWidth={2} aria-hidden />
-        </MinimalShelfButton>
-        <MinimalShelfButton label="Botellas" active={shelf === "bottle"} docked={shelf !== null} onClick={() => onShelf("bottle")}>
-          <BottleWine className="size-[1.35rem]" strokeWidth={2} aria-hidden />
-        </MinimalShelfButton>
-        <MinimalShelfButton label="Tus Tickets" active={shelf === "cart"} docked={shelf !== null} onClick={() => onShelf("cart")}>
-          <span className="relative inline-flex">
-            <Ticket className="size-[1.35rem]" strokeWidth={2} aria-hidden />
-            {cartCount > 0 ? (
-              <span className="absolute -right-2 -top-2 flex min-h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold tabular-nums text-black shadow-sm">
-                {cartCount > 99 ? "99+" : cartCount}
-              </span>
-            ) : null}
-          </span>
-        </MinimalShelfButton>
-      </motion.nav>
-    </>
-  )
-}
-
-function MinimalShelfButton({
-  label,
-  active,
-  onClick,
-  docked = true,
-  dockEdge = "right",
-  children,
-}: {
-  label: string
-  active: boolean
-  onClick: () => void
-  docked?: boolean
-  dockEdge?: "left" | "right"
-  children: ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      aria-pressed={active}
-      onClick={onClick}
-      className={`relative flex h-[3.25rem] items-center outline-none transition-all focus-visible:ring-2 focus-visible:ring-white/35 ${docked ? `w-[3.25rem] justify-center ${dockEdge === "left" ? "rounded-r-xl" : "rounded-l-xl"}` : "w-full justify-start gap-3 rounded-xl px-4"} ${
-        active ? "bg-white text-black" : "text-white/60 hover:bg-white/[0.08] hover:text-white"
-      }`}
-    >
-      {children}
-      {!docked ? <span className="text-sm font-semibold">{label}</span> : null}
-    </button>
   )
 }
 

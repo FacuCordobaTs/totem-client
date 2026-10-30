@@ -99,7 +99,7 @@ export function CheckoutPage() {
   // Tarea 2.2 — el "Volver" navega a la página del evento por slug (la ruta
   // `/e/:eventId` no existe). Se resuelve al montar con `GET /public/events/:id`.
   const [eventSlug, setEventSlug] = useState<string | null>(null)
-  // `volver` lo manda el link de acceso: el checkout regresa al comprobante invitado, no a la
+  // `volver` lo manda el link de acceso: el checkout regresa a la carta de consumos, no a la
   // tienda de entradas. Sólo se aceptan rutas internas.
   const requestedReturnTo = searchParams.get("volver")
   const safeReturnTo =
