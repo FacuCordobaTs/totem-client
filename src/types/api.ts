@@ -103,7 +103,12 @@ export type PublicEventDetailResponse = {
     designType?: "GLASS" | "MINIMAL"
     ticketsAvailableFrom: Date | string | null
     ticketsSalesClosedAt?: Date | string | null
+    /** @deprecated Reemplazada por los canales de venta de consumos. */
     consumptionsAvailableFrom: Date | string | null
+    /** Venta de consumos desde la página pública del evento. */
+    consumptionsOnPageEnabled?: boolean
+    /** Venta de consumos desde el link de acceso (`/{slug}/acceso`). */
+    consumptionsOnAccessLinkEnabled?: boolean
   }
   ticketTypes: PublicTicketTypeItem[]
   drinkProducts: PublicDrinkProductItem[]

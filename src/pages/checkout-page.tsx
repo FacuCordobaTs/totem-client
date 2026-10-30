@@ -222,6 +222,7 @@ export function CheckoutPage() {
         method: "POST",
         body: JSON.stringify({
           eventId: snapshot.eventId,
+          channel: snapshot.channel ?? "PAGE",
           paymentMethod: method,
           clientTotal: totalStr,
           contact: {

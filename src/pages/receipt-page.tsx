@@ -308,16 +308,15 @@ export function ReceiptPage() {
   const showPaidContent = data != null && (data.sale == null || data.sale.paid)
 
   // La tienda de consumos del evento se carga también sin compra: adentro del evento se puede
-  // comprar aunque el cliente no haya comprado nada antes. Mientras la venta de consumos no abrió
-  // (`consumptionsAvailableFrom` en el futuro; el backend los rechaza igual) no hay catálogo: sin
-  // "Comprar más consumos" ni tienda, el cliente no ve los precios (misma regla que la tienda del
-  // evento en `event-detail-page`).
+  // comprar aunque el cliente no haya comprado nada antes. El comprobante puede venir de
+  // cualquiera de los dos canales, así que alcanza con que uno tenga la venta habilitada.
   useEffect(() => {
     if (!showPaidContent || !data?.event?.id) return
     publicApiFetch<PublicEventDetailResponse>(`/public/events/${data.event.id}`)
       .then((r) => {
-        const opensAt = r.event.consumptionsAvailableFrom
-        const consumptionsOpen = opensAt == null || Date.now() >= new Date(opensAt).getTime()
+        const consumptionsOpen =
+          (r.event.consumptionsOnPageEnabled ?? true) ||
+          (r.event.consumptionsOnAccessLinkEnabled ?? true)
         setAddonProducts(consumptionsOpen ? r.drinkProducts : [])
         setAddonCategories(consumptionsOpen ? (r.productCategories ?? []) : [])
       })

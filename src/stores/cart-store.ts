@@ -42,6 +42,8 @@ export type CartSnapshot = {
   eventId: string
   eventName: string
   productoraName: string
+  /** Canal de compra: condiciona la venta de consumos en el backend. */
+  channel?: "PAGE" | "ACCESS_LINK"
   ticketLines: CartTicketLine[]
   drinkLines: CartDrinkLine[]
   transportLines?: { transportId: string; quantity: number; unitPrice: string; name: string; address: string }[]

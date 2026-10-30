@@ -13,7 +13,6 @@ import {
   shouldResumeReceipt,
   writeGuestCart,
 } from "@/lib/quick-purchase"
-import { useWindowOpen } from "@/lib/use-event-purchase"
 import { useBuyerStore } from "@/stores/buyer-store"
 import { useCartStore } from "@/stores/cart-store"
 import type {
@@ -101,13 +100,13 @@ export function AccessStorePage({ eventIdentifier }: { eventIdentifier?: string 
     }
   }, [eventKey])
 
-  // Mientras la venta de consumos no abrió no hay carta: el cliente no ve los precios y el backend
-  // los rechazaría igual (misma regla que la tienda del evento).
-  const consumptionsWindow = useWindowOpen(detail?.event.consumptionsAvailableFrom ?? null)
+  // La venta de consumos se habilita por canal desde el admin: este link tiene el suyo y el
+  // backend rechaza la compra si está apagado.
+  const consumptionsEnabled = detail?.event.consumptionsOnAccessLinkEnabled ?? true
   const products = useMemo(() => {
     if (!detail) return null
-    return consumptionsWindow.open ? detail.drinkProducts : []
-  }, [detail, consumptionsWindow.open])
+    return consumptionsEnabled ? detail.drinkProducts : []
+  }, [detail, consumptionsEnabled])
 
   const lines = useMemo(
     () =>
@@ -142,6 +141,7 @@ export function AccessStorePage({ eventIdentifier }: { eventIdentifier?: string 
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         eventId: detail.event.id,
+        channel: "ACCESS_LINK",
         paymentMethod: "MERCADOPAGO",
         clientTotal: total,
         contact: { name: identity.name, dni: identity.dni, email: "", phone: "" },
@@ -178,6 +178,7 @@ export function AccessStorePage({ eventIdentifier }: { eventIdentifier?: string 
       eventId: detail.event.id,
       eventName: detail.event.name,
       productoraName: detail.productora.name,
+      channel: "ACCESS_LINK",
       ticketLines: [],
       drinkLines: lines,
     })

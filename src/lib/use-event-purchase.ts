@@ -110,9 +110,11 @@ export function useEventPurchase(eventSlug?: string) {
   const [minimalStep, setMinimalStep] = useState<MinimalStep>(() => savedProgress?.minimalStep ?? "cover")
 
   const ticketsFrom = data?.event.ticketsAvailableFrom ?? null
-  const consFrom = data?.event.consumptionsAvailableFrom ?? null
   const ticketsWindow = useWindowOpen(ticketsFrom, data?.event.ticketsSalesClosedAt ?? null)
-  const consWindow = useWindowOpen(consFrom)
+  // Los consumos ya no se programan por fecha: se habilitan por canal desde el admin.
+  const consumptionsOnPage = data?.event.consumptionsOnPageEnabled ?? true
+  const consFrom = null
+  const consWindow = { open: !!data && consumptionsOnPage, msLeft: 0, closed: false }
 
   const load = useCallback(() => {
     if (!slug) return
@@ -138,7 +140,8 @@ export function useEventPurchase(eventSlug?: string) {
   }, [load])
 
   const hasTicketCatalog = (data?.ticketTypes.length ?? 0) > 0
-  const hasProductCatalog = (data?.drinkProducts.length ?? 0) > 0
+  const hasProductCatalog =
+    consumptionsOnPage && (data?.drinkProducts.length ?? 0) > 0
 
   const workflow: PurchaseWorkflow | null = hasTicketCatalog ? "tickets" : hasProductCatalog ? "products" : null
 
@@ -215,6 +218,7 @@ export function useEventPurchase(eventSlug?: string) {
       eventId: data.event.id,
       eventName: data.event.name,
       productoraName: data.productora.name,
+      channel: "PAGE" as const,
       ticketLines,
       drinkLines,
       transportLines,
