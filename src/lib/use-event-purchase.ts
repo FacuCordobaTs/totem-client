@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { useNavigate, useParams, useSearchParams } from "react-router"
+import { useParams, useSearchParams } from "react-router"
 import { ApiError, publicApiFetch } from "@/lib/api"
 import type {
   PublicDrinkProductItem,
@@ -14,6 +14,7 @@ import {
   type CartDrinkLine,
   type CartTicketLine,
 } from "@/stores/cart-store"
+import { useBuyerStore } from "@/stores/buyer-store"
 
 /**
  * Lógica de compra de la página pública del evento: carga, ventanas de venta, entradas,
@@ -90,12 +91,14 @@ export function useWindowOpen(
 export function useEventPurchase(eventSlug?: string) {
   const { slug: routeSlug } = useParams<{ slug: string }>()
   const slug = eventSlug ?? routeSlug
-  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const setCart = useCartStore((s) => s.setCart)
+  const requestIdentity = useBuyerStore((s) => s.requestIdentity)
   // `promotor` viaja en el enlace que comparte cada promotor. También soportamos
   // `promoter` para no romper links que se hayan armado antes del nombre en español.
   const promoterId = searchParams.get("promotor") ?? searchParams.get("promoter") ?? undefined
+  // El link de acceso (`/{slug}/acceso`) manda acá para armar el carrito de consumos sin cuenta.
+  const wantsConsumosStore = searchParams.get("tienda") === "consumos"
 
   const [data, setData] = useState<PublicEventDetailResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -119,6 +122,17 @@ export function useEventPurchase(eventSlug?: string) {
       .then((r) => {
         const saved = restoreSession ? readSavedProgress(slug) : null
         setData(r)
+        if (wantsConsumosStore) {
+          // Llegó por "Comprar consumos" del link de acceso: abre la tienda directo, sin cuenta y
+          // sin restaurar una selección vieja.
+          setTicketQtys({})
+          setDrinks({})
+          setTransportQtys({})
+          setPurchaseOpen(true)
+          setCommerceSurface("store")
+          setMinimalStep("store")
+          return
+        }
         setTicketQtys(saved?.ticketQtys ?? {})
         setDrinks(saved?.drinks ?? {})
         setTransportQtys(saved?.transportQtys ?? {})
@@ -130,7 +144,7 @@ export function useEventPurchase(eventSlug?: string) {
         const detail = err instanceof ApiError ? err.message : err instanceof Error ? err.message : ""
         setError(detail ? `No pudimos cargar el evento. ${detail}` : "No pudimos cargar el evento.")
       })
-  }, [slug, restoreSession])
+  }, [slug, restoreSession, wantsConsumosStore])
 
   useEffect(() => {
     load()
@@ -258,7 +272,9 @@ export function useEventPurchase(eventSlug?: string) {
     if (!cartPreview || !canContinue) return
     setCart(cartPreview)
     const promoterQuery = promoterId ? `?promotor=${encodeURIComponent(promoterId)}` : ""
-    navigate(`/checkout/${data!.event.id}${promoterQuery}`)
+    // Compra sin cuenta: el drawer global pide nombre y DNI (o los confirma si ya compró antes)
+    // y recién ahí navega al checkout.
+    requestIdentity(`/checkout/${data!.event.id}${promoterQuery}`)
   }
 
   const anyTicketPurchasable =
@@ -294,6 +310,7 @@ export function useEventPurchase(eventSlug?: string) {
     data,
     error,
     restoreSession,
+    wantsConsumosStore,
     purchaseOpen,
     setPurchaseOpen,
     commerceSurface,

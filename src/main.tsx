@@ -17,6 +17,7 @@ import { EventAccessPage } from "@/pages/event-access-page"
 import { CustomerProfilePage } from "@/pages/customer-profile-page"
 import { TransportDriverPage } from "@/pages/transport-driver-page"
 import { AppShell } from "@/components/app-shell"
+import { CheckoutIdentitySheet } from "@/components/checkout-identity-sheet"
 
 import { getEventSite } from "@/event-sites/registry"
 import { eventSlugFromHostname } from "@/lib/event-domain"
@@ -36,6 +37,8 @@ function EventSiteHome() {
   return (
     <Suspense fallback={<div role="status" aria-label="Cargando página" style={{ minHeight: "100dvh", background: siteBackground }} />}>
       <Page />
+      {/* Las páginas propias se renderizan fuera de AppShell: el drawer de identidad se monta acá. */}
+      <CheckoutIdentitySheet />
     </Suspense>
   )
 }

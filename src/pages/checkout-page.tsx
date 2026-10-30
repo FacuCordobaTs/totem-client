@@ -29,6 +29,7 @@ import {
   useCartStore,
   type CartSnapshot,
 } from "@/stores/cart-store"
+import { isValidBuyerIdentity, useBuyerStore } from "@/stores/buyer-store"
 import { formatMoneyArsExact } from "@/lib/format"
 import Decimal from "decimal.js"
 
@@ -67,18 +68,6 @@ function clearEventProgress(eventId: string | undefined, slug: string | null) {
   } catch { /* noop */ }
 }
 
-// Teléfonos argentinos: el prefijo +54 se agrega automáticamente. Los dígitos
-// se normalizan (se descarta un "54" o "0" inicial ya incluido) y se recortan a
-// 10, que es el largo de un número local.
-function normalizeArPhone(raw: string): string {
-  const digits = raw.replace(/\D/g, "")
-  let local = digits
-  if (local.startsWith("54")) local = local.slice(2)
-  else if (local.startsWith("0")) local = local.slice(1)
-  local = local.slice(0, 10)
-  return local ? `+54${local}` : ""
-}
-
 export function CheckoutPage() {
   const { eventId } = useParams<{ eventId: string }>()
   const navigate = useNavigate()
@@ -87,13 +76,18 @@ export function CheckoutPage() {
   const cart = useCartStore((s) => s.cart)
   const hydrated = useCartStore((s) => s._hydrated)
   const clearCart = useCartStore((s) => s.clearCart)
+  const storedName = useBuyerStore((s) => s.name)
+  const storedDni = useBuyerStore((s) => s.dni)
+  const setIdentity = useBuyerStore((s) => s.setIdentity)
 
-  const [step, setStep] = useState<Step>("contact")
+  // El drawer de la tienda ya pidió nombre y DNI: con identidad completa se arranca directo en el
+  // método de pago. Si alguien entra al checkout con un carrito viejo, el paso "Datos" los pide.
+  const [step, setStep] = useState<Step>(() =>
+    isValidBuyerIdentity(storedName, storedDni) ? "method" : "contact"
+  )
   const [method, setMethod] = useState<Method>("TRANSFER")
-  const [name, setName] = useState("")
-  const [dni, setDni] = useState("")
-  const [email, setEmail] = useState("")
-  const [phone, setPhone] = useState("")
+  const [name, setName] = useState(storedName)
+  const [dni, setDni] = useState(storedDni)
   const [submitting, setSubmitting] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [result, setResult] = useState<GuestCheckoutResponse | null>(null)
@@ -141,12 +135,9 @@ export function CheckoutPage() {
     [snapshot]
   )
 
-  // Tarea 2.1 — el DNI es requerido y numérico: es la identidad del comprador en la puerta.
+  // La identidad del comprador en la puerta es el DNI; el nombre lo acompaña.
   const dniValid = /^\d{6,9}$/.test(dni.trim())
-  // Teléfono: número local argentino (8 a 10 dígitos, sin contar el +54).
-  const phoneDigits = phone.replace(/\D/g, "").replace(/^54/, "")
-  const contactValid =
-    name.trim().length >= 2 && dniValid && email.includes("@") && phoneDigits.length >= 8
+  const contactValid = name.trim().length >= 2 && dniValid
 
   const goToEventPage = () => {
     // Volver desde el checkout restaura la parte de consumos del evento.
@@ -165,6 +156,7 @@ export function CheckoutPage() {
 
   const goToMethod = () => {
     if (!contactValid) return
+    setIdentity({ name, dni })
     setErr(null)
     setStep("method")
   }
@@ -221,8 +213,10 @@ export function CheckoutPage() {
           contact: {
             name: name.trim(),
             dni: dni.trim(),
-            email: email.trim(),
-            phone: phone.trim(),
+            // Sin cuenta no se pide email ni teléfono: el comprobante queda en pantalla y el
+            // cliente puede volver a entrar con su DNI desde el link de acceso.
+            email: "",
+            phone: "",
           },
           transportLines: (snapshot.transportLines ?? []).map((l) => ({ transportId: l.transportId, quantity: l.quantity })),
           ticketLines: snapshot.ticketLines.map((l) => ({
@@ -325,12 +319,8 @@ export function CheckoutPage() {
               <ContactStep
                 name={name}
                 dni={dni}
-                email={email}
-                phone={phone}
                 setName={setName}
                 setDni={setDni}
-                setEmail={setEmail}
-                setPhone={setPhone}
                 canContinue={contactValid}
                 onContinue={goToMethod}
               />
@@ -352,6 +342,9 @@ export function CheckoutPage() {
                 balanceAmount={balanceAmount}
                 balanceAvailable={balanceAvailable}
                 paymentMethods={paymentMethods}
+                buyerName={name}
+                buyerDni={dni}
+                onEditIdentity={() => setStep("contact")}
               />
             </motion.div>
           ) : (
@@ -461,23 +454,15 @@ function ProgressStepper({ step }: { step: Step }) {
 function ContactStep({
   name,
   dni,
-  email,
-  phone,
   setName,
   setDni,
-  setEmail,
-  setPhone,
   canContinue,
   onContinue,
 }: {
   name: string
   dni: string
-  email: string
-  phone: string
   setName: (v: string) => void
   setDni: (v: string) => void
-  setEmail: (v: string) => void
-  setPhone: (v: string) => void
   canContinue: boolean
   onContinue: () => void
 }) {
@@ -488,14 +473,14 @@ function ContactStep({
           Tus datos
         </h1>
         <p className="text-sm leading-relaxed text-white/55">
-          Te avisamos por email cuando se acredite el pago.
+          Sólo tu nombre y DNI: con eso te identificamos en el evento.
         </p>
       </div>
 
       <div className="flex flex-col gap-10">
         <FloatingField
           id="co-name"
-          label="Nombre"
+          label="Nombre y apellido"
           value={name}
           onChange={setName}
           autoComplete="name"
@@ -504,28 +489,9 @@ function ContactStep({
           id="co-dni"
           label="DNI"
           value={dni}
-          onChange={setDni}
+          onChange={(v) => setDni(v.replace(/\D/g, "").slice(0, 9))}
           inputMode="numeric"
           autoComplete="off"
-        />
-        <FloatingField
-          id="co-email"
-          label="Email"
-          value={email}
-          onChange={setEmail}
-          type="email"
-          inputMode="email"
-          autoComplete="email"
-        />
-        <FloatingField
-          id="co-phone"
-          label="Teléfono"
-          value={phone}
-          onChange={(v) => setPhone(normalizeArPhone(v))}
-          prefix="+54"
-          type="tel"
-          inputMode="tel"
-          autoComplete="tel"
         />
       </div>
 
@@ -550,7 +516,6 @@ function FloatingField({
   type = "text",
   autoComplete,
   inputMode,
-  prefix,
 }: {
   id: string
   label: string
@@ -559,10 +524,7 @@ function FloatingField({
   type?: string
   autoComplete?: string
   inputMode?: "text" | "email" | "tel" | "numeric"
-  prefix?: string
 }) {
-  const displayedValue = prefix && value.startsWith(prefix) ? value.slice(prefix.length) : value
-
   return (
     <div>
       <label
@@ -572,13 +534,10 @@ function FloatingField({
         {label}
       </label>
       <div className="mt-3 flex items-center border-b border-white/[0.12] transition-colors focus-within:border-white">
-        {prefix ? (
-          <span className="shrink-0 py-3 text-xl font-medium text-white/40">{prefix}</span>
-        ) : null}
         <input
           id={id}
           type={type}
-          value={displayedValue}
+          value={value}
           onChange={(e) => onChange(e.target.value)}
           inputMode={inputMode}
           autoComplete={autoComplete}
@@ -598,6 +557,9 @@ function MethodStep({
   balanceAmount,
   balanceAvailable,
   paymentMethods,
+  buyerName,
+  buyerDni,
+  onEditIdentity,
 }: {
   method: Method
   setMethod: (m: Method) => void
@@ -607,6 +569,9 @@ function MethodStep({
   balanceAmount: string
   balanceAvailable: boolean
   paymentMethods: PaymentMethods | null
+  buyerName: string
+  buyerDni: string
+  onEditIdentity: () => void
 }) {
   const availableMethods = [
     ...(balanceAvailable ? (["SALDO"] as const) : []),
@@ -635,6 +600,20 @@ function MethodStep({
         <h1 className="text-3xl font-black leading-[1.05] tracking-tight text-white sm:text-[2.25rem]">
           ¿Cómo querés pagar?
         </h1>
+      </div>
+
+      <div className="flex items-center justify-between gap-4 text-sm">
+        <p className="min-w-0 truncate text-white/55">
+          Comprando como <span className="font-semibold text-white">{buyerName}</span>
+          <span className="text-white/35"> · DNI {buyerDni}</span>
+        </p>
+        <button
+          type="button"
+          onClick={onEditIdentity}
+          className="shrink-0 text-xs font-semibold text-white/45 underline underline-offset-4 transition-colors hover:text-white/70"
+        >
+          Cambiar
+        </button>
       </div>
 
       <div className="flex flex-col gap-3" role="radiogroup" aria-label="Medio de pago">
@@ -826,7 +805,7 @@ function PayTransferView({ amount, alias }: { amount: string; alias: string }) {
       </motion.button>
 
       <p className="mt-10 max-w-[280px] text-xs leading-relaxed text-white/40">
-        Cuando acreditemos el pago te lo confirmamos por email.
+        Cuando acreditemos el pago, el comprobante se actualiza solo.
       </p>
     </div>
   )

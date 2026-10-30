@@ -23,12 +23,12 @@ export function AppleSheet({
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay
-          className="fixed inset-0 z-50 bg-black/45 backdrop-blur-sm data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0"
+          className="fixed inset-0 z-[120] bg-black/45 backdrop-blur-sm data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0"
           style={{ animationDuration: "200ms" }}
         />
         <Dialog.Content
           className={cn(
-            "fixed inset-x-0 bottom-0 z-50 flex max-h-[88vh] flex-col rounded-t-2xl border-t border-zinc-200/50 bg-white outline-none dark:border-zinc-800/50 dark:bg-[#1C1C1E]",
+            "fixed inset-x-0 bottom-0 z-[120] flex max-h-[88vh] flex-col rounded-t-2xl border-t border-zinc-200/50 bg-white outline-none dark:border-zinc-800/50 dark:bg-[#1C1C1E]",
             "data-[state=closed]:animate-out data-[state=closed]:slide-out-to-bottom data-[state=open]:animate-in data-[state=open]:slide-in-from-bottom",
             className
           )}

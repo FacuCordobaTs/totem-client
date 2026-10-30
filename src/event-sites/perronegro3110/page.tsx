@@ -47,6 +47,7 @@ export default function PerroNegroPage() {
     data,
     error,
     restoreSession,
+    wantsConsumosStore,
     ticketQtys,
     drinks,
     minimalStep,
@@ -75,7 +76,7 @@ export default function PerroNegroPage() {
     anythingPurchasable,
   } = purchase
   const reduceMotion = useReducedMotion()
-  const [introDone, setIntroDone] = useState(() => restoreSession || !!reduceMotion)
+  const [introDone, setIntroDone] = useState(() => restoreSession || wantsConsumosStore || !!reduceMotion)
   const [choosingTransport, setChoosingTransport] = useState(false)
   const ticketsRef = useRef<HTMLElement | null>(null)
   const heroRef = useRef<HTMLElement | null>(null)
