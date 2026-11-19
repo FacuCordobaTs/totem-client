@@ -14,8 +14,8 @@ const EVENT_IDENTIFIER = getEventSite("grinch")?.eventIdentifier
 const EASE: Transition["ease"] = [0.22, 1, 0.36, 1]
 
 /**
- * Página propia de GRINCH (grinch.crow.ar). Intro: una guirnalda de luces de navidad que se apaga
- * de a una y en la oscuridad se enciende el GRINCH en verde. Después, el flyer de fondo y las
+ * Página propia de GRINCH (grinch.crow.ar). Intro: una guirnalda de luces de navidad que se enciende
+ * de a una, parpadea dos veces, se apaga y en la oscuridad se enciende el GRINCH en verde. Después, el flyer de fondo y las
  * entradas adelante. La compra es la de la tienda de Crow (`useEventPurchase`).
  */
 export default function GrinchPage() {
@@ -310,9 +310,10 @@ const WIRE_PATH = (() => {
 
 type IntroPhase = "on" | "off" | "grinch"
 
-// Encendido → se apagan de a una (de derecha a izquierda) → oscuridad → GRINCH en verde.
+// Se encienden en orden → todas parpadean dos veces a la vez y se apagan → oscuridad → GRINCH en verde.
 const T_OFF = 1350
-const T_GRINCH = T_OFF + BULBS.length * 95 + 650
+const T_BLINK = 0.7
+const T_GRINCH = T_OFF + T_BLINK * 1000 + 500
 const T_OUT = T_GRINCH + 1250
 
 function Intro({ onDone }: { onDone: () => void }) {
@@ -359,8 +360,6 @@ function Intro({ onDone }: { onDone: () => void }) {
         </defs>
         <path d={WIRE_PATH} className="gr-intro__wire" />
         {BULBS.map((b, i) => {
-          // Se apagan de derecha a izquierda, con un parpadeo antes de morir.
-          const offDelay = (BULBS.length - 1 - i) * 0.095
           return (
             <g key={i} transform={`translate(${b.x} ${b.y}) rotate(${b.tilt})`}>
               <rect x={-2.4} y={0} width={4.8} height={5} rx={1} className="gr-intro__socket" />
@@ -370,12 +369,12 @@ function Intro({ onDone }: { onDone: () => void }) {
                 animate={
                   lightsOn
                     ? { opacity: [0, 1, 0.75, 1] }
-                    : { opacity: [1, 0.15, 0.85, 0] }
+                    : { opacity: [1, 0.08, 1, 0.08, 1, 0] }
                 }
                 transition={
                   lightsOn
                     ? { duration: 0.7, delay: 0.15 + i * 0.07, times: [0, 0.4, 0.7, 1] }
-                    : { duration: 0.32, delay: offDelay, times: [0, 0.3, 0.55, 1] }
+                    : { duration: T_BLINK, ease: "linear", times: [0, 0.14, 0.3, 0.44, 0.6, 1] }
                 }
               >
                 <circle cx={0} cy={11} r={26} fill={`url(#gr-glow-${b.color.slice(1)})`} />
