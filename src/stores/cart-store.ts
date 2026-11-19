@@ -1,35 +1,29 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 import Decimal from "decimal.js"
+import { quoteTicketLine, type TicketLineQuote, type TicketPricingRules } from "@/lib/ticket-pricing"
 
 Decimal.set({ precision: 28, rounding: Decimal.ROUND_HALF_UP })
 
-export type CartTicketLine = {
+/** La línea lleva la oferta del tipo (promo o descuento por cantidad); el backend revalida el total. */
+export type CartTicketLine = TicketPricingRules & {
   ticketTypeId: string
   quantity: number
   /** Precio unitario autoritativo del último fetch del evento (string decimal). */
   unitPrice: string
-  /** Promo "llevás X, pagás Y" del tipo (2x1 = 2/1); el backend revalida el total. */
-  promoBuy?: number | null
-  promoPay?: number | null
 }
 
-/** Unidades que se cobran por `quantity` entradas con la promo del tipo. */
-export function ticketPaidUnits(
-  promo: { promoBuy?: number | null; promoPay?: number | null },
-  quantity: number
-): number {
-  const { promoBuy, promoPay } = promo
-  if (!promoBuy || !promoPay || promoBuy < 2 || promoPay < 1 || promoPay >= promoBuy) return quantity
-  return Math.floor(quantity / promoBuy) * promoPay + (quantity % promoBuy)
-}
-
-export function ticketPromoLabel(promo: { promoBuy?: number | null; promoPay?: number | null }): string | null {
-  return ticketPaidUnits(promo, promo.promoBuy ?? 0) < (promo.promoBuy ?? 0) ? `${promo.promoBuy}x${promo.promoPay} (llevás ${promo.promoBuy}, pagás ${promo.promoPay})` : null
+export function ticketLineQuote(line: CartTicketLine): TicketLineQuote {
+  return quoteTicketLine(line, line.unitPrice, line.quantity)
 }
 
 export function ticketLineSubtotal(line: CartTicketLine): Decimal {
-  return new Decimal(line.unitPrice).mul(ticketPaidUnits(line, line.quantity))
+  return ticketLineQuote(line).total
+}
+
+/** Ahorro total de las entradas del carrito por promos y descuentos por cantidad. */
+export function computeCartTicketSavings(cart: Pick<CartSnapshot, "ticketLines">): Decimal {
+  return cart.ticketLines.reduce((sum, line) => sum.add(ticketLineQuote(line).discount), new Decimal(0))
 }
 
 export type CartDrinkLine = {

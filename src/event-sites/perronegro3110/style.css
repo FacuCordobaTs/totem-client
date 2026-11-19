@@ -415,6 +415,8 @@
 }
 .pn-ticket__window { font-size: 12px; font-style: italic; opacity: 0.75; }
 .pn-ticket__price { font-size: clamp(1rem, 3vw, 1.35rem); font-weight: 700; }
+.pn-ticket__offer { font-size: 12px; line-height: 1.35; opacity: 0.85; }
+.pn-ticket__offer strong { font-weight: 800; }
 .pn-ticket__qty { display: flex; align-items: center; gap: 4px; padding: 0 14px 0 4px; }
 .pn-qty-btn {
   display: grid;

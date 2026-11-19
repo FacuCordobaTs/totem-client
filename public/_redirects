@@ -4,3 +4,5 @@
 # 302 permite volver a la tienda de Crow sin una redirección permanente en caché.
 /perro-negro-31-10 https://perronegro3110.crow.ar/ 302
 /perro-negro-31-10/ https://perronegro3110.crow.ar/ 302
+/grinch https://grinch.crow.ar/ 302
+/grinch/ https://grinch.crow.ar/ 302

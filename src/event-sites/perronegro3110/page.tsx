@@ -16,6 +16,8 @@ import { TransportPicker } from "@/components/transport-picker"
 import { getEventSite } from "@/event-sites/registry"
 import { formatCountdown, formatEventDate, formatMoneyArsExact } from "@/lib/format"
 import { formatAdmissionWindowShort } from "@/lib/ticket-admission"
+import { describeTicketOffer, type TicketOfferDescription } from "@/lib/ticket-pricing"
+import { ticketLineSubtotal } from "@/stores/cart-store"
 import {
   groupProductsByCategory,
   useEventPurchase,
@@ -233,6 +235,7 @@ export default function PerroNegroPage() {
                         <TicketRow
                           index={i + 1}
                           name={t.name}
+                          offer={describeTicketOffer(t, ticketQtys[t.id] ?? 0)}
                           admissionWindow={formatAdmissionWindowShort(t)}
                           priceStr={formatMoneyArsExact(t.price)}
                           count={ticketQtys[t.id] ?? 0}
@@ -735,6 +738,7 @@ function Venue({
 function TicketRow({
   index,
   name,
+  offer,
   admissionWindow,
   priceStr,
   count,
@@ -744,6 +748,7 @@ function TicketRow({
 }: {
   index: number
   name: string
+  offer: TicketOfferDescription | null
   admissionWindow: string | null
   priceStr: string
   count: number
@@ -768,6 +773,12 @@ function TicketRow({
         <span className="pn-ticket__name">{name}</span>
         {admissionWindow ? <span className="pn-ticket__window">{admissionWindow}</span> : null}
         <span className="pn-ticket__price pn-tabular">{priceStr}</span>
+        {offer ? (
+          <span className="pn-ticket__offer">
+            {offer.headline}
+            {offer.status ? <strong aria-live="polite"> — {offer.status}</strong> : null}
+          </span>
+        ) : null}
       </button>
       <div className="pn-ticket__qty">
         <AnimatePresence initial={false}>
@@ -1072,7 +1083,7 @@ function CartPanel({
               return (
                 <li key={line.ticketTypeId} className="pn-cart__row">
                   <span>{line.quantity} × {name}</span>
-                  <span className="pn-tabular">{sub(line.unitPrice, line.quantity)}</span>
+                  <span className="pn-tabular">{formatMoneyArsExact(ticketLineSubtotal(line).toFixed(2))}</span>
                   <button type="button" className="pn-qty-btn pn-qty-btn--sm" onClick={() => trimTicket(line.ticketTypeId)} aria-label={`Quitar una entrada ${name}`}>−</button>
                 </li>
               )

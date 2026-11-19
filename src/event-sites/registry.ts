@@ -19,6 +19,11 @@ const eventSites: Record<string, EventSite> = {
     Page: lazy(() => import("./perronegro3110/page")),
     loadingBackground: "#d81a0f",
   },
+  grinch: {
+    eventIdentifier: "grinch",
+    Page: lazy(() => import("./grinch/page")),
+    loadingBackground: "#000000",
+  },
 }
 
 export function getEventSite(subdomain: string | null): EventSite | null {

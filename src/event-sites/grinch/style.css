@@ -1,0 +1,516 @@
+@import url("https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&display=swap");
+
+/* GRINCH — grinch.crow.ar. Todo bajo .gr-site para no tocar las pantallas de compra. */
+.gr-site {
+  --gr-green: #adfe01;
+  --gr-green-dim: rgba(173, 254, 1, 0.55);
+  --gr-ink: #000;
+  --gr-paper: #f2f5ec;
+  --gr-mute: rgba(242, 245, 236, 0.55);
+  --gr-line: rgba(242, 245, 236, 0.16);
+  --gr-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  position: relative;
+  min-height: 100dvh;
+  background: var(--gr-ink);
+  color: var(--gr-paper);
+  font-family: "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
+}
+
+.gr-site *,
+.gr-site *::before,
+.gr-site *::after {
+  box-sizing: border-box;
+}
+
+.gr-site ::selection {
+  background: var(--gr-green);
+  color: var(--gr-ink);
+}
+
+.gr-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.gr-tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Fondo: el flyer ─── */
+
+.gr-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  transform-origin: 50% 40%;
+}
+
+/* Mobile: el flyer ocupa el ancho (GRINCH entero) y se funde a negro antes de los logos;
+   las entradas quedan en ese negro. */
+.gr-backdrop__flyer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  object-fit: cover;
+  display: block;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 58%, transparent 86%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 58%, transparent 86%);
+}
+
+.gr-backdrop__shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.6) 0%, rgba(0, 0, 0, 0) 14%);
+}
+
+/* Pantallas anchas: el flyer vertical al centro, a toda la altura, fundido con el negro a los lados. */
+@media (min-width: 820px) {
+  .gr-backdrop__flyer {
+    left: 50%;
+    width: auto;
+    height: 100%;
+    transform: translateX(-50%);
+    -webkit-mask-image:
+      linear-gradient(to bottom, #000 0%, #000 58%, transparent 86%),
+      linear-gradient(to right, transparent 0%, #000 20%, #000 80%, transparent 100%);
+    -webkit-mask-composite: source-in;
+    mask-image:
+      linear-gradient(to bottom, #000 0%, #000 58%, transparent 86%),
+      linear-gradient(to right, transparent 0%, #000 20%, #000 80%, transparent 100%);
+    mask-composite: intersect;
+  }
+}
+
+/* ─── Barra superior ─── */
+
+.gr-top {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: max(18px, env(safe-area-inset-top)) 22px 18px;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.gr-top__date {
+  color: var(--gr-green);
+  font-weight: 600;
+}
+
+.gr-top__link {
+  color: var(--gr-paper);
+  text-decoration: none;
+  opacity: 0.8;
+  transition: opacity 0.2s, color 0.2s;
+}
+
+.gr-top__link:hover,
+.gr-top__link:focus-visible {
+  opacity: 1;
+  color: var(--gr-green);
+}
+
+/* ─── Entradas, adelante del flyer ─── */
+
+.gr-main {
+  position: relative;
+  z-index: 2;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  /* Lugar fijo para la barra de pago: la lista no salta cuando aparece. */
+  padding: 0 22px calc(104px + env(safe-area-inset-bottom));
+}
+
+.gr-tickets {
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
+  padding-top: 52dvh;
+}
+
+.gr-tickets__head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 6px;
+}
+
+.gr-tickets__rule {
+  flex: 1;
+  height: 1px;
+  background: var(--gr-green-dim);
+  transform-origin: left center;
+}
+
+.gr-label {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--gr-green);
+}
+
+.gr-label--dim {
+  color: var(--gr-mute);
+  font-weight: 500;
+  letter-spacing: 0.16em;
+}
+
+.gr-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.gr-ticket {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--gr-line);
+}
+
+.gr-ticket__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.gr-ticket__name {
+  font-size: clamp(30px, 9vw, 40px);
+  font-weight: 700;
+  line-height: 0.95;
+  text-transform: uppercase;
+  letter-spacing: 0.005em;
+  transition: color 0.35s var(--gr-ease);
+  overflow-wrap: anywhere;
+}
+
+.gr-ticket.is-picked .gr-ticket__name {
+  color: var(--gr-green);
+}
+
+.gr-ticket.is-off .gr-ticket__name {
+  color: var(--gr-mute);
+}
+
+.gr-ticket__meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--gr-mute);
+  letter-spacing: 0.02em;
+}
+
+.gr-ticket__tag {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gr-green);
+}
+
+.gr-stepper {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.gr-stepper__pair {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+.gr-stepper__count {
+  min-width: 34px;
+  text-align: center;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--gr-paper);
+}
+
+.gr-step {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--gr-line);
+  background: transparent;
+  color: var(--gr-paper);
+  font: inherit;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.2s, background-color 0.2s, color 0.2s, transform 0.15s;
+}
+
+.gr-step:hover:not(:disabled) {
+  border-color: var(--gr-green);
+}
+
+.gr-step:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+.gr-step--add {
+  border-color: var(--gr-green);
+  color: var(--gr-green);
+}
+
+.gr-ticket.is-picked .gr-step--add {
+  background: var(--gr-green);
+  color: var(--gr-ink);
+}
+
+.gr-step:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  border-color: var(--gr-line);
+  color: var(--gr-mute);
+}
+
+.gr-step:focus-visible,
+.gr-cta:focus-visible,
+.gr-text-link:focus-visible,
+.gr-top__link:focus-visible,
+.gr-intro__skip:focus-visible {
+  outline: 2px solid var(--gr-green);
+  outline-offset: 3px;
+}
+
+.gr-note {
+  margin: 18px 0 4px;
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--gr-mute);
+}
+
+.gr-note strong {
+  color: var(--gr-green);
+  font-weight: 600;
+}
+
+.gr-fine {
+  margin: 18px 0 0;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gr-mute);
+}
+
+.gr-text-link {
+  display: inline-block;
+  margin-top: 16px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gr-green);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+/* ─── Pagar ─── */
+
+.gr-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  padding: 0 16px calc(16px + env(safe-area-inset-bottom));
+  display: flex;
+  justify-content: center;
+}
+
+.gr-bar .gr-cta {
+  max-width: 440px;
+  box-shadow: 0 0 48px rgba(173, 254, 1, 0.25);
+}
+
+.gr-cta {
+  width: 100%;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 24px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--gr-green);
+  color: var(--gr-ink);
+  font: inherit;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: transform 0.15s, opacity 0.2s;
+}
+
+.gr-cta:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.gr-cta:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.gr-cta__total {
+  font-weight: 600;
+}
+
+/* ─── Transporte ─── */
+
+.gr-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.gr-sheet__panel {
+  width: 100%;
+  max-width: 520px;
+  max-height: 88dvh;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px 18px calc(18px + env(safe-area-inset-bottom));
+  background: #0b0d09;
+  border-top: 1px solid var(--gr-green-dim);
+  border-radius: 22px 22px 0 0;
+}
+
+.gr-sheet__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.gr-sheet__head .gr-text-link {
+  margin: 0;
+  color: var(--gr-mute);
+}
+
+.gr-sheet__body {
+  flex: 1;
+  overflow-y: auto;
+  color: var(--gr-paper);
+}
+
+/* ─── Intro: la navidad se apaga ─── */
+
+.gr-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  background: #000;
+  cursor: pointer;
+}
+
+.gr-intro__lights {
+  position: absolute;
+  top: 18%;
+  left: 50%;
+  width: min(118vw, 760px);
+  transform: translateX(-50%);
+  overflow: visible;
+}
+
+.gr-intro__wire {
+  fill: none;
+  stroke: #1d2219;
+  stroke-width: 1.4;
+}
+
+.gr-intro__socket {
+  fill: #2a2f25;
+}
+
+.gr-intro__dead {
+  fill: #141711;
+}
+
+/* Misma posición que el GRINCH del flyer: al irse la intro, uno se funde en el otro. */
+.gr-intro__mark-glow {
+  position: absolute;
+  left: 50%;
+  top: calc(100vw * 16 / 9 * 0.4219);
+  width: 84vw;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 0 28px rgba(173, 254, 1, 0.45));
+}
+
+@media (min-width: 820px) {
+  .gr-intro__mark-glow {
+    top: 42.19dvh;
+    width: calc(100dvh * 9 / 16 * 0.84);
+  }
+}
+
+.gr-wordmark {
+  width: 100%;
+  aspect-ratio: 1200 / 386;
+  background: var(--gr-green);
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+
+.gr-intro__skip {
+  position: absolute;
+  right: 20px;
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  padding: 10px 4px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(242, 245, 236, 0.35);
+  cursor: pointer;
+}

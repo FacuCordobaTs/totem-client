@@ -10,11 +10,11 @@ import type {
 import {
   computeCartTotalString,
   useCartStore,
-  ticketPromoLabel,
   type CartDrinkLine,
   type CartTicketLine,
 } from "@/stores/cart-store"
 import { useBuyerStore } from "@/stores/buyer-store"
+import { ticketQuantityStep } from "@/lib/ticket-pricing"
 
 /**
  * Lógica de compra de la página pública del evento: carga, ventanas de venta, entradas,
@@ -151,7 +151,14 @@ export function useEventPurchase(eventSlug?: string) {
     for (const t of data.ticketTypes) {
       const q = ticketQtys[t.id] ?? 0
       if (q <= 0) continue
-      out.push({ ticketTypeId: t.id, quantity: q, unitPrice: t.price, promoBuy: t.promoBuy, promoPay: t.promoPay })
+      out.push({
+        ticketTypeId: t.id,
+        quantity: q,
+        unitPrice: t.price,
+        promoBuy: t.promoBuy,
+        promoPay: t.promoPay,
+        volumeDiscounts: t.volumeDiscounts,
+      })
     }
     return out
   }, [data, ticketQtys])
@@ -159,7 +166,7 @@ export function useEventPurchase(eventSlug?: string) {
   // Con promo "llevás X, pagás Y" cada click suma/quita un pack de X entradas.
   const ticketStep = (ticketTypeId: string) => {
     const t = data?.ticketTypes.find((x) => x.id === ticketTypeId)
-    return t && ticketPromoLabel(t) ? (t.promoBuy as number) : 1
+    return t ? ticketQuantityStep(t) : 1
   }
 
   const bumpTicket = (ticketTypeId: string) => {

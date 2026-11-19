@@ -1,5 +1,7 @@
 /** Client-side API types (no backend package — deploys standalone). */
 
+import type { VolumeDiscountTier } from "@/lib/ticket-pricing"
+
 export type TicketStatus = "PENDING" | "USED" | "CANCELLED"
 export type ConsumptionStatus = "PENDING" | "REDEEMED" | "CANCELLED"
 /** Tarea 6.1 — SALDO: pago con el saldo cargado del cliente (visión §2.7). */
@@ -28,6 +30,8 @@ export type PublicTicketTypeItem = {
   stockLimit: number | null
   promoBuy?: number | null
   promoPay?: number | null
+  /** Descuentos por cantidad; excluyentes con la promo. Ver `lib/ticket-pricing.ts`. */
+  volumeDiscounts?: VolumeDiscountTier[] | null
   sold: number
   remaining: number | null
   availableForPurchase: boolean

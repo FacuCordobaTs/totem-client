@@ -22,7 +22,8 @@ import { Button } from "@/components/ui/button"
 import { ConsumptionMenu } from "@/components/consumption-menu"
 import { EventMap } from "@/components/event-map"
 import { TransportPicker } from "@/components/transport-picker"
-import { ticketLineSubtotal, ticketPromoLabel, type CartDrinkLine, type CartTicketLine } from "@/stores/cart-store"
+import { ticketLineQuote, type CartDrinkLine, type CartTicketLine } from "@/stores/cart-store"
+import { describeTicketOffer, type TicketOfferDescription } from "@/lib/ticket-pricing"
 import {
   productSaleType,
   useEventPurchase,
@@ -542,7 +543,8 @@ function TicketStep({
             return (
               <li key={t.id}>
                 <TicketPickRow
-                  name={t.isActive === false ? `${t.name} · Venta desactivada` : ticketPromoLabel(t) ? `${t.name} · ${ticketPromoLabel(t)}` : t.name}
+                  name={t.isActive === false ? `${t.name} · Venta desactivada` : t.name}
+                  offer={describeTicketOffer(t, count)}
                   admissionWindow={formatAdmissionWindow(t)}
                   priceStr={formatMoneyArsExact(t.price)}
                   count={count}
@@ -562,6 +564,7 @@ function TicketStep({
 
 function TicketPickRow({
   name,
+  offer,
   admissionWindow,
   priceStr,
   count,
@@ -571,6 +574,7 @@ function TicketPickRow({
   onRemove,
 }: {
   name: string
+  offer: TicketOfferDescription | null
   admissionWindow: string | null
   priceStr: string
   count: number
@@ -634,6 +638,7 @@ function TicketPickRow({
             <span className="text-base font-semibold tabular-nums tracking-tight text-white/85">
               {priceStr}
             </span>
+            <TicketOfferNote offer={offer} />
           </motion.div>
           <span
             className="flex size-10 shrink-0 items-center justify-center text-white"
@@ -841,7 +846,13 @@ function StoreCartPanel({
             {ticketLines.map((line) => {
               const t = data.ticketTypes.find((x) => x.id === line.ticketTypeId)
               const name = t?.name ?? "Entrada"
-              const sub = ticketLineSubtotal(line).toFixed(2)
+              const quote = ticketLineQuote(line)
+              const sub = quote.total.toFixed(2)
+              const saving = quote.volumeTier
+                ? `${quote.volumeTier.percentOff}% off`
+                : quote.discount.gt(0)
+                  ? "Promo aplicada"
+                  : null
               return (
                 <li key={line.ticketTypeId}>
                   <motion.div
@@ -856,6 +867,11 @@ function StoreCartPanel({
                         
                         <div className="min-w-0">
                           <p className="text-sm font-bold text-black">{line.quantity} {name}</p>
+                          {saving ? (
+                            <p className="mt-0.5 text-xs font-semibold text-emerald-700">
+                              {saving} · ahorrás {formatMoneyArsExact(quote.discount.toFixed(2))}
+                            </p>
+                          ) : null}
                         </div>
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
@@ -1480,7 +1496,8 @@ function MinimalCover({
                       >
                         <MinimalTicketRow
                           appearance={appearance}
-                          name={t.isActive === false ? `${t.name} · Venta desactivada` : ticketPromoLabel(t) ? `${t.name} · ${ticketPromoLabel(t)}` : t.name}
+                          name={t.isActive === false ? `${t.name} · Venta desactivada` : t.name}
+                          offer={describeTicketOffer(t, count)}
                           admissionWindow={formatAdmissionWindowShort(t)}
                           priceStr={formatMoneyArsExact(t.price)}
                           count={count}
@@ -1802,6 +1819,7 @@ function MinimalCheckoutRow({
 function MinimalTicketRow({
   appearance,
   name,
+  offer,
   admissionWindow,
   priceStr,
   count,
@@ -1811,6 +1829,7 @@ function MinimalTicketRow({
 }: {
   appearance: EventAppearance
   name: string
+  offer: TicketOfferDescription | null
   admissionWindow: string | null
   priceStr: string
   count: number
@@ -1885,6 +1904,7 @@ function MinimalTicketRow({
           <span className="mt-1 text-[14px] font-semibold tabular-nums text-white/60">
             {priceStr}
           </span>
+          <TicketOfferNote offer={offer} />
         </motion.div>
       </motion.button>
 
@@ -1931,5 +1951,20 @@ function MinimalTicketRow({
         />
       ) : null}
     </motion.div>
+  )
+}
+
+/** Oferta del tipo bajo el precio: la regla siempre visible y, al elegir, cuánto falta o qué se aplicó. */
+function TicketOfferNote({ offer }: { offer: TicketOfferDescription | null }) {
+  if (!offer) return null
+  return (
+    <span className="mt-1 flex flex-col gap-0.5 text-xs leading-snug">
+      <span className="font-medium text-white/55">{offer.headline}</span>
+      {offer.status ? (
+        <span aria-live="polite" className={`font-semibold ${offer.applied ? "text-emerald-300" : "text-amber-200"}`}>
+          {offer.status}
+        </span>
+      ) : null}
+    </span>
   )
 }

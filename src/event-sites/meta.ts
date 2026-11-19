@@ -23,4 +23,12 @@ export const eventSiteMeta: Record<string, EventSiteMeta> = {
     appleTouchIcon: "/sites/perronegro3110/apple-touch-icon.png",
     themeColor: "#d81a0f",
   },
+  grinch: {
+    title: "GRINCH · 24/12 · Qualy Lab",
+    description: "24 de diciembre · Qualy Lab Multiespacio. Permitido el ingreso de bebidas. Entradas.",
+    image: "/sites/grinch/og.jpg",
+    icon: "/sites/grinch/icon.png",
+    appleTouchIcon: "/sites/grinch/apple-touch-icon.png",
+    themeColor: "#000000",
+  },
 }
