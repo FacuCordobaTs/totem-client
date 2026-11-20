@@ -183,6 +183,7 @@
 
 .gr-ticket {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
@@ -231,6 +232,80 @@
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--gr-green);
+}
+
+.gr-ticket__info { flex: 1 1 0; }
+
+/* Descuento por cantidad: barra con un hito por escalón, de ancho completo bajo la fila. */
+.gr-volume {
+  flex-basis: 100%;
+  display: grid;
+  gap: 8px;
+}
+.gr-volume__msg {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--gr-paper);
+}
+.gr-volume.is-applied .gr-volume__msg { color: var(--gr-green); }
+.gr-volume__badge {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--gr-green);
+  color: var(--gr-ink);
+  font-size: 12px;
+  font-weight: 800;
+}
+.gr-volume__track {
+  position: relative;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--gr-line);
+}
+.gr-volume__fill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--gr-green);
+  box-shadow: 0 0 12px var(--gr-green-dim);
+  transform-origin: left;
+  transition: transform 0.45s var(--gr-ease);
+}
+.gr-volume__dot {
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--gr-ink);
+  border: 2px solid var(--gr-mute);
+  transform: translate(-50%, -50%);
+  transition: background 0.3s var(--gr-ease), border-color 0.3s var(--gr-ease);
+}
+.gr-volume__dot.is-reached { background: var(--gr-green); border-color: var(--gr-green); }
+.gr-volume__labels { position: relative; height: 14px; }
+.gr-volume__label {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--gr-mute);
+}
+.gr-volume__label.is-last { transform: translateX(-100%); }
+.gr-volume__label.is-reached { color: var(--gr-green); }
+@media (prefers-reduced-motion: reduce) {
+  .gr-volume__fill, .gr-volume__dot { transition: none; }
 }
 
 .gr-stepper {

@@ -23,7 +23,7 @@ import { ConsumptionMenu } from "@/components/consumption-menu"
 import { EventMap } from "@/components/event-map"
 import { TransportPicker } from "@/components/transport-picker"
 import { ticketLineQuote, type CartDrinkLine, type CartTicketLine } from "@/stores/cart-store"
-import { describeTicketOffer, type TicketOfferDescription } from "@/lib/ticket-pricing"
+import { describeTicketOffer, volumeDiscountProgress, type TicketPricingRules } from "@/lib/ticket-pricing"
 import {
   productSaleType,
   useEventPurchase,
@@ -544,7 +544,7 @@ function TicketStep({
               <li key={t.id}>
                 <TicketPickRow
                   name={t.isActive === false ? `${t.name} · Venta desactivada` : t.name}
-                  offer={describeTicketOffer(t, count)}
+                  pricing={t}
                   admissionWindow={formatAdmissionWindow(t)}
                   priceStr={formatMoneyArsExact(t.price)}
                   count={count}
@@ -564,7 +564,7 @@ function TicketStep({
 
 function TicketPickRow({
   name,
-  offer,
+  pricing,
   admissionWindow,
   priceStr,
   count,
@@ -574,7 +574,7 @@ function TicketPickRow({
   onRemove,
 }: {
   name: string
-  offer: TicketOfferDescription | null
+  pricing: TicketPricingRules
   admissionWindow: string | null
   priceStr: string
   count: number
@@ -638,7 +638,7 @@ function TicketPickRow({
             <span className="text-base font-semibold tabular-nums tracking-tight text-white/85">
               {priceStr}
             </span>
-            <TicketOfferNote offer={offer} />
+            <TicketOfferNote pricing={pricing} count={count} />
           </motion.div>
           <span
             className="flex size-10 shrink-0 items-center justify-center text-white"
@@ -1497,7 +1497,7 @@ function MinimalCover({
                         <MinimalTicketRow
                           appearance={appearance}
                           name={t.isActive === false ? `${t.name} · Venta desactivada` : t.name}
-                          offer={describeTicketOffer(t, count)}
+                          pricing={t}
                           admissionWindow={formatAdmissionWindowShort(t)}
                           priceStr={formatMoneyArsExact(t.price)}
                           count={count}
@@ -1819,7 +1819,7 @@ function MinimalCheckoutRow({
 function MinimalTicketRow({
   appearance,
   name,
-  offer,
+  pricing,
   admissionWindow,
   priceStr,
   count,
@@ -1829,7 +1829,7 @@ function MinimalTicketRow({
 }: {
   appearance: EventAppearance
   name: string
-  offer: TicketOfferDescription | null
+  pricing: TicketPricingRules
   admissionWindow: string | null
   priceStr: string
   count: number
@@ -1904,7 +1904,7 @@ function MinimalTicketRow({
           <span className="mt-1 text-[14px] font-semibold tabular-nums text-white/60">
             {priceStr}
           </span>
-          <TicketOfferNote offer={offer} />
+          <TicketOfferNote pricing={pricing} count={count} />
         </motion.div>
       </motion.button>
 
@@ -1954,17 +1954,62 @@ function MinimalTicketRow({
   )
 }
 
-/** Oferta del tipo bajo el precio: la regla siempre visible y, al elegir, cuánto falta o qué se aplicó. */
-function TicketOfferNote({ offer }: { offer: TicketOfferDescription | null }) {
-  if (!offer) return null
+/**
+ * Oferta del tipo bajo el precio. Con descuento por cantidad, una barra muestra cuánto falta
+ * para cada escalón y cuál ya se aplicó; con "llevás X, pagás Y", la regla en texto.
+ */
+function TicketOfferNote({ pricing, count }: { pricing: TicketPricingRules; count: number }) {
+  const progress = volumeDiscountProgress(pricing, count)
+  if (!progress) {
+    const offer = describeTicketOffer(pricing, count)
+    return offer ? <span className="mt-1 text-xs font-medium leading-snug text-white/55">{offer.headline}</span> : null
+  }
   return (
-    <span className="mt-1 flex flex-col gap-0.5 text-xs leading-snug">
-      <span className="font-medium text-white/55">{offer.headline}</span>
-      {offer.status ? (
-        <span aria-live="polite" className={`font-semibold ${offer.applied ? "text-emerald-300" : "text-amber-200"}`}>
-          {offer.status}
+    <span className="mt-2 flex w-full flex-col gap-1.5" aria-live="polite">
+      <span className="flex items-baseline justify-between gap-2 text-xs leading-snug">
+        <span className={progress.current ? "font-semibold text-white" : "font-medium text-white/70"}>
+          {progress.message}
         </span>
-      ) : null}
+        {progress.current ? (
+          <span className="shrink-0 rounded-full bg-emerald-300 px-1.5 py-0.5 text-[10px] font-bold text-black tabular-nums">
+            −{progress.current.percentOff}%
+          </span>
+        ) : null}
+      </span>
+      <span
+        role="progressbar"
+        aria-label="Progreso del descuento por cantidad"
+        aria-valuemin={0}
+        aria-valuemax={progress.milestones[progress.milestones.length - 1].minQuantity}
+        aria-valuenow={count}
+        className="relative block h-1.5 w-full rounded-full bg-white/15"
+      >
+        <motion.span
+          className="absolute inset-y-0 left-0 rounded-full bg-emerald-300"
+          initial={false}
+          animate={{ width: `${progress.fill * 100}%` }}
+          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        />
+        {progress.milestones.map((m) => (
+          <span
+            key={m.minQuantity}
+            aria-hidden
+            className={`absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-neutral-950 transition-colors ${m.reached ? "bg-emerald-300" : "bg-white/40"}`}
+            style={{ left: `${m.position * 100}%` }}
+          />
+        ))}
+      </span>
+      <span className="relative block h-3.5 text-[10px] font-semibold tabular-nums" aria-hidden>
+        {progress.milestones.map((m, i) => (
+          <span
+            key={m.minQuantity}
+            className={`absolute top-0 whitespace-nowrap ${i === progress.milestones.length - 1 ? "-translate-x-full" : "-translate-x-1/2"} ${m.reached ? "text-emerald-300" : "text-white/45"}`}
+            style={{ left: `${m.position * 100}%` }}
+          >
+            {m.minQuantity}+ · {m.percentOff}%
+          </span>
+        ))}
+      </span>
     </span>
   )
 }

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { describeTicketOffer, quoteTicketLine, ticketQuantityStep } from "../src/lib/ticket-pricing"
+import { describeTicketOffer, quoteTicketLine, ticketQuantityStep, volumeDiscountProgress } from "../src/lib/ticket-pricing"
 
 // Mismos casos que backend/src/lib/ticket-pricing.test.ts: el total mostrado debe coincidir
 // centavo a centavo con el que revalida el checkout.
@@ -38,5 +38,19 @@ describe("describeTicketOffer", () => {
     expect(describeTicketOffer(volume, 7)?.status).toBe("10% off aplicado. Sumá 3 más y tenés 15% off")
     expect(describeTicketOffer(volume, 25)).toMatchObject({ status: "20% off aplicado", applied: true })
     expect(describeTicketOffer({}, 3)).toBeNull()
+  })
+})
+
+describe("volumeDiscountProgress", () => {
+  test("invita, empuja y confirma el máximo", () => {
+    expect(volumeDiscountProgress(volume, 0)?.message).toBe("Llevando 5 o más tenés 10% off")
+    expect(volumeDiscountProgress(volume, 7)).toMatchObject({ missing: 3, fill: 0.35, message: "Sumá 3 más y tenés 15% off" })
+    expect(volumeDiscountProgress(volume, 30)).toMatchObject({ fill: 1, next: null, message: "Tenés el máximo descuento: 20% off" })
+    expect(volumeDiscountProgress(volume, 10)?.milestones.map((m) => [m.position, m.reached])).toEqual([
+      [0.25, true],
+      [0.5, true],
+      [1, false],
+    ])
+    expect(volumeDiscountProgress({ promoBuy: 2, promoPay: 1 }, 2)).toBeNull()
   })
 })

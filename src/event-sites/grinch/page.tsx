@@ -4,6 +4,7 @@ import { AnimatePresence, motion, useReducedMotion, type Transition } from "moti
 import { TransportPicker } from "@/components/transport-picker"
 import { getEventSite } from "@/event-sites/registry"
 import { formatCountdown, formatEventDate, formatMenuPrice } from "@/lib/format"
+import { ticketOffer, volumeDiscountProgress, type TicketPricingRules } from "@/lib/ticket-pricing"
 import { useEventPurchase } from "@/lib/use-event-purchase"
 import flyerUrl from "./assets/flyer.webp"
 import wordmarkUrl from "./assets/wordmark.png"
@@ -151,7 +152,8 @@ export default function GrinchPage() {
                     const disabled = !t.availableForPurchase || !ticketsWindow.open
                     const soldOut = t.remaining != null && t.remaining <= 0
                     const fewLeft = !soldOut && t.remaining != null && t.remaining <= 20
-                    const promo = t.promoBuy && t.promoPay ? `${t.promoBuy}x${t.promoPay}` : null
+                    const offer = ticketOffer(t)
+                    const promo = offer.kind === "bundle" ? `${offer.buy}x${offer.pay}` : null
                     return (
                       <motion.li
                         key={t.id}
@@ -194,6 +196,7 @@ export default function GrinchPage() {
                             +
                           </button>
                         </div>
+                        <VolumeDiscountBar pricing={t} count={count} />
                       </motion.li>
                     )
                   })}
@@ -401,5 +404,49 @@ function Intro({ onDone }: { onDone: () => void }) {
 
       <button type="button" className="gr-intro__skip" onClick={onDone}>saltar</button>
     </motion.div>
+  )
+}
+
+/** Escalones de descuento por cantidad del tipo: cuánto falta para el próximo y cuál ya aplica. */
+function VolumeDiscountBar({ pricing, count }: { pricing: TicketPricingRules; count: number }) {
+  const progress = volumeDiscountProgress(pricing, count)
+  if (!progress) return null
+  const last = progress.milestones[progress.milestones.length - 1]
+  return (
+    <div className={`gr-volume${progress.current ? " is-applied" : ""}`} aria-live="polite">
+      <p className="gr-volume__msg">
+        <span>{progress.message}</span>
+        {progress.current ? <span className="gr-volume__badge gr-tabular">−{progress.current.percentOff}%</span> : null}
+      </p>
+      <div
+        className="gr-volume__track"
+        role="progressbar"
+        aria-label="Progreso del descuento por cantidad"
+        aria-valuemin={0}
+        aria-valuemax={last.minQuantity}
+        aria-valuenow={count}
+      >
+        <span className="gr-volume__fill" style={{ transform: `scaleX(${progress.fill})` }} />
+        {progress.milestones.map((m) => (
+          <span
+            key={m.minQuantity}
+            aria-hidden
+            className={`gr-volume__dot${m.reached ? " is-reached" : ""}`}
+            style={{ left: `${m.position * 100}%` }}
+          />
+        ))}
+      </div>
+      <div className="gr-volume__labels" aria-hidden>
+        {progress.milestones.map((m) => (
+          <span
+            key={m.minQuantity}
+            className={`gr-volume__label gr-tabular${m.reached ? " is-reached" : ""}${m === last ? " is-last" : ""}`}
+            style={{ left: `${m.position * 100}%` }}
+          >
+            {m.minQuantity}+ · {m.percentOff}%
+          </span>
+        ))}
+      </div>
+    </div>
   )
 }

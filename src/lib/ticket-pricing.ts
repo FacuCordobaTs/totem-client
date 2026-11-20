@@ -99,3 +99,38 @@ export function describeTicketOffer(rules: TicketPricingRules, quantity: number)
   }
   return { headline, status, applied: current != null }
 }
+
+export type VolumeDiscountProgress = {
+  /** 0–1: avance de la cantidad elegida hasta el último escalón. */
+  fill: number
+  milestones: (VolumeDiscountTier & { position: number; reached: boolean })[]
+  current: VolumeDiscountTier | null
+  next: VolumeDiscountTier | null
+  /** Entradas que faltan para `next` (0 si ya está en el máximo). */
+  missing: number
+  /** Frase lista para mostrar: invita, empuja al próximo escalón o confirma el máximo. */
+  message: string
+}
+
+/** Progreso hacia los escalones de descuento por cantidad; null si el tipo no tiene. */
+export function volumeDiscountProgress(rules: TicketPricingRules, quantity: number): VolumeDiscountProgress | null {
+  const offer = ticketOffer(rules)
+  if (offer.kind !== "volume") return null
+  const tiers = offer.tiers
+  const scale = tiers[tiers.length - 1].minQuantity
+  const current = volumeTierFor(tiers, quantity)
+  const next = tiers.find((t) => t.minQuantity > quantity) ?? null
+  const missing = next ? next.minQuantity - quantity : 0
+  let message: string
+  if (!next) message = `Tenés el máximo descuento: ${current!.percentOff}% off`
+  else if (quantity === 0) message = `Llevando ${next.minQuantity} o más tenés ${next.percentOff}% off`
+  else message = `Sumá ${missing} más y tenés ${next.percentOff}% off`
+  return {
+    fill: Math.min(1, quantity / scale),
+    milestones: tiers.map((t) => ({ ...t, position: t.minQuantity / scale, reached: quantity >= t.minQuantity })),
+    current,
+    next,
+    missing,
+    message,
+  }
+}
